@@ -15,12 +15,15 @@ export class UserRepository implements IUserRepository {
   }
 
   async findById(id: number): Promise<User | null> {
-    const [item] = await this.db.select().from(users).where(eq(users.id, id));
+    const [{ password, ...item }] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
     return (item as unknown as User) || null;
   }
 
   async create(user: User): Promise<User> {
-    const [created] = await this.db
+    const [{ password, ...created }] = await this.db
       .insert(users)
       .values(user as any)
       .returning();
@@ -29,15 +32,16 @@ export class UserRepository implements IUserRepository {
 
   async findAll(): Promise<User[]> {
     const results = await this.db.select().from(users);
-    return results as unknown as User[];
+    return results.map(({ password, ...rest }) => rest) as unknown as User[];
   }
 
   async update(id: number, data: Partial<User>): Promise<User> {
-    const [updated] = await this.db
+    const [{ password, ...updated }] = await this.db
       .update(users)
       .set({ ...data, updatedAt: new Date() } as any)
       .where(eq(users.id, id))
       .returning();
+
     return updated as unknown as User;
   }
 
