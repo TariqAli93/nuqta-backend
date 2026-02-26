@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "test": "vitest",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

@@ -110,7 +110,7 @@ const initializeDatabase = async (): Promise<void> => {
     accountingRepo,
   );
 
-  const now = new Date().toISOString();
+  const now = new Date();
 
   // ========== SETTINGS ==========
   console.log("⚙️  Setting up application settings...");
@@ -232,15 +232,21 @@ const initializeDatabase = async (): Promise<void> => {
     fullName: string;
     role: "admin" | "cashier" | "manager" | "viewer";
     isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
+    createdAt: Date;
+    updatedAt: Date;
   }) {
     const existing = await userRepo.findByUsername(userData.username);
     if (existing) {
       console.log(`   ✓ User '${userData.username}' already exists`);
       return existing;
     }
-    const user = await createUserUseCase.execute(userData);
+    const user = await createUserUseCase.execute({
+      username: userData.username,
+      password: userData.password,
+      fullName: userData.fullName,
+      role: userData.role,
+      isActive: userData.isActive,
+    });
     console.log(`   ✓ Created user '${userData.username}' (${userData.role})`);
     return user;
   }
@@ -317,7 +323,6 @@ const initializeDatabase = async (): Promise<void> => {
       name,
       description,
       isActive: true,
-      createdAt: now,
       createdBy,
     });
   }
@@ -344,7 +349,6 @@ const initializeDatabase = async (): Promise<void> => {
       supplier: data.supplier,
       status: data.status,
       isActive: true,
-      createdAt: now,
       createdBy,
     });
   }
