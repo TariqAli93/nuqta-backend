@@ -21,7 +21,8 @@
     "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P dist/app.js",
     "watch:ts": "tsc -w",
     "start": "pnpm build:ts && fastify start -l info dist/app.js",
-    "test": "pnpm build:ts && tsc -p test/tsconfig.json && c8 node --test -r ts-node/register \"test/**/*.ts\"",
+    "test": "pnpm build && vitest run",
+    "test:watch": "pnpm build && vitest",
     "test:all": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules && rm -rf dist node_modules"
@@ -34,17 +35,14 @@
     "@fastify/sensible": "^6.0.0",
     "@nuqta/core": "workspace:*",
     "@nuqta/data": "workspace:*",
-    "dotenv": "^17.3.1",
     "fastify": "^5.0.0",
     "fastify-cli": "^7.4.1",
     "fastify-plugin": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.8",
-    "c8": "^10.1.2",
     "concurrently": "^9.0.0",
     "fastify-tsconfig": "^3.0.0",
-    "ts-node": "^10.4.0",
     "typescript": "~5.9.2"
   }
 }
