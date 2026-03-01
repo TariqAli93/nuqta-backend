@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const ProductUnitSchema = z.object({
   id: z.number().optional(),
@@ -9,7 +9,7 @@ export const ProductUnitSchema = z.object({
   sellingPrice: z.number().int().nullable().optional(),
   isDefault: z.boolean().default(false),
   isActive: z.boolean().default(true),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export type ProductUnit = z.infer<typeof ProductUnitSchema>;

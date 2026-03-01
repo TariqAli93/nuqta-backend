@@ -229,7 +229,7 @@ export class AdjustProductStockUseCase {
     if (quantityChange < 0 && cogsAcct?.id) {
       await this.accountingRepo.createJournalEntrySync({
         entryNumber: `JE-ADJ-${movementId || Date.now()}`,
-        entryDate: new Date().toISOString(),
+        entryDate: new Date(),
         description: "Inventory shrinkage adjustment",
         sourceType: "adjustment",
         sourceId: movementId,
@@ -256,7 +256,7 @@ export class AdjustProductStockUseCase {
     } else if (quantityChange > 0 && revenueAcct?.id) {
       await this.accountingRepo.createJournalEntrySync({
         entryNumber: `JE-ADJ-${movementId || Date.now()}`,
-        entryDate: new Date().toISOString(),
+        entryDate: new Date(),
         description: "Inventory gain adjustment",
         sourceType: "adjustment",
         sourceId: movementId,

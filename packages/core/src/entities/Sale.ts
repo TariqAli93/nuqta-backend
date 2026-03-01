@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const SaleItemSchema = z.object({
   id: z.number().optional(),
@@ -6,7 +6,7 @@ export const SaleItemSchema = z.object({
   productId: z.number().min(1),
   productName: z.string().min(1),
   quantity: z.number().int().min(1),
-  unitName: z.string().default('piece'),
+  unitName: z.string().default("piece"),
   unitFactor: z.number().int().default(1),
   quantityBase: z.number().int().optional(),
   batchId: z.number().optional(),
@@ -15,7 +15,7 @@ export const SaleItemSchema = z.object({
   subtotal: z.number().int().min(0),
   cogs: z.number().int().optional(),
   weightedAverageCost: z.number().int().optional(),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export const SaleItemDepletionSchema = z.object({
@@ -25,11 +25,11 @@ export const SaleItemDepletionSchema = z.object({
   productId: z.number().min(1),
   batchId: z.number().min(1),
   batchNumber: z.string().optional(),
-  expiryDate: z.string().nullable().optional(),
+  expiryDate: z.union([z.string(), z.date()]).nullable().optional(),
   quantityBase: z.number().int().min(1),
   costPerUnit: z.number().int().min(0),
   totalCost: z.number().int().min(0),
-  createdAt: z.string().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export const SaleItemWithDepletionsSchema = SaleItemSchema.extend({
@@ -44,18 +44,18 @@ export const SaleSchema = z.object({
   discount: z.number().int().default(0),
   tax: z.number().int().default(0),
   total: z.number().int().min(0),
-  currency: z.string().default('IQD'),
+  currency: z.string().default("IQD"),
   exchangeRate: z.number().default(1),
   interestRate: z.number().int().default(0),
   interestAmount: z.number().int().default(0),
-  paymentType: z.enum(['cash', 'credit', 'mixed']).default('cash'),
+  paymentType: z.enum(["cash", "credit", "mixed"]).default("cash"),
   paidAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
-  status: z.enum(['pending', 'completed', 'cancelled']).default('pending'),
+  status: z.enum(["pending", "completed", "cancelled"]).default("pending"),
   notes: z.string().nullable().optional(),
   idempotencyKey: z.string().nullable().optional(),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
   // Relations
   items: z.array(SaleItemWithDepletionsSchema).optional(),
@@ -67,5 +67,7 @@ export const SaleSchema = z.object({
 
 export type SaleItem = z.infer<typeof SaleItemSchema>;
 export type SaleItemDepletion = z.infer<typeof SaleItemDepletionSchema>;
-export type SaleItemWithDepletions = z.infer<typeof SaleItemWithDepletionsSchema>;
+export type SaleItemWithDepletions = z.infer<
+  typeof SaleItemWithDepletionsSchema
+>;
 export type Sale = z.infer<typeof SaleSchema>;

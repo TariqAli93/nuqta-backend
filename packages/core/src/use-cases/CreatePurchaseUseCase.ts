@@ -152,7 +152,7 @@ export class CreatePurchaseUseCase {
     const total = subtotal - discount + tax;
     const paidAmount = Math.max(0, input.paidAmount || 0);
     const remainingAmount = Math.max(0, total - paidAmount);
-    const now = new Date().toISOString();
+    const now = new Date();
 
     const purchase: Purchase = {
       invoiceNumber: input.invoiceNumber,
@@ -348,7 +348,7 @@ export class CreatePurchaseUseCase {
 
     await this.accountingRepository.createJournalEntrySync({
       entryNumber: `JE-PUR-${purchase.id || Date.now()}`,
-      entryDate: new Date().toISOString(),
+      entryDate: new Date(),
       description: `Purchase #${purchase.invoiceNumber}`,
       sourceType: "purchase",
       sourceId: purchase.id,

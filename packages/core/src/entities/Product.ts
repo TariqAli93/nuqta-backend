@@ -15,14 +15,14 @@ export const ProductSchema = z.object({
   unit: z.string().default("piece"),
   supplier: z.string().nullable().optional(),
   supplierId: z.number().nullable().optional(),
-  expireDate: z.string().nullable().optional(),
+  expireDate: z.union([z.string(), z.date()]).nullable().optional(),
   isExpire: z.boolean().default(false),
   status: z
     .enum(["available", "out_of_stock", "discontinued"])
     .default("available"),
   isActive: z.boolean().default(true),
-  createdAt: z.iso.datetime().optional(),
-  updatedAt: z.iso.datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
 });
 

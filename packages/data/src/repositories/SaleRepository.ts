@@ -137,14 +137,15 @@ export class SaleRepository implements ISaleRepository {
     return rows as unknown as SaleItemDepletion[];
   }
 
-  async getDailySummary(date: Date): Promise<{
+  async getDailySummary(date: string | Date): Promise<{
     revenue: number;
     count: number;
     cash: number;
     card: number;
     transfer: number;
   }> {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr =
+      typeof date === "string" ? date : date.toISOString().split("T")[0];
     const rows = await this.db
       .select()
       .from(sales)

@@ -5,7 +5,7 @@ export const CategorySchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
   isActive: z.boolean().default(true),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
 });
 

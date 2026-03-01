@@ -172,7 +172,7 @@ export class AddPurchasePaymentUseCase {
       notes: input.notes,
       createdBy: userId,
       status: "completed",
-      paymentDate: new Date().toISOString(),
+      paymentDate: new Date(),
       idempotencyKey: input.idempotencyKey,
     });
 
@@ -251,7 +251,7 @@ export class AddPurchasePaymentUseCase {
 
     await this.accountingRepo.createJournalEntrySync({
       entryNumber: `JE-PPAY-${paymentId}`,
-      entryDate: new Date().toISOString(),
+      entryDate: new Date(),
       description: `Supplier payment #${paymentId} for purchase #${purchaseId}`,
       sourceType: "payment",
       sourceId: paymentId,

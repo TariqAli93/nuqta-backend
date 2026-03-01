@@ -22,9 +22,9 @@ export const users = pgTable("users", {
   phone: text("phone"),
   role: text("role").notNull().default("cashier"),
   isActive: boolean("is_active").default(true),
-  lastLoginAt: timestamp("last_login_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  lastLoginAt: timestamp("last_login_at", { mode: "string" }),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -41,8 +41,8 @@ export const customers = pgTable("customers", {
   totalPurchases: integer("total_purchases").default(0),
   totalDebt: integer("total_debt").default(0),
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
 });
 
@@ -61,8 +61,8 @@ export const suppliers = pgTable("suppliers", {
   openingBalance: integer("opening_balance").default(0),
   currentBalance: integer("current_balance").default(0),
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
 });
 
@@ -75,8 +75,8 @@ export const categories = pgTable("categories", {
   name: text("name").notNull().unique(),
   description: text("description"),
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
 });
 
@@ -99,12 +99,12 @@ export const products = pgTable("products", {
   unit: text("unit").default("piece"),
   supplier: text("supplier"),
   supplierId: integer("supplier_id"),
-  expireDate: timestamp("expire_date"),
+  expireDate: timestamp("expire_date", { mode: "string" }),
   isExpire: boolean("is_expire").default(false),
   status: text("status").notNull().default("available"),
   isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
 });
 
@@ -123,7 +123,7 @@ export const productUnits = pgTable(
     sellingPrice: integer("selling_price"),
     isDefault: boolean("is_default").default(false),
     isActive: boolean("is_active").default(true),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_product_units_product").on(table.productId),
@@ -141,15 +141,15 @@ export const productBatches = pgTable(
     id: serial("id").primaryKey(),
     productId: integer("product_id").notNull(),
     batchNumber: text("batch_number").notNull(),
-    expiryDate: timestamp("expiry_date"),
-    manufacturingDate: timestamp("manufacturing_date"),
+    expiryDate: timestamp("expiry_date", { mode: "string" }),
+    manufacturingDate: timestamp("manufacturing_date", { mode: "string" }),
     quantityReceived: integer("quantity_received").notNull(),
     quantityOnHand: integer("quantity_on_hand").notNull(),
     costPerUnit: integer("cost_per_unit"),
     purchaseId: integer("purchase_id"),
     status: text("status").notNull().default("active"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_batches_product").on(table.productId),
@@ -181,10 +181,10 @@ export const sales = pgTable("sales", {
   notes: text("notes"),
   idempotencyKey: text("idempotency_key").unique(),
   printStatus: text("print_status").notNull().default("pending"),
-  printedAt: timestamp("printed_at"),
+  printedAt: timestamp("printed_at", { mode: "string" }),
   printError: text("print_error"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
 });
 
@@ -205,7 +205,7 @@ export const saleItems = pgTable("sale_items", {
   unitPrice: integer("unit_price").notNull(),
   discount: integer("discount").default(0),
   subtotal: integer("subtotal").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -223,7 +223,7 @@ export const saleItemDepletions = pgTable(
     quantityBase: integer("quantity_base").notNull(),
     costPerUnit: integer("cost_per_unit").notNull(),
     totalCost: integer("total_cost").notNull(),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_sale_item_depletions_sale").on(table.saleId),
@@ -256,10 +256,10 @@ export const purchases = pgTable(
     exchangeRate: real("exchange_rate").default(1),
     status: text("status").notNull().default("pending"),
     notes: text("notes"),
-    receivedAt: timestamp("received_at"),
+    receivedAt: timestamp("received_at", { mode: "string" }),
     idempotencyKey: text("idempotency_key"),
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -291,8 +291,8 @@ export const purchaseItems = pgTable(
     lineSubtotal: integer("line_subtotal").notNull(),
     discount: integer("discount").default(0),
     batchId: integer("batch_id"),
-    expiryDate: timestamp("expiry_date"),
-    createdAt: timestamp("created_at").defaultNow(),
+    expiryDate: timestamp("expiry_date", { mode: "string" }),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_purchase_items_purchase").on(table.purchaseId),
@@ -319,9 +319,9 @@ export const payments = pgTable(
     referenceNumber: text("reference_number"),
     idempotencyKey: text("idempotency_key"),
     status: text("status").notNull().default("completed"),
-    paymentDate: timestamp("payment_date").defaultNow(),
+    paymentDate: timestamp("payment_date", { mode: "string" }).defaultNow(),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -355,7 +355,7 @@ export const inventoryMovements = pgTable(
     sourceType: text("source_type"),
     sourceId: integer("source_id"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -380,7 +380,7 @@ export const accounts = pgTable("accounts", {
   isSystem: boolean("is_system").default(false),
   isActive: boolean("is_active").default(true),
   balance: integer("balance").default(0),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -397,10 +397,10 @@ export const postingBatches = pgTable(
     entriesCount: integer("entries_count").notNull().default(0),
     totalAmount: integer("total_amount").notNull().default(0),
     status: text("status").notNull().default("posted"),
-    postedAt: timestamp("posted_at").notNull().defaultNow(),
+    postedAt: timestamp("posted_at", { mode: "string" }).notNull().defaultNow(),
     postedBy: integer("posted_by"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_posting_batches_period").on(
@@ -420,7 +420,7 @@ export const journalEntries = pgTable(
   {
     id: serial("id").primaryKey(),
     entryNumber: text("entry_number").notNull().unique(),
-    entryDate: timestamp("entry_date").notNull().defaultNow(),
+    entryDate: timestamp("entry_date", { mode: "string" }).notNull().defaultNow(),
     description: text("description").notNull(),
     sourceType: text("source_type"),
     sourceId: integer("source_id"),
@@ -431,7 +431,7 @@ export const journalEntries = pgTable(
     totalAmount: integer("total_amount").notNull(),
     currency: text("currency").notNull().default("IQD"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -453,7 +453,7 @@ export const journalLines = pgTable(
     debit: integer("debit").default(0),
     credit: integer("credit").default(0),
     description: text("description"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_journal_lines_entry").on(table.journalEntryId),
@@ -477,7 +477,7 @@ export const customerLedger = pgTable(
     paymentId: integer("payment_id"),
     journalEntryId: integer("journal_entry_id"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -502,7 +502,7 @@ export const supplierLedger = pgTable(
     paymentId: integer("payment_id"),
     journalEntryId: integer("journal_entry_id"),
     notes: text("notes"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -527,7 +527,7 @@ export const barcodeTemplates = pgTable("barcode_templates", {
   showExpiry: boolean("show_expiry").default(false),
   layoutJson: text("layout_json"),
   isDefault: boolean("is_default").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -543,12 +543,12 @@ export const barcodePrintJobs = pgTable(
     productName: text("product_name").notNull(),
     barcode: text("barcode"),
     price: integer("price"),
-    expiryDate: timestamp("expiry_date"),
+    expiryDate: timestamp("expiry_date", { mode: "string" }),
     quantity: integer("quantity").notNull().default(1),
     status: text("status").notNull().default("pending"),
-    printedAt: timestamp("printed_at"),
+    printedAt: timestamp("printed_at", { mode: "string" }),
     printError: text("print_error"),
-    createdAt: timestamp("created_at").defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
     createdBy: integer("created_by"),
   },
   (table) => [
@@ -569,7 +569,7 @@ export const currencySettings = pgTable("currency_settings", {
   exchangeRate: real("exchange_rate").notNull(),
   isBaseCurrency: boolean("is_base_currency").default(false),
   isActive: boolean("is_active").default(true),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
 });
 
 export const settings = pgTable("settings", {
@@ -577,7 +577,7 @@ export const settings = pgTable("settings", {
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   description: text("description"),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   updatedBy: integer("updated_by"),
 });
 
@@ -591,7 +591,7 @@ export const auditLogs = pgTable("audit_logs", {
   action: text("action").notNull(),
   entityType: text("entity_type").notNull(),
   entityId: integer("entity_id").notNull(),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  timestamp: timestamp("timestamp", { mode: "string" }).notNull().defaultNow(),
   changedFields: text("changed_fields"),
   changeDescription: text("change_description"),
   ipAddress: text("ip_address"),

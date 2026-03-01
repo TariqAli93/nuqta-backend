@@ -1,15 +1,11 @@
-/**
- * AuditEvent Entity
- * Represents an immutable record of critical business actions for compliance & forensics
- */
-
+import { z } from "zod";
 export interface AuditEventData {
   id?: number;
   userId: number;
   action: string; // e.g., 'sales:create', 'products:update', 'user:role-change'
   entityType: string; // e.g., 'Sale', 'Product', 'User', 'Customer'
   entityId: number;
-  timestamp: string; // ISO 8601 format
+  timestamp: string | Date; // ISO string or Date object
   changedFields?: Record<string, { old: any; new: any }>; // Only fields that changed (can be null for create)
   changeDescription?: string; // Human-readable summary, e.g., 'Price updated from 100 to 150'
   ipAddress?: string;
@@ -23,7 +19,7 @@ export class AuditEvent {
   readonly action: string;
   readonly entityType: string;
   readonly entityId: number;
-  readonly timestamp: string;
+  readonly timestamp: string | Date; // ISO string or Date object
   readonly changedFields?: Record<string, { old: any; new: any }>;
   readonly changeDescription?: string;
   readonly ipAddress?: string;
@@ -53,7 +49,7 @@ export class AuditEvent {
     entityType: string,
     entityId: number,
     newData?: Record<string, any>,
-    changeDescription?: string
+    changeDescription?: string,
   ): AuditEvent {
     const changedFields: Record<string, { old: any; new: any }> = {};
     if (newData) {
@@ -82,7 +78,7 @@ export class AuditEvent {
     entityType: string,
     entityId: number,
     changes: Record<string, { old: any; new: any }>,
-    changeDescription?: string
+    changeDescription?: string,
   ): AuditEvent {
     return new AuditEvent({
       userId,
@@ -103,7 +99,7 @@ export class AuditEvent {
     action: string,
     entityType: string,
     entityId: number,
-    oldData?: Record<string, any>
+    oldData?: Record<string, any>,
   ): AuditEvent {
     const changedFields: Record<string, { old: any; new: any }> = {};
     if (oldData) {

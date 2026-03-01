@@ -145,7 +145,7 @@ export class AddPaymentUseCase {
       notes: input.notes,
       createdBy: userId,
       status: "completed",
-      paymentDate: new Date().toISOString(),
+      paymentDate: new Date(),
       idempotencyKey: input.idempotencyKey,
     });
 
@@ -167,7 +167,7 @@ export class AddPaymentUseCase {
       paidAmount: newPaidAmount,
       remainingAmount: newRemainingAmount,
       status: newStatus,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(),
     });
 
     const accountingEnabled = await this.isAccountingEnabled();
@@ -243,7 +243,7 @@ export class AddPaymentUseCase {
 
     await this.accountingRepo.createJournalEntrySync({
       entryNumber: `JE-PAY-${paymentId}`,
-      entryDate: new Date().toISOString(),
+      entryDate: new Date(),
       description: `Customer payment #${paymentId}`,
       sourceType: "payment",
       sourceId: paymentId,

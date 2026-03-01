@@ -1,11 +1,11 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const PurchaseItemSchema = z.object({
   id: z.number().optional(),
   purchaseId: z.number().optional(),
   productId: z.number().min(1),
   productName: z.string().min(1),
-  unitName: z.string().default('piece'),
+  unitName: z.string().default("piece"),
   unitFactor: z.number().int().default(1),
   quantity: z.number().int().min(1),
   quantityBase: z.number().int().min(1),
@@ -14,8 +14,8 @@ export const PurchaseItemSchema = z.object({
   discount: z.number().int().default(0),
   batchId: z.number().optional(),
   batchNumber: z.string().optional(),
-  expiryDate: z.string().nullable().optional(),
-  createdAt: z.string().datetime().optional(),
+  expiryDate: z.union([z.string(), z.date()]).nullable().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export const PurchaseSchema = z.object({
@@ -28,14 +28,16 @@ export const PurchaseSchema = z.object({
   total: z.number().int().min(0),
   paidAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
-  currency: z.string().default('IQD'),
+  currency: z.string().default("IQD"),
   exchangeRate: z.number().default(1),
-  status: z.enum(['pending', 'completed', 'cancelled', 'received', 'partial']).default('pending'),
+  status: z
+    .enum(["pending", "completed", "cancelled", "received", "partial"])
+    .default("pending"),
   notes: z.string().nullable().optional(),
-  receivedAt: z.string().datetime().nullable().optional(),
+  receivedAt: z.union([z.string(), z.date()]).nullable().optional(),
   idempotencyKey: z.string().nullable().optional(),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
   // Relations
   items: z.array(PurchaseItemSchema).optional(),

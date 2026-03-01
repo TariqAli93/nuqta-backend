@@ -70,8 +70,8 @@ export class RecordSupplierPaymentUseCase {
       idempotencyKey: data.idempotencyKey,
       status: "completed",
       notes: data.notes,
-      paymentDate: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
+      paymentDate: new Date(),
+      createdAt: new Date(),
       createdBy: userId,
     } as any);
 
@@ -115,7 +115,7 @@ export class RecordSupplierPaymentUseCase {
 
     await this.accountingRepo.createJournalEntrySync({
       entryNumber: `JE-SPAY-${paymentId}`,
-      entryDate: new Date().toISOString(),
+      entryDate: new Date(),
       description: `Supplier payment #${paymentId}`,
       sourceType: "payment",
       sourceId: paymentId,

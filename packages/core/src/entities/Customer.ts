@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const CustomerSchema = z.object({
   id: z.number().optional(),
@@ -10,8 +10,8 @@ export const CustomerSchema = z.object({
   totalPurchases: z.number().int().default(0),
   totalDebt: z.number().int().default(0),
   isActive: z.boolean().default(true),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
 });
 

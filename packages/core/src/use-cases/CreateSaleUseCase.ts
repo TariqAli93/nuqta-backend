@@ -436,7 +436,7 @@ export class CreateSaleUseCase {
         discount: si.discount,
         subtotal: si.subtotal,
       })),
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(),
     };
 
     const createdSale = await this.saleRepo.create(saleData);
@@ -782,7 +782,7 @@ export class CreateSaleUseCase {
 
     await this.accountingRepo.createJournalEntrySync({
       entryNumber,
-      entryDate: new Date().toISOString(),
+      entryDate: new Date(),
       description: `Sale #${sale.invoiceNumber}`,
       sourceType: "sale",
       sourceId: sale.id,

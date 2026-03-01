@@ -8,9 +8,9 @@ export const UserSchema = z.object({
   phone: z.string().nullable().optional(),
   role: z.enum(["admin", "cashier", "manager", "viewer"]).default("cashier"),
   isActive: z.boolean().default(true),
-  lastLoginAt: z.date().nullable().optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
+  lastLoginAt: z.union([z.string(), z.date()]).nullable().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
+  updatedAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export type User = z.infer<typeof UserSchema>;

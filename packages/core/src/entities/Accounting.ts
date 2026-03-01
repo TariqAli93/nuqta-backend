@@ -1,16 +1,16 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const AccountSchema = z.object({
   id: z.number().optional(),
   code: z.string().min(1),
   name: z.string().min(1),
   nameAr: z.string().nullable().optional(),
-  accountType: z.enum(['asset', 'liability', 'equity', 'revenue', 'expense']),
+  accountType: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
   parentId: z.number().nullable().optional(),
   isSystem: z.boolean().default(false),
   isActive: z.boolean().default(true),
   balance: z.number().int().default(0),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export const JournalLineSchema = z.object({
@@ -20,22 +20,24 @@ export const JournalLineSchema = z.object({
   debit: z.number().int().default(0),
   credit: z.number().int().default(0),
   description: z.string().nullable().optional(),
-  createdAt: z.string().datetime().optional(),
+  createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
 export const JournalEntrySchema = z.object({
   id: z.number().optional(),
   entryNumber: z.string().min(1),
-  entryDate: z.string(),
+  entryDate: z.union([z.string(), z.date()]),
   description: z.string().min(1),
-  sourceType: z.enum(['sale', 'purchase', 'payment', 'adjustment', 'manual']).optional(),
+  sourceType: z
+    .enum(["sale", "purchase", "payment", "adjustment", "manual"])
+    .optional(),
   sourceId: z.number().optional(),
   isPosted: z.boolean().default(false),
   isReversed: z.boolean().default(false),
   reversalOfId: z.number().optional(),
   postingBatchId: z.number().nullable().optional(),
   totalAmount: z.number().int().min(0),
-  currency: z.string().default('IQD'),
+  currency: z.string().default("IQD"),
   notes: z.string().nullable().optional(),
   createdAt: z.string().datetime().optional(),
   createdBy: z.number().optional(),
