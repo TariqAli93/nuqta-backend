@@ -27,7 +27,8 @@ export class LoginUseCase {
       throw new UnauthorizedError("البيانات غير صحيحة");
     }
 
-    await this.userRepo.updateLastLogin(user.id!);
+    // await this.userRepo.updateLastLogin(user.id as number);
+    await this.userRepo.updateLastLogin(user.id as number);
 
     const permissions = PermissionService.getPermissionsForRole(
       user.role as UserRole,

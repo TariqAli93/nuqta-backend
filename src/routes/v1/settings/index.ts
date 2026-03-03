@@ -17,6 +17,7 @@ import {
   getSettingByKeySchema,
   updateSettingByKeySchema,
 } from "../../../schemas/settings.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const settings: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
@@ -35,7 +36,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
   // PUT /settings/company
   fastify.put(
     "/company",
-    { schema: updateCompanySettingsSchema },
+    {
+      schema: updateCompanySettingsSchema,
+      preHandler: requirePermission("settings:update"),
+    },
     async (request) => {
       const body = request.body as any;
       const uc = new SetCompanySettingsUseCase(fastify.repos.settings);
@@ -92,7 +96,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
   // PUT /settings/:key
   fastify.put<{ Params: { key: string } }>(
     "/:key",
-    { schema: updateSettingByKeySchema },
+    {
+      schema: updateSettingByKeySchema,
+      preHandler: requirePermission("settings:update"),
+    },
     async (request) => {
       const { value } = request.body as { value: string };
       const uc = new SetSettingUseCase(fastify.repos.settings);

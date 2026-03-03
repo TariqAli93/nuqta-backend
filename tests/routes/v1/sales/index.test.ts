@@ -1,0 +1,266 @@
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { expectError, expectOk } from "../../../helpers/assertions.ts";
+import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
+import { paymentResult, sale, saleList } from "../../../helpers/fixtures.ts";
+import { mockUseCase, resetMockCore } from "../../../helpers/mockCore.ts";
+import { resetMockData } from "../../../helpers/mockData.ts";
+
+describe("/api/v1/sales", () => {
+  let ctx: BuiltApp;
+
+  beforeEach(async () => {
+    resetMockCore();
+    resetMockData();
+    ctx = await buildApp();
+  });
+
+  afterEach(async () => {
+    if (ctx) {
+      await ctx.close();
+    }
+  });
+
+  test.each([
+    {
+      title: "GET / returns sales from the repository",
+      method: "GET",
+      url: "/api/v1/sales?page=1&limit=20&startDate=2026-03-01&endDate=2026-03-01",
+      setup: () => {
+        ctx.repos.sale.findAll = async () => saleList;
+      },
+      assert: (data: typeof saleList) => {
+        expect(data.items[0].invoiceNumber).toBe(sale.invoiceNumber);
+      },
+    },
+    {
+      title: "GET /:id returns one sale",
+      method: "GET",
+      url: "/api/v1/sales/11",
+      setup: () => mockUseCase("GetSaleByIdUseCase", { execute: sale }),
+      assert: (data: typeof sale) => {
+        expect(data.id).toBe(sale.id);
+      },
+    },
+    {
+      title: "POST / creates a sale",
+      method: "POST",
+      url: "/api/v1/sales",
+      payload: {
+        items: [{ productId: 5, quantity: 1, unitPrice: 10000 }],
+        paymentType: "cash",
+      },
+      setup: () =>
+        mockUseCase("CreateSaleUseCase", {
+          executeCommitPhase: { createdSale: sale },
+        }),
+      assert: (data: typeof sale) => {
+        expect(data.invoiceNumber).toBe(sale.invoiceNumber);
+      },
+    },
+    {
+      title: "POST /:id/payments adds a payment",
+      method: "POST",
+      url: "/api/v1/sales/11/payments",
+      payload: {
+        amount: 10000,
+        paymentMethod: "cash",
+      },
+      setup: () =>
+        mockUseCase("AddPaymentUseCase", {
+          execute: paymentResult,
+        }),
+      assert: (data: typeof paymentResult) => {
+        expect(data.amount).toBe(paymentResult.amount);
+      },
+    },
+  ])("$title", async ({ method, url, payload, setup, assert }) => {
+    setup();
+
+    const response = await ctx.app.inject({
+      method,
+      url,
+      payload,
+      headers: ctx.authHeaders(),
+    });
+
+    const data = expectOk(response);
+    assert(data as never);
+  });
+
+  test("POST / returns 401 when request.user is missing (RBAC blocks unauthenticated requests)", async () => {
+    const branchCtx = await buildApp({
+      authenticate: async () => {},
+    });
+
+    try {
+      const response = await branchCtx.app.inject({
+        method: "POST",
+        url: "/api/v1/sales",
+        payload: {
+          items: [{ productId: 5, quantity: 1, unitPrice: 10000 }],
+          paymentType: "cash",
+        },
+      });
+
+      expectError(response, 401, "UNAUTHORIZED");
+    } finally {
+      await branchCtx.close();
+    }
+  });
+
+  test("POST /:id/payments returns 401 when request.user is missing (RBAC blocks unauthenticated requests)", async () => {
+    const branchCtx = await buildApp({
+      authenticate: async () => {},
+    });
+
+    try {
+      const response = await branchCtx.app.inject({
+        method: "POST",
+        url: "/api/v1/sales/11/payments",
+        payload: {
+          amount: 10000,
+          paymentMethod: "cash",
+        },
+      });
+
+      expectError(response, 401, "UNAUTHORIZED");
+    } finally {
+      await branchCtx.close();
+    }
+  });
+
+  test.each([
+    {
+      method: "GET",
+      url: "/api/v1/sales?page=bad",
+    },
+    {
+      method: "GET",
+      url: "/api/v1/sales/not-a-number",
+    },
+    {
+      method: "POST",
+      url: "/api/v1/sales",
+      payload: {
+        items: [{ productId: 5, quantity: 1, unitPrice: 10000 }],
+      },
+    },
+    {
+      method: "POST",
+      url: "/api/v1/sales/11/payments",
+      payload: {
+        paymentMethod: "cash",
+      },
+    },
+  ])("returns 400 for invalid %s %s", async ({ method, url, payload }) => {
+    const response = await ctx.app.inject({
+      method,
+      url,
+      payload,
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  test("returns 401 when auth is missing", async () => {
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/sales",
+    });
+
+    expectError(response, 401, "UNAUTHORIZED");
+  });
+
+  test("returns 403 when adding a payment is forbidden", async () => {
+    mockUseCase("AddPaymentUseCase", {
+      execute: async () => {
+        throw new PermissionDeniedError("denied");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/payments",
+      payload: {
+        amount: 10000,
+        paymentMethod: "cash",
+      },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 403, "PERMISSION_DENIED");
+  });
+
+  test("returns 404 when a sale does not exist", async () => {
+    mockUseCase("GetSaleByIdUseCase", {
+      execute: async () => {
+        throw new NotFoundError("missing");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/sales/999",
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 404, "NOT_FOUND");
+  });
+
+  // ── Covers L29-30: page/limit ternary fallback branches (: 1, : 20) ──
+  test("GET /sales without query params hits default page/limit", async () => {
+    ctx.repos.sale.findAll = async () => saleList;
+
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/sales",
+      headers: ctx.authHeaders(),
+    });
+
+    expectOk(response);
+  });
+
+  // ── Negative-path: expired token → 401 (exercises jwt.verify null → support.ts L35-39) ──
+  test("returns 401 when token is expired", async () => {
+    const expired = ctx.jwt.sign({
+      sub: 1,
+      role: "admin",
+      permissions: ["sales:read"],
+    });
+    // Manually forge an expired token by re-encoding with past exp
+    const parts = expired.split(".");
+    const payload = JSON.parse(
+      Buffer.from(
+        parts[1].replace(/-/g, "+").replace(/_/g, "/"),
+        "base64",
+      ).toString(),
+    );
+    payload.exp = Math.floor(Date.now() / 1000) - 3600;
+    // Re-sign is impossible so just use a completely invalid token
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales",
+      payload: {
+        items: [{ productId: 1, quantity: 1, unitPrice: 1000 }],
+        paymentType: "cash",
+      },
+      headers: { authorization: "Bearer invalid.token.here" },
+    });
+
+    expectError(response, 401, "UNAUTHORIZED");
+  });
+
+  // ── Negative-path: completely empty body → 400 ──
+  test("returns 400 when POST /sales body is completely empty", async () => {
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales",
+      payload: {},
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+});

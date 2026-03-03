@@ -75,8 +75,8 @@ export class PostingRepository implements IPostingRepository {
       .where(
         and(
           eq(journalEntries.isPosted, false),
-          gte(journalEntries.entryDate, new Date(startDate)),
-          lte(journalEntries.entryDate, new Date(endDate)),
+          gte(journalEntries.entryDate, new Date(startDate).toISOString()),
+          lte(journalEntries.entryDate, new Date(endDate).toISOString()),
           sql`COALESCE(${journalEntries.isReversed}, false) = false`,
         ),
       )

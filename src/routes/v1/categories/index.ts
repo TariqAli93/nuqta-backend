@@ -12,29 +12,47 @@ import {
   updateCategorySchema,
   deleteCategorySchema,
 } from "../../../schemas/categories.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const categories: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
 
   // GET /categories
-  fastify.get("/", { schema: getCategoriesSchema }, async (request) => {
-    const uc = new GetCategoriesUseCase(fastify.repos.category);
-    const data = await uc.execute();
-    return { ok: true, data };
-  });
+  fastify.get(
+    "/",
+    {
+      schema: getCategoriesSchema,
+      preHandler: requirePermission("categories:read"),
+    },
+    async (request) => {
+      const uc = new GetCategoriesUseCase(fastify.repos.category);
+      const data = await uc.execute();
+      return { ok: true, data };
+    },
+  );
 
   // POST /categories
-  fastify.post("/", { schema: createCategorySchema }, async (request) => {
-    const body = request.body as Category;
-    const uc = new CreateCategoryUseCase(fastify.repos.category);
-    const data = await uc.execute(body);
-    return { ok: true, data };
-  });
+  fastify.post(
+    "/",
+    {
+      schema: createCategorySchema,
+      preHandler: requirePermission("categories:create"),
+    },
+    async (request) => {
+      const body = request.body as Category;
+      const uc = new CreateCategoryUseCase(fastify.repos.category);
+      const data = await uc.execute(body);
+      return { ok: true, data };
+    },
+  );
 
   // PUT /categories/:id
   fastify.put<{ Params: { id: string } }>(
     "/:id",
-    { schema: updateCategorySchema },
+    {
+      schema: updateCategorySchema,
+      preHandler: requirePermission("categories:update"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<Category>;
@@ -47,7 +65,10 @@ const categories: FastifyPluginAsync = async (fastify) => {
   // DELETE /categories/:id
   fastify.delete<{ Params: { id: string } }>(
     "/:id",
-    { schema: deleteCategorySchema },
+    {
+      schema: deleteCategorySchema,
+      preHandler: requirePermission("categories:delete"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const uc = new DeleteCategoryUseCase(fastify.repos.category);

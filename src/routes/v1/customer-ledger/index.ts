@@ -11,6 +11,7 @@ import {
   addCustomerAdjustmentSchema,
   reconcileCustomerDebtSchema,
 } from "../../../schemas/customer-ledger.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const customerLedger: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
@@ -18,7 +19,10 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
   // GET /customer-ledger/:customerId
   fastify.get<{ Params: { customerId: string } }>(
     "/:customerId",
-    { schema: getCustomerLedgerSchema },
+    {
+      schema: getCustomerLedgerSchema,
+      preHandler: requirePermission("ledger:read"),
+    },
     async (request) => {
       const customerId = parseInt(request.params.customerId, 10);
       const query = request.query as {
@@ -42,7 +46,10 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
   // POST /customer-ledger/:customerId/payments
   fastify.post<{ Params: { customerId: string } }>(
     "/:customerId/payments",
-    { schema: recordCustomerPaymentSchema },
+    {
+      schema: recordCustomerPaymentSchema,
+      preHandler: requirePermission("ledger:payment"),
+    },
     async (request) => {
       const customerId = parseInt(request.params.customerId, 10);
       const body = request.body as {
@@ -67,7 +74,10 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
   // POST /customer-ledger/:customerId/adjustments
   fastify.post<{ Params: { customerId: string } }>(
     "/:customerId/adjustments",
-    { schema: addCustomerAdjustmentSchema },
+    {
+      schema: addCustomerAdjustmentSchema,
+      preHandler: requirePermission("ledger:adjust"),
+    },
     async (request) => {
       const customerId = parseInt(request.params.customerId, 10);
       const body = request.body as { amount: number; notes?: string };
@@ -85,7 +95,10 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
   // POST /customer-ledger/reconcile
   fastify.post(
     "/reconcile",
-    { schema: reconcileCustomerDebtSchema },
+    {
+      schema: reconcileCustomerDebtSchema,
+      preHandler: requirePermission("ledger:adjust"),
+    },
     async (request) => {
       const { repair } = (request.query as { repair?: string }) || {};
       const uc = new ReconcileCustomerDebtUseCase(

@@ -1,7 +1,11 @@
 /**
  * Posting domain schemas.
  */
-import { ErrorResponses, successEnvelope } from "./common.js";
+import {
+  ErrorResponses,
+  successEnvelope,
+  successArrayEnvelope,
+} from "./common.js";
 
 const PostingBatchSchema = {
   type: "object" as const,
@@ -60,7 +64,10 @@ export const reverseEntrySchema = {
   security: [{ bearerAuth: [] }],
   params: { $ref: "IdParams#" },
   response: {
-    200: successEnvelope({ type: "object" as const }, "Reversal result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reversal result",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -71,7 +78,10 @@ export const postEntrySchema = {
   security: [{ bearerAuth: [] }],
   params: { $ref: "IdParams#" },
   response: {
-    200: successEnvelope({ type: "object" as const }, "Posted entry"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Posted entry",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -82,7 +92,72 @@ export const unpostEntrySchema = {
   security: [{ bearerAuth: [] }],
   params: { $ref: "IdParams#" },
   response: {
-    200: successEnvelope({ type: "object" as const }, "Unposted entry"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Unposted entry",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Batches ───────────────────────────────────────────────────────
+
+const BatchListQuerySchema = {
+  type: "object" as const,
+  properties: {
+    status: { type: "string", enum: ["draft", "posted", "locked"] },
+    limit: { type: "string", pattern: "^\\d+$" },
+    offset: { type: "string", pattern: "^\\d+$" },
+  },
+} as const;
+
+export const getPostingBatchesSchema = {
+  tags: ["Posting"],
+  summary: "List posting batches",
+  security: [{ bearerAuth: [] }],
+  querystring: BatchListQuerySchema,
+  response: {
+    200: successArrayEnvelope(PostingBatchSchema, "Posting batches"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const lockBatchSchema = {
+  tags: ["Posting"],
+  summary: "Lock a posting batch",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope(
+      {
+        type: "object" as const,
+        properties: {
+          batchId: { type: "integer" },
+          status: { type: "string" },
+        },
+      },
+      "Batch locked",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const unlockBatchSchema = {
+  tags: ["Posting"],
+  summary: "Unlock a posting batch",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope(
+      {
+        type: "object" as const,
+        properties: {
+          batchId: { type: "integer" },
+          status: { type: "string" },
+        },
+      },
+      "Batch unlocked",
+    ),
     ...ErrorResponses,
   },
 } as const;

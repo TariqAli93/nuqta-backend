@@ -1,0 +1,3262 @@
+##############################################################################
+# Nuqta Backend — OpenAPI 3.0 Specification
+# Generated from Full API Endpoint Map — UI
+# All endpoints under /api/v1
+##############################################################################
+openapi: "3.0.3"
+info:
+  title: Nuqta Backend API
+  version: 1.0.0
+  description: |
+    REST JSON API for Nuqta POS / ERP system.
+    All responses use the standard envelope:
+    - Success: `{ ok: true, data: T }`
+    - Error:   `{ ok: false, error: { code, message, details?, status? } }`
+  contact:
+    name: Nuqta Dev Team
+
+servers:
+  - url: /api/v1
+    description: API v1 base path
+
+# ─── Security Schemes ──────────────────────────────────────────────────
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT HS256 token.
+        Access token TTL: 15 min (900s).
+        Refresh token TTL: 7 days (604800s).
+        Header: `Authorization: Bearer <accessToken>`
+
+  # ─── Reusable Schemas ─────────────────────────────────────────────
+  schemas:
+    # ── Envelope ──
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - IDEMPOTENCY_REPLAY
+            - INSUFFICIENT_STOCK
+            - INVALID_STATE
+            - INTERNAL_ERROR
+        message:
+          type: string
+        details:
+          description: Additional context (validation field errors, etc.)
+        status:
+          type: integer
+
+    ErrorEnvelope:
+      type: object
+      required: [ok, error]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: "#/components/schemas/ApiError"
+
+    # ── Pagination ──
+    PaginatedMeta:
+      type: object
+      properties:
+        items:
+          type: array
+          items: {}
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    # ── Auth ──
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+      additionalProperties: false
+
+    RegisterRequest:
+      type: object
+      required: [username, password, fullName]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 6 }
+        fullName: { type: string, minLength: 1 }
+        phone: { type: string, nullable: true }
+      additionalProperties: false
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1 }
+        newPassword: { type: string, minLength: 6 }
+      additionalProperties: false
+
+    UserSafe:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        fullName: { type: string }
+        phone: { type: string, nullable: true }
+        role: { type: string, enum: [admin, cashier, manager, viewer] }
+        isActive: { type: boolean }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    LoginData:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        user: { $ref: "#/components/schemas/UserSafe" }
+        permissions: { type: array, items: { type: string } }
+
+    SetupStatus:
+      type: object
+      properties:
+        hasUsers: { type: boolean }
+        isSetupComplete: { type: boolean }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+      additionalProperties: false
+
+    RefreshData:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    # ── Category ──
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        parentId: { type: integer, nullable: true }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    CreateCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string, nullable: true }
+        parentId: { type: integer, nullable: true }
+      additionalProperties: false
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string, nullable: true }
+        parentId: { type: integer, nullable: true }
+        isActive: { type: boolean }
+      additionalProperties: false
+
+    # ── Product ──
+    Product:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        categoryId: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        costPrice: { type: integer, description: "Minor units (IQD)" }
+        sellingPrice: { type: integer }
+        currency: { type: string }
+        stock: { type: integer }
+        minStock: { type: integer }
+        unit: { type: string }
+        supplier: { type: string, nullable: true }
+        supplierId: { type: integer, nullable: true }
+        expireDate: { type: string, nullable: true }
+        isExpire: { type: boolean }
+        status: { type: string, enum: [available, out_of_stock, discontinued] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        createdBy: { type: integer, nullable: true }
+
+    CreateProductRequest:
+      type: object
+      required: [name, costPrice, sellingPrice]
+      properties:
+        name: { type: string, minLength: 1 }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        categoryId: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        costPrice: { type: integer, minimum: 0 }
+        sellingPrice: { type: integer, minimum: 0 }
+        currency: { type: string, default: IQD }
+        stock: { type: integer, minimum: 0, default: 0 }
+        minStock: { type: integer, minimum: 0, default: 0 }
+        unit: { type: string, default: piece }
+        supplier: { type: string, nullable: true }
+        supplierId: { type: integer, nullable: true }
+        expireDate: { type: string, format: date-time, nullable: true }
+        isExpire: { type: boolean, default: false }
+        status: { type: string, enum: [available, out_of_stock, discontinued], default: available }
+        isActive: { type: boolean, default: true }
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name: { type: string }
+        sku: { type: string, nullable: true }
+        barcode: { type: string, nullable: true }
+        categoryId: { type: integer, nullable: true }
+        description: { type: string, nullable: true }
+        costPrice: { type: integer, minimum: 0 }
+        sellingPrice: { type: integer, minimum: 0 }
+        currency: { type: string }
+        stock: { type: integer, minimum: 0 }
+        minStock: { type: integer, minimum: 0 }
+        unit: { type: string }
+        supplier: { type: string, nullable: true }
+        supplierId: { type: integer, nullable: true }
+        expireDate: { type: string, nullable: true }
+        isExpire: { type: boolean }
+        status: { type: string, enum: [available, out_of_stock, discontinued] }
+        isActive: { type: boolean }
+
+    ProductUnit:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        name: { type: string }
+        factor: { type: number }
+        barcode: { type: string, nullable: true }
+        isDefault: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    ProductBatch:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        batchNumber: { type: string }
+        quantity: { type: integer }
+        costPrice: { type: integer }
+        expiryDate: { type: string, format: date, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    AdjustStockRequest:
+      type: object
+      required: [quantityChange]
+      properties:
+        quantityChange: { type: number }
+        reason: { type: string, enum: [manual, damage, opening] }
+        notes: { type: string, nullable: true }
+        batchId: { type: integer, nullable: true }
+        unitName: { type: string }
+        unitFactor: { type: integer, minimum: 1 }
+      additionalProperties: false
+
+    # ── Customer ──
+    Customer:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        totalDebt: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    CreateCustomerRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+      additionalProperties: false
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    # ── Supplier ──
+    Supplier:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        totalBalance: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+
+    CreateSupplierRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1 }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+      additionalProperties: false
+
+    UpdateSupplierRequest:
+      type: object
+      properties:
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        isActive: { type: boolean }
+
+    # ── Sale ──
+    SaleItem:
+      type: object
+      properties:
+        id: { type: integer }
+        saleId: { type: integer }
+        productId: { type: integer }
+        productName: { type: string }
+        quantity: { type: integer }
+        unitName: { type: string }
+        unitFactor: { type: integer }
+        quantityBase: { type: integer }
+        batchId: { type: integer, nullable: true }
+        unitPrice: { type: integer }
+        discount: { type: integer }
+        subtotal: { type: integer }
+        cogs: { type: integer, nullable: true }
+        weightedAverageCost: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Sale:
+      type: object
+      properties:
+        id: { type: integer }
+        invoiceNumber: { type: string }
+        customerId: { type: integer, nullable: true }
+        subtotal: { type: integer }
+        discount: { type: integer }
+        tax: { type: integer }
+        total: { type: integer }
+        currency: { type: string }
+        exchangeRate: { type: number }
+        interestRate: { type: integer }
+        interestAmount: { type: integer }
+        paymentType: { type: string, enum: [cash, credit, mixed] }
+        paidAmount: { type: integer }
+        remainingAmount: { type: integer }
+        status: { type: string, enum: [pending, completed, cancelled, refunded] }
+        notes: { type: string, nullable: true }
+        idempotencyKey: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        createdBy: { type: integer, nullable: true }
+        items: { type: array, items: { $ref: "#/components/schemas/SaleItem" } }
+        cogs: { type: integer, nullable: true }
+        totalCogs: { type: integer, nullable: true }
+        profit: { type: integer, nullable: true }
+        marginBps: { type: integer, nullable: true }
+
+    CreateSaleItem:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId: { type: integer, minimum: 1 }
+        quantity: { type: integer, minimum: 1 }
+        unitPrice: { type: integer, minimum: 0 }
+        discount: { type: integer, minimum: 0 }
+        unitName: { type: string }
+        unitFactor: { type: integer, minimum: 1 }
+        batchId: { type: integer }
+
+    CreateSaleRequest:
+      type: object
+      required: [items, paymentType]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/CreateSaleItem" }, minItems: 1 }
+        customerId: { type: integer }
+        discount: { type: integer, minimum: 0 }
+        tax: { type: integer, minimum: 0 }
+        paymentType: { type: string, enum: [cash, credit, mixed] }
+        paidAmount: { type: integer, minimum: 0 }
+        currency: { type: string }
+        notes: { type: string }
+        interestRate: { type: integer }
+        interestRateBps: { type: integer }
+        paymentMethod: { type: string, enum: [cash, card, bank_transfer, credit] }
+        referenceNumber: { type: string }
+        idempotencyKey: { type: string }
+      additionalProperties: false
+
+    AddPaymentRequest:
+      type: object
+      required: [amount, paymentMethod]
+      properties:
+        customerId: { type: integer }
+        amount: { type: integer, minimum: 1 }
+        currency: { type: string }
+        exchangeRate: { type: number }
+        paymentMethod: { type: string, enum: [cash, card, bank_transfer, credit] }
+        referenceNumber: { type: string }
+        notes: { type: string }
+        idempotencyKey: { type: string }
+      additionalProperties: false
+
+    # ── Purchase ──
+    Purchase:
+      type: object
+      properties:
+        id: { type: integer }
+        invoiceNumber: { type: string }
+        supplierId: { type: integer }
+        subtotal: { type: integer }
+        discount: { type: integer }
+        tax: { type: integer }
+        total: { type: integer }
+        currency: { type: string }
+        paidAmount: { type: integer }
+        remainingAmount: { type: integer }
+        status: { type: string, enum: [pending, completed, cancelled] }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        createdBy: { type: integer, nullable: true }
+        items: { type: array, items: {} }
+
+    CreatePurchaseRequest:
+      type: object
+      required: [supplierId, items]
+      properties:
+        supplierId: { type: integer, minimum: 1 }
+        items: { type: array, minItems: 1 }
+        discount: { type: integer, minimum: 0 }
+        tax: { type: integer, minimum: 0 }
+        paidAmount: { type: integer, minimum: 0 }
+        paymentMethod: { type: string, enum: [cash, card, bank_transfer, credit] }
+        currency: { type: string }
+        notes: { type: string }
+        idempotencyKey: { type: string }
+      additionalProperties: false
+
+    # ── Accounting ──
+    Account:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        nameAr: { type: string, nullable: true }
+        type: { type: string, enum: [asset, liability, equity, revenue, expense] }
+        parentId: { type: integer, nullable: true }
+        isLeaf: { type: boolean }
+        balance: { type: integer }
+        currency: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    JournalEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        entryDate: { type: string, format: date }
+        description: { type: string }
+        sourceType: { type: string }
+        sourceId: { type: integer, nullable: true }
+        isPosted: { type: boolean }
+        postedAt: { type: string, format: date-time, nullable: true }
+        postedBy: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+        lines: { type: array, items: {} }
+
+    TrialBalance:
+      type: object
+      properties:
+        accounts: { type: array, items: {} }
+        totalDebits: { type: integer }
+        totalCredits: { type: integer }
+        isBalanced: { type: boolean }
+
+    ProfitLoss:
+      type: object
+      properties:
+        revenue: { type: array, items: {} }
+        expenses: { type: array, items: {} }
+        totalRevenue: { type: integer }
+        totalExpenses: { type: integer }
+        netIncome: { type: integer }
+
+    BalanceSheet:
+      type: object
+      properties:
+        assets: { type: array, items: {} }
+        liabilities: { type: array, items: {} }
+        equity: { type: array, items: {} }
+        totalAssets: { type: integer }
+        totalLiabilities: { type: integer }
+        totalEquity: { type: integer }
+
+    AccountingStatus:
+      type: object
+      properties:
+        isInitialized: { type: boolean }
+        accountCount: { type: integer }
+        lastInitializedAt: { type: string, format: date-time, nullable: true }
+
+    # ── Posting ──
+    PostingBatch:
+      type: object
+      properties:
+        id: { type: integer }
+        periodType: { type: string, enum: [day, month, year] }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        entriesCount: { type: integer }
+        totalAmount: { type: integer }
+        status: { type: string, enum: [draft, posted, locked] }
+        postedAt: { type: string, format: date-time, nullable: true }
+        postedBy: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    PostPeriodRequest:
+      type: object
+      required: [periodType, periodStart, periodEnd]
+      properties:
+        periodType: { type: string, enum: [day, month, year] }
+        periodStart: { type: string, format: date }
+        periodEnd: { type: string, format: date }
+        notes: { type: string }
+      additionalProperties: false
+
+    # ── Inventory ──
+    InventoryMovement:
+      type: object
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        productName: { type: string }
+        movementType: { type: string }
+        quantity: { type: integer }
+        reason: { type: string, nullable: true }
+        referenceId: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        createdBy: { type: integer, nullable: true }
+
+    InventoryDashboard:
+      type: object
+      properties:
+        totalProducts: { type: integer }
+        lowStockCount: { type: integer }
+        outOfStockCount: { type: integer }
+        expiringCount: { type: integer }
+        totalValue: { type: integer }
+
+    ExpiryAlert:
+      type: object
+      properties:
+        productId: { type: integer }
+        productName: { type: string }
+        batchId: { type: integer }
+        batchNumber: { type: string }
+        expiryDate: { type: string, format: date }
+        quantity: { type: integer }
+        daysUntilExpiry: { type: integer }
+
+    # ── Ledger ──
+    LedgerEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        amount: { type: integer }
+        balance: { type: integer }
+        description: { type: string }
+        referenceId: { type: integer, nullable: true }
+        referenceType: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    RecordPaymentRequest:
+      type: object
+      required: [amount, paymentMethod]
+      properties:
+        amount: { type: integer, minimum: 1 }
+        paymentMethod: { type: string, enum: [cash, card, bank_transfer] }
+        notes: { type: string }
+        idempotencyKey: { type: string }
+      additionalProperties: false
+
+    LedgerAdjustmentRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: integer }
+        notes: { type: string }
+      additionalProperties: false
+
+    # ── Dashboard ──
+    DashboardStats:
+      type: object
+      properties:
+        totalSalesToday: { type: integer }
+        totalSalesMonth: { type: integer }
+        totalProducts: { type: integer }
+        lowStockCount: { type: integer }
+        totalCustomers: { type: integer }
+        totalRevenue: { type: integer }
+        recentSales: { type: array, items: {} }
+
+    # ── Settings ──
+    CompanySettings:
+      type: object
+      properties:
+        companyName: { type: string }
+        companyAddress: { type: string, nullable: true }
+        companyPhone: { type: string, nullable: true }
+        companyEmail: { type: string, nullable: true }
+        companyLogo: { type: string, nullable: true }
+        taxNumber: { type: string, nullable: true }
+
+    CurrencySettings:
+      type: object
+      properties:
+        defaultCurrency: { type: string }
+        supportedCurrencies: { type: array, items: { type: string } }
+        exchangeRates: { type: object, additionalProperties: { type: number } }
+
+    ModuleSettings:
+      type: object
+      additionalProperties: true
+
+    SetupWizardRequest:
+      type: object
+      properties:
+        companyName: { type: string }
+        currency: { type: string }
+        modules: { type: object }
+      additionalProperties: true
+
+    # ── Barcode ──
+    BarcodeTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        width: { type: number }
+        height: { type: number }
+        fields: { type: array, items: {} }
+        createdAt: { type: string, format: date-time }
+
+    BarcodePrintJob:
+      type: object
+      properties:
+        id: { type: integer }
+        templateId: { type: integer }
+        products: { type: array, items: {} }
+        quantity: { type: integer }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    # ── Backup ──
+    BackupInfo:
+      type: object
+      properties:
+        name: { type: string }
+        size: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    BackupStats:
+      type: object
+      properties:
+        totalBackups: { type: integer }
+        lastBackupAt: { type: string, format: date-time, nullable: true }
+        totalSize: { type: integer }
+
+    # ── Audit ──
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        userId: { type: integer, nullable: true }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: integer, nullable: true }
+        details: {}
+        ipAddress: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    # ── Capabilities ──
+    SystemCapabilities:
+      type: object
+      properties:
+        status: { type: string }
+        capabilities: { type: array, items: { type: object, properties: { key: { type: string }, enabled: { type: boolean } } } }
+        limits: { type: object }
+        version: { type: string }
+        environment: { type: string }
+
+    # ── Idempotency ──
+    IdempotencyHeader:
+      description: Idempotency key for write operations
+      type: string
+
+  # ─── Reusable Parameters ──────────────────────────────────────────
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, pattern: "^\\d+$" }
+      description: Numeric resource ID
+
+    LimitParam:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    OffsetParam:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    PageParam:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    SearchParam:
+      name: search
+      in: query
+      schema: { type: string }
+    DateFromParam:
+      name: dateFrom
+      in: query
+      schema: { type: string, format: date }
+    DateToParam:
+      name: dateTo
+      in: query
+      schema: { type: string, format: date }
+
+    IdempotencyKeyHeader:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: Idempotency key — required for financial write operations
+
+  # ─── Reusable Responses ───────────────────────────────────────────
+  responses:
+    BadRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: Conflict (duplicate, state mismatch)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    IdempotencyReplay:
+      description: Idempotency replay — same response returned
+      content:
+        application/json:
+          schema:
+            description: Original response replayed
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+# ═══════════════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════════════
+paths:
+
+  # ─── AUTH ─────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      security: []
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/LoginData" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/setup-status:
+    get:
+      tags: [Auth]
+      summary: Check initial setup status
+      security: []
+      operationId: authSetupStatus
+      responses:
+        "200":
+          description: Setup status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/SetupStatus" }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register first admin user
+      security: []
+      operationId: authRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "200":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/UserSafe" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      operationId: authMe
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/UserSafe" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change current user password
+      operationId: authChangePassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChangePasswordRequest" }
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      operationId: authRefresh
+      description: |
+        Exchange a valid refresh token for a new access + refresh token pair.
+        Returns 401 if refresh token is invalid/expired — client must re-login.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: New tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/RefreshData" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (invalidate refresh token)
+      operationId: authLogout
+      description: Invalidates the refresh token. Client should discard both tokens.
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+
+  # ─── PRODUCTS ─────────────────────────────────────────────────────
+  /products:
+    get:
+      tags: [Products]
+      summary: List products (paginated)
+      operationId: listProducts
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: categoryId
+          in: query
+          schema: { type: integer }
+        - name: supplierId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string, enum: [available, out_of_stock, discontinued] }
+        - name: lowStockOnly
+          in: query
+          schema: { type: boolean }
+        - name: expiringSoonOnly
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Product" } }
+                      total: { type: integer }
+                      page: { type: integer }
+                      limit: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Products]
+      summary: Create product
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductRequest" }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Product" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product by ID
+      operationId: getProduct
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Product" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Products]
+      summary: Update product
+      operationId: updateProduct
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProductRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Product" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Products]
+      summary: Delete product
+      operationId: deleteProduct
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/purchase-history:
+    get:
+      tags: [Products]
+      summary: Get product purchase history
+      operationId: getProductPurchaseHistory
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: Purchase history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: {} }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/sales-history:
+    get:
+      tags: [Products]
+      summary: Get product sales history
+      operationId: getProductSalesHistory
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: Sales history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: {} }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/units:
+    get:
+      tags: [Products]
+      summary: List product units
+      operationId: listProductUnits
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Product units
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/ProductUnit" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Products]
+      summary: Create product unit
+      operationId: createProductUnit
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, factor]
+              properties:
+                name: { type: string }
+                factor: { type: number, minimum: 0.001 }
+                barcode: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Created unit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ProductUnit" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /products/units/{id}:
+    put:
+      tags: [Products]
+      summary: Update product unit
+      operationId: updateProductUnit
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                factor: { type: number }
+                barcode: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Updated unit
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ProductUnit" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Products]
+      summary: Delete product unit
+      operationId: deleteProductUnit
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/units/{unitId}/set-default:
+    post:
+      tags: [Products]
+      summary: Set default unit for product
+      operationId: setDefaultProductUnit
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: unitId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Default unit set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ProductUnit" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/batches:
+    get:
+      tags: [Products]
+      summary: List product batches
+      operationId: listProductBatches
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Product batches
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/ProductBatch" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Products]
+      summary: Create product batch
+      operationId: createProductBatch
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [batchNumber, quantity, costPrice]
+              properties:
+                batchNumber: { type: string }
+                quantity: { type: integer, minimum: 1 }
+                costPrice: { type: integer, minimum: 0 }
+                expiryDate: { type: string, format: date, nullable: true }
+      responses:
+        "200":
+          description: Created batch
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ProductBatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /products/{productId}/adjust-stock:
+    post:
+      tags: [Products]
+      summary: Adjust product stock
+      operationId: adjustProductStock
+      description: Used by inventoryClient for manual stock adjustments
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdjustStockRequest" }
+      responses:
+        "200":
+          description: Stock adjusted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── SALES ────────────────────────────────────────────────────────
+  /sales:
+    get:
+      tags: [Sales]
+      summary: List sales (paginated)
+      operationId: listSales
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Paginated sales list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Sale" } }
+                      total: { type: integer }
+                      page: { type: integer }
+                      limit: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Sales]
+      summary: Create sale
+      operationId: createSale
+      description: |
+        Creates a new sale with line items and payment information.
+        Requires X-Idempotency-Key header to prevent double sales.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSaleRequest" }
+      responses:
+        "200":
+          description: Sale created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Sale" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /sales/{id}:
+    get:
+      tags: [Sales]
+      summary: Get sale by ID
+      operationId: getSale
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Sale details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Sale" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /sales/{saleId}/payments:
+    post:
+      tags: [Sales]
+      summary: Add payment to sale
+      operationId: addSalePayment
+      parameters:
+        - name: saleId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddPaymentRequest" }
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /sales/{id}/cancel:
+    post:
+      tags: [Sales]
+      summary: Cancel a sale
+      operationId: cancelSale
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Sale cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Sale" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /sales/{id}/refund:
+    post:
+      tags: [Sales]
+      summary: Refund a sale
+      operationId: refundSale
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+                items: { type: array, items: { type: object, properties: { saleItemId: { type: integer }, quantity: { type: integer } } } }
+      responses:
+        "200":
+          description: Sale refunded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Sale" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /sales/{id}/receipt:
+    get:
+      tags: [Sales]
+      summary: Get sale receipt data
+      operationId: getSaleReceipt
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Receipt data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    description: Full receipt with company info, sale details, items, payments
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── POS ──────────────────────────────────────────────────────────
+  /pos/after-pay:
+    post:
+      tags: [POS]
+      summary: Process after-payment POS flow
+      operationId: posAfterPay
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: POS after-pay payload (same shape as CreateSaleRequest with POS-specific fields)
+      responses:
+        "200":
+          description: POS sale processed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── CATEGORIES ───────────────────────────────────────────────────
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List all categories
+      operationId: listCategories
+      responses:
+        "200":
+          description: Categories list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/Category" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Categories]
+      summary: Create category
+      operationId: createCategory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCategoryRequest" }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /categories/{id}:
+    put:
+      tags: [Categories]
+      summary: Update category
+      operationId: updateCategory
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCategoryRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Category" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Categories]
+      summary: Delete category
+      operationId: deleteCategory
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── CUSTOMERS ────────────────────────────────────────────────────
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List customers (paginated)
+      operationId: listCustomers
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/SearchParam"
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Customer" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Customers]
+      summary: Create customer
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCustomerRequest" }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Customer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Get customer by ID
+      operationId: getCustomer
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Customer" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Customers]
+      summary: Update customer
+      operationId: updateCustomer
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateCustomerRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Customer" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Customers]
+      summary: Delete customer
+      operationId: deleteCustomer
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── CUSTOMER LEDGER ──────────────────────────────────────────────
+  /customer-ledger/{customerId}:
+    get:
+      tags: [Customer Ledger]
+      summary: Get customer ledger entries
+      operationId: getCustomerLedger
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Ledger entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/LedgerEntry" } }
+                      total: { type: integer }
+                      balance: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /customer-ledger/{customerId}/payments:
+    post:
+      tags: [Customer Ledger]
+      summary: Record customer payment
+      operationId: recordCustomerPayment
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordPaymentRequest" }
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /customer-ledger/{customerId}/adjustments:
+    post:
+      tags: [Customer Ledger]
+      summary: Add customer ledger adjustment
+      operationId: addCustomerAdjustment
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LedgerAdjustmentRequest" }
+      responses:
+        "200":
+          description: Adjustment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /customer-ledger/reconcile:
+    post:
+      tags: [Customer Ledger]
+      summary: Reconcile customer debts
+      operationId: reconcileCustomerDebts
+      parameters:
+        - name: repair
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Reconciliation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── SUPPLIERS ────────────────────────────────────────────────────
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List suppliers (paginated)
+      operationId: listSuppliers
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/SearchParam"
+      responses:
+        "200":
+          description: Supplier list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Supplier" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Suppliers]
+      summary: Create supplier
+      operationId: createSupplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateSupplierRequest" }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Supplier" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /suppliers/{id}:
+    get:
+      tags: [Suppliers]
+      summary: Get supplier by ID
+      operationId: getSupplier
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Supplier details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Supplier" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Suppliers]
+      summary: Update supplier
+      operationId: updateSupplier
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateSupplierRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Supplier" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Suppliers]
+      summary: Delete supplier
+      operationId: deleteSupplier
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── SUPPLIER LEDGER ──────────────────────────────────────────────
+  /supplier-ledger/{supplierId}:
+    get:
+      tags: [Supplier Ledger]
+      summary: Get supplier ledger entries
+      operationId: getSupplierLedger
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Ledger entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/LedgerEntry" } }
+                      total: { type: integer }
+                      balance: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /supplier-ledger/{supplierId}/payments:
+    post:
+      tags: [Supplier Ledger]
+      summary: Record supplier payment
+      operationId: recordSupplierPayment
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RecordPaymentRequest" }
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /supplier-ledger/reconcile:
+    post:
+      tags: [Supplier Ledger]
+      summary: Reconcile supplier balances
+      operationId: reconcileSupplierBalances
+      parameters:
+        - name: repair
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Reconciliation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── PURCHASES ────────────────────────────────────────────────────
+  /purchases:
+    get:
+      tags: [Purchases]
+      summary: List purchases (paginated)
+      operationId: listPurchases
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Purchase list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Purchase" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Purchases]
+      summary: Create purchase
+      operationId: createPurchase
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePurchaseRequest" }
+      responses:
+        "200":
+          description: Purchase created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Purchase" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /purchases/{id}:
+    get:
+      tags: [Purchases]
+      summary: Get purchase by ID
+      operationId: getPurchase
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Purchase details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/Purchase" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /purchases/{purchaseId}/payments:
+    post:
+      tags: [Purchases]
+      summary: Add payment to purchase
+      operationId: addPurchasePayment
+      parameters:
+        - name: purchaseId
+          in: path
+          required: true
+          schema: { type: integer }
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddPaymentRequest" }
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── INVENTORY ────────────────────────────────────────────────────
+  /inventory/dashboard:
+    get:
+      tags: [Inventory]
+      summary: Inventory dashboard stats
+      operationId: getInventoryDashboard
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/InventoryDashboard" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /inventory/movements:
+    get:
+      tags: [Inventory]
+      summary: List inventory movements (paginated)
+      operationId: listInventoryMovements
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - name: productId
+          in: query
+          schema: { type: integer }
+        - name: movementType
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Movement list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/InventoryMovement" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /inventory/expiry-alerts:
+    get:
+      tags: [Inventory]
+      summary: Get expiry alerts
+      operationId: getExpiryAlerts
+      responses:
+        "200":
+          description: Expiry alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/ExpiryAlert" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /inventory/reconcile:
+    post:
+      tags: [Inventory]
+      summary: Reconcile inventory
+      operationId: reconcileInventory
+      responses:
+        "200":
+          description: Reconciliation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── ACCOUNTING ───────────────────────────────────────────────────
+  /accounting/accounts:
+    get:
+      tags: [Accounting]
+      summary: List chart of accounts
+      operationId: listAccounts
+      responses:
+        "200":
+          description: Accounts list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/Account" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /accounting/journal-entries:
+    get:
+      tags: [Accounting]
+      summary: List journal entries (paginated)
+      operationId: listJournalEntries
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - name: sourceType
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+        - name: isPosted
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Journal entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/JournalEntry" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /accounting/journal-entries/{id}:
+    get:
+      tags: [Accounting]
+      summary: Get journal entry by ID
+      operationId: getJournalEntry
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Journal entry details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/JournalEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /accounting/trial-balance:
+    get:
+      tags: [Accounting]
+      summary: Get trial balance
+      operationId: getTrialBalance
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Trial balance
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/TrialBalance" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /accounting/profit-loss:
+    get:
+      tags: [Accounting]
+      summary: Get profit & loss statement
+      operationId: getProfitLoss
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Profit & loss
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ProfitLoss" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /accounting/balance-sheet:
+    get:
+      tags: [Accounting]
+      summary: Get balance sheet
+      operationId: getBalanceSheet
+      parameters:
+        - name: fromDate
+          in: query
+          schema: { type: string, format: date }
+        - name: toDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Balance sheet
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BalanceSheet" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /accounting/status:
+    get:
+      tags: [Accounting Setup]
+      summary: Get accounting initialization status
+      operationId: getAccountingStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/AccountingStatus" }
+
+  /accounting/initialize:
+    post:
+      tags: [Accounting Setup]
+      summary: Initialize chart of accounts
+      operationId: initializeAccounting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currency: { type: string }
+                language: { type: string }
+      responses:
+        "200":
+          description: Initialized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ─── POSTING ──────────────────────────────────────────────────────
+  /posting/entries/{entryId}/post:
+    post:
+      tags: [Posting]
+      summary: Post individual journal entry
+      operationId: postEntry
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Entry posted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /posting/entries/{entryId}/unpost:
+    post:
+      tags: [Posting]
+      summary: Unpost individual journal entry
+      operationId: unpostEntry
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Entry unposted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /posting/period:
+    post:
+      tags: [Posting]
+      summary: Batch post entries for period
+      operationId: postPeriod
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostPeriodRequest" }
+      responses:
+        "200":
+          description: Posting batch result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PostingBatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /posting/batches:
+    get:
+      tags: [Posting]
+      summary: List posting batches
+      operationId: listPostingBatches
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+      responses:
+        "200":
+          description: Posting batches
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/PostingBatch" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /posting/batches/{batchId}/reverse:
+    post:
+      tags: [Posting]
+      summary: Reverse a posting batch
+      operationId: reversePostingBatch
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Batch reversed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /posting/batches/{batchId}/lock:
+    post:
+      tags: [Posting]
+      summary: Lock a posting batch
+      operationId: lockPostingBatch
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Batch locked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /posting/batches/{batchId}/unlock:
+    post:
+      tags: [Posting]
+      summary: Unlock a posting batch
+      operationId: unlockPostingBatch
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Batch unlocked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ─── AUDIT ────────────────────────────────────────────────────────
+  /audit/trail:
+    get:
+      tags: [Audit]
+      summary: Get audit trail
+      operationId: getAuditTrail
+      parameters:
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/OffsetParam"
+        - name: userId
+          in: query
+          schema: { type: integer }
+        - name: entityType
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } }
+                      total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ─── BACKUP ───────────────────────────────────────────────────────
+  /backup:
+    post:
+      tags: [Backup]
+      summary: Create a backup
+      operationId: createBackup
+      responses:
+        "200":
+          description: Backup created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BackupInfo" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    get:
+      tags: [Backup]
+      summary: List backups
+      operationId: listBackups
+      responses:
+        "200":
+          description: Backup list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/BackupInfo" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /backup/generate-token:
+    post:
+      tags: [Backup]
+      summary: Generate backup download token
+      operationId: generateBackupToken
+      responses:
+        "200":
+          description: Token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      token: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /backup/restore:
+    post:
+      tags: [Backup]
+      summary: Restore from backup
+      operationId: restoreBackup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backupName]
+              properties:
+                backupName: { type: string }
+      responses:
+        "200":
+          description: Restore initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /backup/{backupName}:
+    delete:
+      tags: [Backup]
+      summary: Delete a backup
+      operationId: deleteBackup
+      parameters:
+        - name: backupName
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Backup deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /backup/stats:
+    get:
+      tags: [Backup]
+      summary: Get backup statistics
+      operationId: getBackupStats
+      responses:
+        "200":
+          description: Backup stats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BackupStats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── BARCODE ──────────────────────────────────────────────────────
+  /barcode/templates:
+    get:
+      tags: [Barcode]
+      summary: List barcode templates
+      operationId: listBarcodeTemplates
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/BarcodeTemplate" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Barcode]
+      summary: Create barcode template
+      operationId: createBarcodeTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                width: { type: number }
+                height: { type: number }
+                fields: { type: array, items: {} }
+      responses:
+        "200":
+          description: Template created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BarcodeTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /barcode/templates/{id}:
+    delete:
+      tags: [Barcode]
+      summary: Delete barcode template
+      operationId: deleteBarcodeTemplate
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /barcode/print-jobs:
+    get:
+      tags: [Barcode]
+      summary: List print jobs
+      operationId: listBarcodePrintJobs
+      responses:
+        "200":
+          description: Print jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/BarcodePrintJob" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Barcode]
+      summary: Create print job
+      operationId: createBarcodePrintJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateId, products]
+              properties:
+                templateId: { type: integer }
+                products: { type: array, items: { type: object, properties: { productId: { type: integer }, quantity: { type: integer } } } }
+      responses:
+        "200":
+          description: Print job created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BarcodePrintJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── DASHBOARD ────────────────────────────────────────────────────
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Get dashboard statistics
+      operationId: getDashboardStats
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/DashboardStats" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ─── SETTINGS ─────────────────────────────────────────────────────
+  /settings/{key}:
+    get:
+      tags: [Settings]
+      summary: Get setting by key
+      operationId: getSetting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Setting value
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: {}
+    put:
+      tags: [Settings]
+      summary: Update setting by key
+      operationId: updateSetting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /settings/typed:
+    get:
+      tags: [Settings]
+      summary: Get typed settings object
+      operationId: getTypedSettings
+      responses:
+        "200":
+          description: Typed settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: object }
+    put:
+      tags: [Settings]
+      summary: Update typed settings
+      operationId: updateTypedSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /settings/currency:
+    get:
+      tags: [Settings]
+      summary: Get currency settings
+      operationId: getCurrencySettings
+      security: []
+      responses:
+        "200":
+          description: Currency settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/CurrencySettings" }
+
+  /settings/company:
+    get:
+      tags: [Settings]
+      summary: Get company settings
+      operationId: getCompanySettings
+      security: []
+      responses:
+        "200":
+          description: Company settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/CompanySettings" }
+    put:
+      tags: [Settings]
+      summary: Update company settings
+      operationId: updateCompanySettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanySettings" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/CompanySettings" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /system/capabilities:
+    get:
+      tags: [System]
+      summary: Get system capabilities
+      operationId: getSystemCapabilities
+      security: []
+      responses:
+        "200":
+          description: System capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/SystemCapabilities" }
+
+  /settings/modules:
+    get:
+      tags: [Settings]
+      summary: Get module settings
+      operationId: getModuleSettings
+      responses:
+        "200":
+          description: Module settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ModuleSettings" }
+
+  /settings/setup-wizard:
+    post:
+      tags: [Settings]
+      summary: Complete setup wizard
+      operationId: completeSetupWizard
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetupWizardRequest" }
+      responses:
+        "200":
+          description: Setup completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    properties:
+                      completed: { type: boolean }
+
+  # ─── USERS ────────────────────────────────────────────────────────
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      operationId: listUsers
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { type: array, items: { $ref: "#/components/schemas/UserSafe" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Users]
+      summary: Create user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, fullName, role]
+              properties:
+                username: { type: string, minLength: 1 }
+                password: { type: string, minLength: 6 }
+                fullName: { type: string, minLength: 1 }
+                phone: { type: string, nullable: true }
+                role: { type: string, enum: [admin, cashier, manager, viewer] }
+      responses:
+        "200":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/UserSafe" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /users/{id}:
+    put:
+      tags: [Users]
+      summary: Update user
+      operationId: updateUser
+      parameters:
+        - $ref: "#/components/parameters/IdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName: { type: string }
+                phone: { type: string, nullable: true }
+                role: { type: string, enum: [admin, cashier, manager, viewer] }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/UserSafe" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }

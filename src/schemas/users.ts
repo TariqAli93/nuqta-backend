@@ -96,3 +96,13 @@ export const updateUserSchema = {
     ...ErrorResponses,
   },
 } as const;
+
+export const currentUserSchema = {
+  tags: ["Users"],
+  summary: "Get current authenticated user",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: successEnvelope(UserSchema, "Current user details"),
+    ...ErrorResponses,
+  },
+} as const;

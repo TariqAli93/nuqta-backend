@@ -182,7 +182,10 @@ export const getSettingByKeySchema = {
   security: [{ bearerAuth: [] }],
   params: KeyParamsSchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Setting value"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Setting value",
+    ),
     ...ErrorResponses,
   },
 } as const;

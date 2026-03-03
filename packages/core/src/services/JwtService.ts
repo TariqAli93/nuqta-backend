@@ -1,128 +1,134 @@
 /**
  * JWT Service
- * Handles JWT token signing and verification for both Cloud and Offline modes
- * Token structure: { sub: userId, role: userRole, permissions: permissionList, iat, exp, jti }
+ * Handles JWT token signing and verification using jsonwebtoken library.
+ * Supports two token types:
+ *   - access  (short-lived, default 15 min)  — used for API authorization
+ *   - refresh (long-lived, default 7 days)   — used to obtain new access tokens
+ *
+ * Token structure: { sub, role, permissions, username, fullName, phone?, type, iat, exp, jti }
  */
 
-import crypto from 'crypto';
+import jwt, { SignOptions } from "jsonwebtoken";
+import { randomBytes } from "crypto";
+
+export type TokenType = "access" | "refresh";
 
 export interface JwtPayload {
-  sub: number; // User ID
-  role: string;
-  permissions: string[];
-  iat: number; // Issued at
-  exp: number; // Expiration
-  jti: string; // JWT ID (for refresh token rotation)
+  sub: string; // user ID
+  role: string; // user role (e.g. "admin", "manager")
+  permissions: string[]; // list of permissions
+  username: string; // for convenience
+  fullName: string; // for convenience
+  phone?: string; // optional
+  type: TokenType; // discriminator
 }
 
 export interface JwtOptions {
   secret: string;
-  expiresIn: number; // seconds
+  accessExpiresIn: number; // seconds  (default 900 = 15 min)
+  refreshExpiresIn: number; // seconds  (default 604_800 = 7 days)
 }
 
 export class JwtService {
   private secret: string;
-  private expiresIn: number;
+  private accessExpiresIn: number;
+  private refreshExpiresIn: number;
 
-  constructor(secret: string, expiresIn: number = 900) {
-    // Default 15 min access token
+  constructor(
+    secret: string,
+    accessExpiresIn: number = 900,
+    refreshExpiresIn: number = 604_800,
+  ) {
     this.secret = secret;
-    this.expiresIn = expiresIn;
+    this.accessExpiresIn = accessExpiresIn;
+    this.refreshExpiresIn = refreshExpiresIn;
   }
 
-  /**
-   * Sign a JWT token (simple implementation, suitable for HS256)
-   */
-  sign(payload: Omit<JwtPayload, 'iat' | 'exp' | 'jti'>): string {
-    const now = Math.floor(Date.now() / 1000);
-    const jti = crypto.randomBytes(16).toString('hex');
+  // ── helpers ────────────────────────────────────────────────────────
 
-    const fullPayload: JwtPayload = {
-      ...payload,
-      iat: now,
-      exp: now + this.expiresIn,
-      jti,
+  private signToken(
+    payload: Omit<JwtPayload, "iat" | "exp" | "jti">,
+    expiresIn: number,
+  ): string {
+    const jti = randomBytes(16).toString("hex");
+    const signOptions: SignOptions = {
+      algorithm: "HS256",
+      expiresIn,
+      jwtid: jti,
     };
-
-    const header = {
-      alg: 'HS256',
-      typ: 'JWT',
-    };
-
-    const token =
-      this.base64UrlEncode(JSON.stringify(header)) +
-      '.' +
-      this.base64UrlEncode(JSON.stringify(fullPayload));
-
-    const signature = this.hmacSha256(token, this.secret);
-    return token + '.' + signature;
+    return jwt.sign(payload, this.secret, signOptions);
   }
 
-  /**
-   * Verify and decode a JWT token
-   */
-  verify(token: string): JwtPayload | null {
+  private verifyToken(
+    token: string,
+    expectedType: TokenType,
+  ): JwtPayload | null {
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-
-      const [headerB64, payloadB64, signatureB64] = parts;
-      const expectedSignature = this.hmacSha256(`${headerB64}.${payloadB64}`, this.secret);
-
-      if (signatureB64 !== expectedSignature) {
-        return null;
-      }
-
-      const payload = JSON.parse(this.base64UrlDecode(payloadB64)) as JwtPayload;
-
-      // Check expiration
-      const now = Math.floor(Date.now() / 1000);
-      if (payload.exp < now) {
-        return null;
-      }
-
+      const payload = jwt.verify(token, this.secret) as JwtPayload;
+      if (payload.type !== expectedType) return null;
       return payload;
     } catch {
       return null;
     }
   }
 
+  // ── public API ─────────────────────────────────────────────────────
+
   /**
-   * Decode without verification (for debugging)
+   * Sign a short-lived access token (default 15 min).
+   */
+  signAccess(
+    payload: Omit<JwtPayload, "iat" | "exp" | "jti" | "type">,
+  ): string {
+    return this.signToken({ ...payload, type: "access" }, this.accessExpiresIn);
+  }
+
+  /**
+   * Sign a long-lived refresh token (default 7 days).
+   */
+  signRefresh(
+    payload: Omit<JwtPayload, "iat" | "exp" | "jti" | "type">,
+  ): string {
+    return this.signToken(
+      { ...payload, type: "refresh" },
+      this.refreshExpiresIn,
+    );
+  }
+
+  /**
+   * Verify an access token. Returns null if invalid, expired, or wrong type.
+   */
+  verifyAccess(token: string): JwtPayload | null {
+    return this.verifyToken(token, "access");
+  }
+
+  /**
+   * Verify a refresh token. Returns null if invalid, expired, or wrong type.
+   */
+  verifyRefresh(token: string): JwtPayload | null {
+    return this.verifyToken(token, "refresh");
+  }
+
+  // ── backwards-compatible aliases ───────────────────────────────────
+
+  /** @deprecated Use signAccess() instead */
+  sign(payload: Omit<JwtPayload, "iat" | "exp" | "jti" | "type">): string {
+    return this.signAccess(payload);
+  }
+
+  /** @deprecated Use verifyAccess() instead */
+  verify(token: string): JwtPayload | null {
+    return this.verifyAccess(token);
+  }
+
+  /**
+   * Decode without verification (for debugging).
    */
   decode(token: string): JwtPayload | null {
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-      return JSON.parse(this.base64UrlDecode(parts[1])) as JwtPayload;
+      return jwt.decode(token, { complete: false }) as JwtPayload | null;
     } catch {
       return null;
     }
-  }
-
-  // Helper: Base64URL encode
-  private base64UrlEncode(str: string): string {
-    return Buffer.from(str)
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-  }
-
-  // Helper: Base64URL decode
-  private base64UrlDecode(str: string): string {
-    const padded = str + '='.repeat((4 - (str.length % 4)) % 4);
-    return Buffer.from(padded.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString();
-  }
-
-  // Helper: HMAC-SHA256
-  private hmacSha256(message: string, secret: string): string {
-    return crypto
-      .createHmac('sha256', secret)
-      .update(message)
-      .digest('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
   }
 }

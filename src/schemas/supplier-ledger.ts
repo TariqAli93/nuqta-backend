@@ -99,7 +99,10 @@ export const recordSupplierPaymentSchema = {
   params: SupplierIdParamsSchema,
   body: SupplierPaymentBodySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Payment recorded"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Payment recorded",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -111,7 +114,10 @@ export const reconcileSupplierBalanceSchema = {
   security: [{ bearerAuth: [] }],
   querystring: ReconcileQuerySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Reconciliation result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reconciliation result",
+    ),
     ...ErrorResponses,
   },
 } as const;

@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.28.0",
   "main": "dist/app.js",
   "directories": {
-    "test": "test"
+    "test": "tests"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -21,8 +21,9 @@
     "dev:start": "fastify start --ignore-watch=.ts$ -w -l info -P dist/app.js",
     "watch:ts": "tsc -w",
     "start": "pnpm build:ts && fastify start -l info dist/app.js",
-    "test": "pnpm build && vitest run",
-    "test:watch": "pnpm build && vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:all": "pnpm -r run test",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules && rm -rf dist node_modules"
@@ -47,9 +48,11 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.8",
+    "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^9.0.0",
     "fastify-tsconfig": "^3.0.0",
     "knip": "^5.85.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.18"
   }
 }

@@ -110,3 +110,14 @@ export const deleteCustomerSchema = {
     ...ErrorResponses,
   },
 } as const;
+
+export const getCustomerByIdSchema = {
+  tags: ["Customers"],
+  summary: "Get customer by ID",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope(CustomerSchema, "Customer details"),
+    ...ErrorResponses,
+  },
+} as const;

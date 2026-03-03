@@ -158,7 +158,10 @@ export const getProfitLossSchema = {
   security: [{ bearerAuth: [] }],
   querystring: DateRangeQuerySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Profit & loss report"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Profit & loss report",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -169,7 +172,10 @@ export const getBalanceSheetSchema = {
   security: [{ bearerAuth: [] }],
   querystring: BalanceSheetDateRangeSchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Balance sheet"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Balance sheet",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -185,7 +191,10 @@ export const initializeAccountingSchema = {
     description: "Optional initialization parameters",
   },
   response: {
-    200: successEnvelope({ type: "object" as const }, "Initialization result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Initialization result",
+    ),
     ...ErrorResponses,
   },
 } as const;

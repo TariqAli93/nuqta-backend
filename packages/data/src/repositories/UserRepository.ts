@@ -55,7 +55,7 @@ export class UserRepository implements IUserRepository {
   async updateLastLogin(id: number): Promise<void> {
     await this.db
       .update(users)
-      .set({ lastLoginAt: new Date() } as any)
+      .set({ lastLoginAt: new Date().toISOString() } as any)
       .where(eq(users.id, id));
   }
 }

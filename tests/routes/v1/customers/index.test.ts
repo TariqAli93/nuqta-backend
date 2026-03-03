@@ -1,0 +1,192 @@
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { expectError, expectOk } from "../../../helpers/assertions.ts";
+import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
+import { customer } from "../../../helpers/fixtures.ts";
+import {
+  getUseCaseMock,
+  mockUseCase,
+  resetMockCore,
+} from "../../../helpers/mockCore.ts";
+import { resetMockData } from "../../../helpers/mockData.ts";
+
+describe("/api/v1/customers", () => {
+  let ctx: BuiltApp;
+
+  beforeEach(async () => {
+    resetMockCore();
+    resetMockData();
+    ctx = await buildApp();
+  });
+
+  afterEach(async () => {
+    if (ctx) {
+      await ctx.close();
+    }
+  });
+
+  test.each([
+    {
+      title: "GET / returns the customer list",
+      method: "GET",
+      url: "/api/v1/customers?search=Layla&page=1&limit=10",
+      setup: () => mockUseCase("GetCustomersUseCase", { execute: [customer] }),
+      assert: (data: (typeof customer)[]) => {
+        expect(data[0].name).toBe(customer.name);
+      },
+    },
+    {
+      title: "POST / creates a customer",
+      method: "POST",
+      url: "/api/v1/customers",
+      payload: { name: "Samir", phone: "7701231234", isActive: true },
+      setup: () =>
+        mockUseCase("CreateCustomerUseCase", {
+          execute: { ...customer, id: 8, name: "Samir" },
+        }),
+      assert: (data: typeof customer) => {
+        expect(data.name).toBe("Samir");
+      },
+    },
+    {
+      title: "PUT /:id updates a customer",
+      method: "PUT",
+      url: "/api/v1/customers/3",
+      payload: { city: "Basra" },
+      setup: () =>
+        mockUseCase("UpdateCustomerUseCase", {
+          execute: { ...customer, city: "Basra" },
+        }),
+      assert: (data: typeof customer) => {
+        expect(data.city).toBe("Basra");
+      },
+    },
+    {
+      title: "DELETE /:id removes a customer",
+      method: "DELETE",
+      url: "/api/v1/customers/3",
+      setup: () => mockUseCase("DeleteCustomerUseCase", { execute: null }),
+      assert: (data: null) => {
+        expect(data).toBeNull();
+      },
+    },
+  ])("$title", async ({ method, url, payload, setup, assert }) => {
+    setup();
+
+    const response = await ctx.app.inject({
+      method,
+      url,
+      payload,
+      headers: ctx.authHeaders(),
+    });
+
+    const data = expectOk(response);
+    assert(data as never);
+  });
+
+  test.each([
+    {
+      method: "GET",
+      url: "/api/v1/customers?page=bad",
+    },
+    {
+      method: "POST",
+      url: "/api/v1/customers",
+      payload: { phone: "7700000000" },
+    },
+    {
+      method: "PUT",
+      url: "/api/v1/customers/3",
+      payload: { isActive: "nope" },
+    },
+  ])("returns 400 for invalid %s %s", async ({ method, url, payload }) => {
+    const response = await ctx.app.inject({
+      method,
+      url,
+      payload,
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  test("returns 401 when auth is missing", async () => {
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/customers",
+    });
+
+    expectError(response, 401, "UNAUTHORIZED");
+  });
+
+  test("returns 403 when update is forbidden", async () => {
+    mockUseCase("UpdateCustomerUseCase", {
+      execute: async () => {
+        throw new PermissionDeniedError("denied");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "PUT",
+      url: "/api/v1/customers/3",
+      payload: { city: "Denied" },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 403, "PERMISSION_DENIED");
+  });
+
+  test("returns 404 when deleting a missing customer", async () => {
+    mockUseCase("DeleteCustomerUseCase", {
+      execute: async () => {
+        throw new NotFoundError("missing");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "DELETE",
+      url: "/api/v1/customers/999",
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 404, "NOT_FOUND");
+  });
+
+  // ── Covers L29-32: limit/page/nested-limit ternary fallback branches ──
+  test("GET /customers without optional query params hits default fallbacks", async () => {
+    mockUseCase("GetCustomersUseCase", { execute: [] });
+
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/customers",
+      headers: ctx.authHeaders(),
+    });
+
+    expectOk(response);
+  });
+
+  test(
+    "GET /customers with page but no limit uses the default page-size offset (covers src/routes/v1/customers/index.ts:32)",
+    async () => {
+      mockUseCase("GetCustomersUseCase", { execute: [customer] });
+
+      const response = await ctx.app.inject({
+        method: "GET",
+        url: "/api/v1/customers?page=2",
+        headers: ctx.authHeaders(),
+      });
+
+      const data = expectOk(response);
+      expect(Array.isArray(data)).toBe(true);
+      expect((data as (typeof customer)[])[0]).toMatchObject({
+        id: customer.id,
+        name: customer.name,
+      });
+      expect(getUseCaseMock("GetCustomersUseCase", "execute")).toHaveBeenCalledWith({
+        search: undefined,
+        limit: undefined,
+        offset: 20,
+      });
+    },
+  );
+});

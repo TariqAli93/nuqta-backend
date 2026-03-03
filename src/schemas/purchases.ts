@@ -171,7 +171,10 @@ export const addPurchasePaymentSchema = {
   params: { $ref: "IdParams#" },
   body: AddPurchasePaymentBodySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Payment result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Payment result",
+    ),
     ...ErrorResponses,
   },
 } as const;

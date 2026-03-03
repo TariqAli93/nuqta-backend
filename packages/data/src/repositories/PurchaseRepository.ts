@@ -60,9 +60,13 @@ export class PurchaseRepository implements IPurchaseRepository {
       conditions.push(eq(purchases.supplierId, params.supplierId));
     if (params?.status) conditions.push(eq(purchases.status, params.status));
     if (params?.dateFrom)
-      conditions.push(gte(purchases.createdAt, new Date(params.dateFrom)));
+      conditions.push(
+        gte(purchases.createdAt, new Date(params.dateFrom).toISOString()),
+      );
     if (params?.dateTo)
-      conditions.push(lte(purchases.createdAt, new Date(params.dateTo)));
+      conditions.push(
+        lte(purchases.createdAt, new Date(params.dateTo).toISOString()),
+      );
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 

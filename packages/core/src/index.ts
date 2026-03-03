@@ -120,3 +120,36 @@ export * from "./use-cases/posting/PostPeriodUseCase.js";
 export * from "./use-cases/posting/ReverseEntryUseCase.js";
 export * from "./use-cases/posting/PostIndividualEntryUseCase.js";
 export * from "./use-cases/posting/UnpostIndividualEntryUseCase.js";
+export * from "./use-cases/posting/GetPostingBatchesUseCase.js";
+export * from "./use-cases/posting/LockPostingBatchUseCase.js";
+export * from "./use-cases/posting/UnlockPostingBatchUseCase.js";
+
+// ── Auth / Password ──
+export * from "./use-cases/ChangePasswordUseCase.js";
+
+// ── Products: Units + Batches ──
+export * from "./use-cases/GetProductByIdUseCase.js";
+export * from "./use-cases/GetProductUnitsUseCase.js";
+export * from "./use-cases/CreateProductUnitUseCase.js";
+export * from "./use-cases/UpdateProductUnitUseCase.js";
+export * from "./use-cases/DeleteProductUnitUseCase.js";
+export * from "./use-cases/SetDefaultProductUnitUseCase.js";
+export * from "./use-cases/GetProductBatchesUseCase.js";
+export * from "./use-cases/CreateProductBatchUseCase.js";
+
+// ── Customers ──
+export * from "./use-cases/GetCustomerByIdUseCase.js";
+
+// ── Sales: Cancel / Refund / Receipt ──
+export * from "./use-cases/CancelSaleUseCase.js";
+export * from "./use-cases/RefundSaleUseCase.js";
+export * from "./use-cases/GetSaleReceiptUseCase.js";
+
+// ── Backup ──
+export * from "./interfaces/IBackupRepository.js";
+export * from "./use-cases/backup/CreateBackupUseCase.js";
+export * from "./use-cases/backup/ListBackupsUseCase.js";
+export * from "./use-cases/backup/RestoreBackupUseCase.js";
+export * from "./use-cases/backup/DeleteBackupUseCase.js";
+export * from "./use-cases/backup/GetBackupStatsUseCase.js";
+export * from "./use-cases/backup/GenerateBackupTokenUseCase.js";

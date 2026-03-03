@@ -9,6 +9,7 @@ import {
   recordSupplierPaymentSchema,
   reconcileSupplierBalanceSchema,
 } from "../../../schemas/supplier-ledger.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const supplierLedger: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
@@ -16,7 +17,10 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
   // GET /supplier-ledger/:supplierId
   fastify.get<{ Params: { supplierId: string } }>(
     "/:supplierId",
-    { schema: getSupplierLedgerSchema },
+    {
+      schema: getSupplierLedgerSchema,
+      preHandler: requirePermission("ledger:read"),
+    },
     async (request) => {
       const supplierId = parseInt(request.params.supplierId, 10);
       const query = request.query as {
@@ -40,7 +44,10 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
   // POST /supplier-ledger/:supplierId/payments
   fastify.post<{ Params: { supplierId: string } }>(
     "/:supplierId/payments",
-    { schema: recordSupplierPaymentSchema },
+    {
+      schema: recordSupplierPaymentSchema,
+      preHandler: requirePermission("ledger:payment"),
+    },
     async (request) => {
       const supplierId = parseInt(request.params.supplierId, 10);
       const body = request.body as {
@@ -65,7 +72,10 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
   // POST /supplier-ledger/reconcile
   fastify.post(
     "/reconcile",
-    { schema: reconcileSupplierBalanceSchema },
+    {
+      schema: reconcileSupplierBalanceSchema,
+      preHandler: requirePermission("ledger:adjust"),
+    },
     async (request) => {
       const { repair } = (request.query as { repair?: string }) || {};
       const uc = new ReconcileSupplierBalanceUseCase(

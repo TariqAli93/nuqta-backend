@@ -14,30 +14,41 @@ import {
   updateSupplierSchema,
   deleteSupplierSchema,
 } from "../../../schemas/suppliers.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const suppliers: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
 
   // GET /suppliers
-  fastify.get("/", { schema: getSuppliersSchema }, async (request) => {
-    const query = request.query as {
-      search?: string;
-      limit?: string;
-      offset?: string;
-    };
-    const uc = new GetSuppliersUseCase(fastify.repos.supplier);
-    const data = await uc.execute({
-      search: query.search,
-      limit: query.limit ? parseInt(query.limit, 10) : undefined,
-      offset: query.offset ? parseInt(query.offset, 10) : undefined,
-    });
-    return { ok: true, data };
-  });
+  fastify.get(
+    "/",
+    {
+      schema: getSuppliersSchema,
+      preHandler: requirePermission("suppliers:read"),
+    },
+    async (request) => {
+      const query = request.query as {
+        search?: string;
+        limit?: string;
+        offset?: string;
+      };
+      const uc = new GetSuppliersUseCase(fastify.repos.supplier);
+      const data = await uc.execute({
+        search: query.search,
+        limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        offset: query.offset ? parseInt(query.offset, 10) : undefined,
+      });
+      return { ok: true, data };
+    },
+  );
 
   // GET /suppliers/:id
   fastify.get<{ Params: { id: string } }>(
     "/:id",
-    { schema: getSupplierByIdSchema },
+    {
+      schema: getSupplierByIdSchema,
+      preHandler: requirePermission("suppliers:read"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const uc = new GetSupplierByIdUseCase(fastify.repos.supplier);
@@ -47,17 +58,27 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
   );
 
   // POST /suppliers
-  fastify.post("/", { schema: createSupplierSchema }, async (request) => {
-    const body = request.body as Supplier;
-    const uc = new CreateSupplierUseCase(fastify.repos.supplier);
-    const data = await uc.execute(body);
-    return { ok: true, data };
-  });
+  fastify.post(
+    "/",
+    {
+      schema: createSupplierSchema,
+      preHandler: requirePermission("suppliers:create"),
+    },
+    async (request) => {
+      const body = request.body as Supplier;
+      const uc = new CreateSupplierUseCase(fastify.repos.supplier);
+      const data = await uc.execute(body);
+      return { ok: true, data };
+    },
+  );
 
   // PUT /suppliers/:id
   fastify.put<{ Params: { id: string } }>(
     "/:id",
-    { schema: updateSupplierSchema },
+    {
+      schema: updateSupplierSchema,
+      preHandler: requirePermission("suppliers:update"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<Supplier>;
@@ -70,7 +91,10 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
   // DELETE /suppliers/:id
   fastify.delete<{ Params: { id: string } }>(
     "/:id",
-    { schema: deleteSupplierSchema },
+    {
+      schema: deleteSupplierSchema,
+      preHandler: requirePermission("suppliers:delete"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const uc = new DeleteSupplierUseCase(fastify.repos.supplier);

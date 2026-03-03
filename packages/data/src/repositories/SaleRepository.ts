@@ -53,9 +53,13 @@ export class SaleRepository implements ISaleRepository {
   }): Promise<{ items: Sale[]; total: number }> {
     const conditions: any[] = [];
     if (params?.startDate)
-      conditions.push(gte(sales.createdAt, new Date(params.startDate)));
+      conditions.push(
+        gte(sales.createdAt, new Date(params.startDate).toISOString()),
+      );
     if (params?.endDate)
-      conditions.push(lte(sales.createdAt, new Date(params.endDate)));
+      conditions.push(
+        lte(sales.createdAt, new Date(params.endDate).toISOString()),
+      );
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 

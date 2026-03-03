@@ -1,7 +1,11 @@
 /**
  * Sales domain schemas.
  */
-import { ErrorResponses, successEnvelope } from "./common.js";
+import {
+  ErrorResponses,
+  successEnvelope,
+  SuccessNullResponse,
+} from "./common.js";
 
 const SaleItemSchema = {
   type: "object" as const,
@@ -178,7 +182,75 @@ export const addSalePaymentSchema = {
   params: { $ref: "IdParams#" },
   body: AddSalePaymentBodySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Payment result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Payment result",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Cancel ────────────────────────────────────────────────────────
+
+export const cancelSaleSchema = {
+  tags: ["Sales"],
+  summary: "Cancel a sale",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Refund ────────────────────────────────────────────────────────
+
+const RefundSaleBodySchema = {
+  type: "object" as const,
+  required: ["amount"],
+  properties: {
+    amount: {
+      type: "integer",
+      minimum: 1,
+      description: "Refund amount in minor units",
+    },
+    reason: { type: "string" },
+  },
+  additionalProperties: false,
+} as const;
+
+export const refundSaleSchema = {
+  tags: ["Sales"],
+  summary: "Refund a sale",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  body: RefundSaleBodySchema,
+  response: {
+    200: successEnvelope(
+      {
+        type: "object" as const,
+        properties: {
+          saleId: { type: "integer" },
+          refundedAmount: { type: "integer" },
+          newPaidAmount: { type: "integer" },
+          newRemainingAmount: { type: "integer" },
+        },
+      },
+      "Refund result",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Receipt ───────────────────────────────────────────────────────
+
+export const getSaleReceiptSchema = {
+  tags: ["Sales"],
+  summary: "Get sale receipt",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope({ type: "string" }, "Receipt content"),
     ...ErrorResponses,
   },
 } as const;

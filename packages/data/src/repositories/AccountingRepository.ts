@@ -80,9 +80,13 @@ export class AccountingRepository implements IAccountingRepository {
     if (params?.sourceType)
       conditions.push(eq(journalEntries.sourceType, params.sourceType));
     if (params?.dateFrom)
-      conditions.push(gte(journalEntries.entryDate, new Date(params.dateFrom)));
+      conditions.push(
+        gte(journalEntries.entryDate, new Date(params.dateFrom).toISOString()),
+      );
     if (params?.dateTo)
-      conditions.push(lte(journalEntries.entryDate, new Date(params.dateTo)));
+      conditions.push(
+        lte(journalEntries.entryDate, new Date(params.dateTo).toISOString()),
+      );
     if (params?.isPosted !== undefined)
       conditions.push(eq(journalEntries.isPosted, params.isPosted));
 

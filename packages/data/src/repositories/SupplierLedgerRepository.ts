@@ -53,9 +53,13 @@ export class SupplierLedgerRepository implements ISupplierLedgerRepository {
       eq(supplierLedger.supplierId, params.supplierId),
     ];
     if (params.dateFrom)
-      conditions.push(gte(supplierLedger.createdAt, new Date(params.dateFrom)));
+      conditions.push(
+        gte(supplierLedger.createdAt, new Date(params.dateFrom).toISOString()),
+      );
     if (params.dateTo)
-      conditions.push(lte(supplierLedger.createdAt, new Date(params.dateTo)));
+      conditions.push(
+        lte(supplierLedger.createdAt, new Date(params.dateTo).toISOString()),
+      );
 
     const where = and(...conditions);
 

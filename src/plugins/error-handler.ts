@@ -2,6 +2,15 @@ import fp from "fastify-plugin";
 import { isDomainError, toApiError } from "@nuqta/core";
 
 export default fp(async (fastify) => {
+  fastify.setNotFoundHandler(async (request, reply) => {
+    return reply.status(404).send({
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `Route ${request.method}:${request.url} not found`,
+      },
+    });
+  });
   // ── Custom validation error formatter ─────────────────────────────
   // Transforms AJV validation errors into the standard { ok, error } envelope
   // so that runtime validation and documented 400 schemas stay in sync.

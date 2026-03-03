@@ -112,7 +112,10 @@ export const recordCustomerPaymentSchema = {
   params: CustomerIdParamsSchema,
   body: CustomerPaymentBodySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Payment recorded"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Payment recorded",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -124,7 +127,10 @@ export const addCustomerAdjustmentSchema = {
   params: CustomerIdParamsSchema,
   body: CustomerAdjustmentBodySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Adjustment recorded"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Adjustment recorded",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -136,7 +142,10 @@ export const reconcileCustomerDebtSchema = {
   security: [{ bearerAuth: [] }],
   querystring: ReconcileQuerySchema,
   response: {
-    200: successEnvelope({ type: "object" as const }, "Reconciliation result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reconciliation result",
+    ),
     ...ErrorResponses,
   },
 } as const;

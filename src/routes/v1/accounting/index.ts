@@ -18,21 +18,32 @@ import {
   initializeAccountingSchema,
   getAccountingStatusSchema,
 } from "../../../schemas/accounting.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const accounting: FastifyPluginAsync = async (fastify) => {
-  fastify.addHook("onRequest", fastify.authenticate);
+  // fastify.addHook("onRequest", fastify.authenticate);
 
   // GET /accounting/accounts
-  fastify.get("/accounts", { schema: getAccountsSchema }, async (request) => {
-    const uc = new GetAccountsUseCase(fastify.repos.accounting);
-    const data = await uc.execute();
-    return { ok: true, data };
-  });
+  fastify.get(
+    "/accounts",
+    {
+      schema: getAccountsSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
+    async (request) => {
+      const uc = new GetAccountsUseCase(fastify.repos.accounting);
+      const data = await uc.execute();
+      return { ok: true, data };
+    },
+  );
 
   // GET /accounting/journal-entries
   fastify.get(
     "/journal-entries",
-    { schema: getJournalEntriesSchema },
+    {
+      schema: getJournalEntriesSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const query = request.query as {
         sourceType?: string;
@@ -59,7 +70,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // GET /accounting/journal-entries/:id
   fastify.get<{ Params: { id: string } }>(
     "/journal-entries/:id",
-    { schema: getEntryByIdSchema },
+    {
+      schema: getEntryByIdSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const uc = new GetEntryByIdUseCase(fastify.repos.accounting);
@@ -71,7 +85,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // GET /accounting/trial-balance
   fastify.get(
     "/trial-balance",
-    { schema: getTrialBalanceSchema },
+    {
+      schema: getTrialBalanceSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const query = request.query as { dateFrom?: string; dateTo?: string };
       const uc = new GetTrialBalanceUseCase(fastify.repos.accounting);
@@ -86,7 +103,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // GET /accounting/profit-loss
   fastify.get(
     "/profit-loss",
-    { schema: getProfitLossSchema },
+    {
+      schema: getProfitLossSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const query = request.query as { dateFrom?: string; dateTo?: string };
       const uc = new GetProfitLossUseCase(fastify.repos.accounting);
@@ -101,7 +121,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // GET /accounting/balance-sheet
   fastify.get(
     "/balance-sheet",
-    { schema: getBalanceSheetSchema },
+    {
+      schema: getBalanceSheetSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const query = request.query as { fromDate?: string; toDate?: string };
       const uc = new GetBalanceSheetUseCase(fastify.repos.accounting);
@@ -116,7 +139,13 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // POST /accounting/initialize
   fastify.post(
     "/initialize",
-    { schema: initializeAccountingSchema },
+    {
+      schema: initializeAccountingSchema,
+      preHandler: [
+        fastify.authenticate,
+        requirePermission("accounting:update"),
+      ],
+    },
     async (request) => {
       const body = request.body as any;
       const uc = new InitializeAccountingUseCase(
@@ -131,7 +160,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
   // GET /accounting/status
   fastify.get(
     "/status",
-    { schema: getAccountingStatusSchema },
+    {
+      schema: getAccountingStatusSchema,
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
     async (request) => {
       const uc = new InitializeAccountingUseCase(
         fastify.repos.settings,

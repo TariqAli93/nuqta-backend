@@ -1,5 +1,6 @@
 import fp from "fastify-plugin";
 import rateLimit, { RateLimitPluginOptions } from "@fastify/rate-limit";
+import { DomainError } from "@nuqta/core";
 
 /**
  * Global rate-limiter.
@@ -25,12 +26,11 @@ export default fp<RateLimitPluginOptions>(async (fastify) => {
       "x-ratelimit-reset": true,
       "retry-after": true,
     },
-    errorResponseBuilder: (_request, context) => ({
-      ok: false,
-      error: {
-        code: "RATE_LIMITED",
-        message: `Too many requests – limit is ${context.max} per ${context.after}. Please try again later.`,
-      },
-    }),
+    errorResponseBuilder: (_request, context) =>
+      new DomainError(
+        "RATE_LIMITED",
+        `Too many requests - limit is ${context.max} per ${context.after}. Please try again later.`,
+        context.statusCode,
+      ),
   });
 });

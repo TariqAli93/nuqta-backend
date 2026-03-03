@@ -70,7 +70,7 @@ export const getInventoryDashboardSchema = {
   security: [{ bearerAuth: [] }],
   response: {
     200: successEnvelope(
-      { type: "object" as const },
+      { type: "object" as const, additionalProperties: true },
       "Inventory dashboard data",
     ),
     ...ErrorResponses,
@@ -83,7 +83,24 @@ export const getExpiryAlertsSchema = {
   description: "Products nearing or past expiry date.",
   security: [{ bearerAuth: [] }],
   response: {
-    200: successArrayEnvelope({ type: "object" as const }, "Expiry alerts"),
+    200: successArrayEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Expiry alerts",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const reconcileInventorySchema = {
+  tags: ["Inventory"],
+  summary: "Reconcile inventory stock",
+  description: "Reconcile cached stock against actual inventory movements.",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reconciliation result",
+    ),
     ...ErrorResponses,
   },
 } as const;

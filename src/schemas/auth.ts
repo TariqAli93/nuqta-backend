@@ -1,7 +1,11 @@
 /**
  * Auth domain schemas – login, register, setup status.
  */
-import { ErrorResponses, successEnvelope } from "./common.js";
+import {
+  ErrorResponses,
+  successEnvelope,
+  SuccessNullResponse,
+} from "./common.js";
 
 // ─── Request Schemas ───────────────────────────────────────────────
 
@@ -47,7 +51,9 @@ const UserSafeSchema = {
 const LoginDataSchema = {
   type: "object" as const,
   properties: {
-    token: { type: "string" },
+    accessToken: { type: "string" },
+    refreshToken: { type: "string" },
+    token: { type: "string", description: "Legacy alias for accessToken" },
     user: UserSafeSchema,
     permissions: { type: "array", items: { type: "string" } },
   },
@@ -92,6 +98,88 @@ export const setupStatusSchema = {
   description: "Check whether initial setup has been completed.",
   response: {
     200: successEnvelope(SetupStatusDataSchema, "Setup status"),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Refresh ───────────────────────────────────────────────────────
+
+const RefreshBodySchema = {
+  type: "object" as const,
+  required: ["refreshToken"],
+  properties: {
+    refreshToken: { type: "string", minLength: 1 },
+  },
+  additionalProperties: false,
+} as const;
+
+const RefreshDataSchema = {
+  type: "object" as const,
+  properties: {
+    accessToken: { type: "string" },
+    refreshToken: { type: "string" },
+    token: { type: "string" },
+  },
+};
+
+export const refreshSchema = {
+  tags: ["Auth"],
+  summary: "Refresh tokens",
+  description:
+    "Exchange a valid refresh token for a new access + refresh pair (token rotation).",
+  body: RefreshBodySchema,
+  response: {
+    200: successEnvelope(RefreshDataSchema, "New token pair"),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Change password ───────────────────────────────────────────────
+
+const ChangePasswordBodySchema = {
+  type: "object" as const,
+  required: ["currentPassword", "newPassword"],
+  properties: {
+    currentPassword: { type: "string", minLength: 1 },
+    newPassword: { type: "string", minLength: 6 },
+  },
+  additionalProperties: false,
+} as const;
+
+export const changePasswordSchema = {
+  tags: ["Auth"],
+  summary: "Change password",
+  description: "Change the currently authenticated user's password.",
+  security: [{ bearerAuth: [] }],
+  body: ChangePasswordBodySchema,
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Logout ────────────────────────────────────────────────────────
+
+export const logoutSchema = {
+  tags: ["Auth"],
+  summary: "Logout",
+  description:
+    "Client should discard tokens. Server-side blacklist is optional.",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Me ────────────────────────────────────────────────────────────
+
+export const meSchema = {
+  tags: ["Auth"],
+  summary: "Current user info",
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: successEnvelope(UserSafeSchema, "Current user"),
     ...ErrorResponses,
   },
 } as const;

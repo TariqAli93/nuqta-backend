@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { commonSchemas } from "../schemas/common.js";
+import "dotenv/config";
 
 /**
  * Swagger / OpenAPI 3.x plugin.
@@ -18,9 +19,6 @@ import { commonSchemas } from "../schemas/common.js";
  *   - In production, set ENABLE_DOCS=true to expose /docs.
  */
 export default fp(async (fastify) => {
-  const isDev = process.env.NODE_ENV !== "production";
-  const docsEnabled = isDev || process.env.ENABLE_DOCS === "true";
-
   // ── 1. Register shared $ref schemas ───────────────────────────────
   for (const schema of commonSchemas) {
     fastify.addSchema(schema);
@@ -73,7 +71,10 @@ export default fp(async (fastify) => {
   });
 
   // ── 3. @fastify/swagger-ui — serves interactive docs ──────────────
-  if (docsEnabled) {
+  const isProduction = process.env.NODE_ENV === "production";
+  const enableDocs = process.env.ENABLE_DOCS === "true";
+
+  if (!isProduction || enableDocs) {
     await fastify.register(swaggerUi, {
       routePrefix: "/docs",
       uiConfig: {

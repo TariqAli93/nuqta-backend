@@ -132,9 +132,13 @@ export class AuditRepository implements IAuditRepository {
       conditions.push(eq(auditLogs.entityId, filters.entityId));
     if (filters.action) conditions.push(eq(auditLogs.action, filters.action));
     if (filters.startDate)
-      conditions.push(gte(auditLogs.timestamp, new Date(filters.startDate)));
+      conditions.push(
+        gte(auditLogs.timestamp, new Date(filters.startDate).toISOString()),
+      );
     if (filters.endDate)
-      conditions.push(lte(auditLogs.timestamp, new Date(filters.endDate)));
+      conditions.push(
+        lte(auditLogs.timestamp, new Date(filters.endDate).toISOString()),
+      );
     return conditions;
   }
 

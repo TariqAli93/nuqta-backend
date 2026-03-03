@@ -38,8 +38,13 @@ export class SettingsRepository implements ISettingsRepository {
     if (existing) {
       await this.db
         .update(settings)
-        .set({ value, updatedAt: new Date() } as any)
+        .set({ value, updatedAt: new Date().toISOString() } as any)
         .where(eq(settings.key, key));
+
+      console.log(
+        "SettingsRepository.set updatedAt type:",
+        typeof new Date().toISOString(),
+      );
     } else {
       await this.db.insert(settings).values({ key, value } as any);
     }

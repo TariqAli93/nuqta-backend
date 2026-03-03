@@ -47,11 +47,17 @@ export class InventoryRepository implements IInventoryRepository {
       conditions.push(eq(inventoryMovements.sourceId, params.sourceId));
     if (params?.dateFrom)
       conditions.push(
-        gte(inventoryMovements.createdAt, new Date(params.dateFrom)),
+        gte(
+          inventoryMovements.createdAt,
+          new Date(params.dateFrom).toISOString(),
+        ),
       );
     if (params?.dateTo)
       conditions.push(
-        lte(inventoryMovements.createdAt, new Date(params.dateTo)),
+        lte(
+          inventoryMovements.createdAt,
+          new Date(params.dateTo).toISOString(),
+        ),
       );
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;

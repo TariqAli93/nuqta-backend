@@ -53,9 +53,13 @@ export class CustomerLedgerRepository implements ICustomerLedgerRepository {
       eq(customerLedger.customerId, params.customerId),
     ];
     if (params.dateFrom)
-      conditions.push(gte(customerLedger.createdAt, new Date(params.dateFrom)));
+      conditions.push(
+        gte(customerLedger.createdAt, new Date(params.dateFrom).toISOString()),
+      );
     if (params.dateTo)
-      conditions.push(lte(customerLedger.createdAt, new Date(params.dateTo)));
+      conditions.push(
+        lte(customerLedger.createdAt, new Date(params.dateTo).toISOString()),
+      );
 
     const where = and(...conditions);
 

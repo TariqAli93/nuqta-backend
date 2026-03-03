@@ -13,32 +13,43 @@ import {
   createPurchaseSchema,
   addPurchasePaymentSchema,
 } from "../../../schemas/purchases.js";
+import { requirePermission } from "../../../middleware/rbac.js";
 
 const purchases: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
 
   // GET /purchases
-  fastify.get("/", { schema: getPurchasesSchema }, async (request) => {
-    const query = request.query as {
-      search?: string;
-      status?: string;
-      limit?: string;
-      offset?: string;
-    };
-    const uc = new GetPurchasesUseCase(fastify.repos.purchase);
-    const data = await uc.execute({
-      search: query.search,
-      status: query.status,
-      limit: query.limit ? parseInt(query.limit, 10) : undefined,
-      offset: query.offset ? parseInt(query.offset, 10) : undefined,
-    });
-    return { ok: true, data };
-  });
+  fastify.get(
+    "/",
+    {
+      schema: getPurchasesSchema,
+      preHandler: requirePermission("purchases:read"),
+    },
+    async (request) => {
+      const query = request.query as {
+        search?: string;
+        status?: string;
+        limit?: string;
+        offset?: string;
+      };
+      const uc = new GetPurchasesUseCase(fastify.repos.purchase);
+      const data = await uc.execute({
+        search: query.search,
+        status: query.status,
+        limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        offset: query.offset ? parseInt(query.offset, 10) : undefined,
+      });
+      return { ok: true, data };
+    },
+  );
 
   // GET /purchases/:id
   fastify.get<{ Params: { id: string } }>(
     "/:id",
-    { schema: getPurchaseByIdSchema },
+    {
+      schema: getPurchaseByIdSchema,
+      preHandler: requirePermission("purchases:read"),
+    },
     async (request) => {
       const id = parseInt(request.params.id, 10);
       const uc = new GetPurchaseByIdUseCase(fastify.repos.purchase);
@@ -48,26 +59,36 @@ const purchases: FastifyPluginAsync = async (fastify) => {
   );
 
   // POST /purchases
-  fastify.post("/", { schema: createPurchaseSchema }, async (request) => {
-    const body = request.body as CreatePurchaseInput;
-    const userId = request.user?.sub || 1;
-    const uc = new CreatePurchaseUseCase(
-      fastify.repos.purchase,
-      fastify.repos.supplier,
-      fastify.repos.payment,
-      fastify.repos.supplierLedger,
-      fastify.repos.accounting,
-      fastify.repos.settings,
-      fastify.repos.audit,
-    );
-    const result = await uc.execute(body, userId);
-    return { ok: true, data: result };
-  });
+  fastify.post(
+    "/",
+    {
+      schema: createPurchaseSchema,
+      preHandler: requirePermission("purchases:create"),
+    },
+    async (request) => {
+      const body = request.body as CreatePurchaseInput;
+      const userId = request.user?.sub || 1;
+      const uc = new CreatePurchaseUseCase(
+        fastify.repos.purchase,
+        fastify.repos.supplier,
+        fastify.repos.payment,
+        fastify.repos.supplierLedger,
+        fastify.repos.accounting,
+        fastify.repos.settings,
+        fastify.repos.audit,
+      );
+      const result = await uc.execute(body, userId);
+      return { ok: true, data: result };
+    },
+  );
 
   // POST /purchases/:id/payments
   fastify.post<{ Params: { id: string } }>(
     "/:id/payments",
-    { schema: addPurchasePaymentSchema },
+    {
+      schema: addPurchasePaymentSchema,
+      preHandler: requirePermission("purchases:create"),
+    },
     async (request) => {
       const purchaseId = parseInt(request.params.id, 10);
       const body = request.body as Omit<AddPurchasePaymentInput, "purchaseId">;

@@ -4,6 +4,7 @@
 import {
   ErrorResponses,
   successEnvelope,
+  successArrayEnvelope,
   SuccessNullResponse,
 } from "./common.js";
 
@@ -206,7 +207,7 @@ export const adjustStockSchema = {
   body: AdjustStockBodySchema,
   response: {
     200: successEnvelope(
-      { type: "object" as const },
+      { type: "object" as const, additionalProperties: true },
       "Stock adjustment result",
     ),
     ...ErrorResponses,
@@ -220,7 +221,195 @@ export const reconcileStockSchema = {
   security: [{ bearerAuth: [] }],
   params: { $ref: "IdParams#" },
   response: {
-    200: successEnvelope({ type: "object" as const }, "Reconciliation result"),
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reconciliation result",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── GET /products/:id ─────────────────────────────────────────────
+
+export const getProductByIdSchema = {
+  tags: ["Products"],
+  summary: "Get product by ID",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope(ProductSchema, "Product details"),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Product Units ─────────────────────────────────────────────────
+
+const ProductUnitSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    productId: { type: "integer" },
+    unitName: { type: "string" },
+    factorToBase: { type: "number" },
+    barcode: { type: "string", nullable: true },
+    sellingPrice: { type: "integer", nullable: true },
+    isDefault: { type: "boolean" },
+    isActive: { type: "boolean" },
+  },
+};
+
+const CreateUnitBodySchema = {
+  type: "object" as const,
+  required: ["unitName", "factorToBase"],
+  properties: {
+    unitName: { type: "string", minLength: 1 },
+    factorToBase: { type: "number", minimum: 0.001 },
+    barcode: { type: "string", nullable: true },
+    sellingPrice: { type: "integer", minimum: 0, nullable: true },
+    isDefault: { type: "boolean", default: false },
+    isActive: { type: "boolean", default: true },
+  },
+  additionalProperties: false,
+} as const;
+
+const UpdateUnitBodySchema = {
+  type: "object" as const,
+  properties: {
+    unitName: { type: "string", minLength: 1 },
+    factorToBase: { type: "number", minimum: 0.001 },
+    barcode: { type: "string", nullable: true },
+    sellingPrice: { type: "integer", minimum: 0, nullable: true },
+    isDefault: { type: "boolean" },
+    isActive: { type: "boolean" },
+  },
+  additionalProperties: false,
+} as const;
+
+export const getProductUnitsSchema = {
+  tags: ["Products"],
+  summary: "List product units",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successArrayEnvelope(ProductUnitSchema, "Product units"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const createProductUnitSchema = {
+  tags: ["Products"],
+  summary: "Create product unit",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  body: CreateUnitBodySchema,
+  response: {
+    200: successEnvelope(ProductUnitSchema, "Created unit"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const updateProductUnitSchema = {
+  tags: ["Products"],
+  summary: "Update product unit",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object" as const,
+    required: ["id"],
+    properties: { id: { type: "string", pattern: "^\\d+$" } },
+  },
+  body: UpdateUnitBodySchema,
+  response: {
+    200: successEnvelope(ProductUnitSchema, "Updated unit"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const deleteProductUnitSchema = {
+  tags: ["Products"],
+  summary: "Delete product unit",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object" as const,
+    required: ["id"],
+    properties: { id: { type: "string", pattern: "^\\d+$" } },
+  },
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+export const setDefaultUnitSchema = {
+  tags: ["Products"],
+  summary: "Set default unit",
+  security: [{ bearerAuth: [] }],
+  params: {
+    type: "object" as const,
+    required: ["id", "uid"],
+    properties: {
+      id: { type: "string", pattern: "^\\d+$" },
+      uid: { type: "string", pattern: "^\\d+$" },
+    },
+  },
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+// ─── Product Batches ───────────────────────────────────────────────
+
+const ProductBatchSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    productId: { type: "integer" },
+    batchNumber: { type: "string" },
+    expiryDate: { type: "string", nullable: true },
+    quantityReceived: { type: "integer" },
+    quantityOnHand: { type: "integer" },
+    costPerUnit: { type: "integer" },
+    status: { type: "string", enum: ["active", "depleted", "expired"] },
+  },
+};
+
+const CreateBatchBodySchema = {
+  type: "object" as const,
+  required: ["batchNumber", "quantityReceived", "costPerUnit"],
+  properties: {
+    batchNumber: { type: "string", minLength: 1 },
+    expiryDate: { type: "string", format: "date", nullable: true },
+    quantityReceived: { type: "integer", minimum: 1 },
+    quantityOnHand: { type: "integer", minimum: 0 },
+    costPerUnit: { type: "integer", minimum: 0 },
+    status: {
+      type: "string",
+      enum: ["active", "depleted", "expired"],
+      default: "active",
+    },
+  },
+  additionalProperties: false,
+} as const;
+
+export const getProductBatchesSchema = {
+  tags: ["Products"],
+  summary: "List product batches",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successArrayEnvelope(ProductBatchSchema, "Product batches"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const createProductBatchSchema = {
+  tags: ["Products"],
+  summary: "Create product batch",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  body: CreateBatchBodySchema,
+  response: {
+    200: successEnvelope(ProductBatchSchema, "Created batch"),
     ...ErrorResponses,
   },
 } as const;
