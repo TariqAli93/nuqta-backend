@@ -31,7 +31,7 @@ describe("/api/v1/dashboard", () => {
     });
 
     const data = expectOk<typeof dashboardStats>(response);
-    expect(data.totalSales).toBe(dashboardStats.totalSales);
+    expect(data.lowStockCount).toBe(dashboardStats.lowStockCount);
   });
 
   test("returns 401 when auth is missing", async () => {

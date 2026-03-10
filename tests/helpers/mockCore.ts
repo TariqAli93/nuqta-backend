@@ -49,6 +49,9 @@ const useCaseNames = [
   "ReverseEntryUseCase",
   "PostIndividualEntryUseCase",
   "UnpostIndividualEntryUseCase",
+  "GetPostingBatchesUseCase",
+  "LockPostingBatchUseCase",
+  "UnlockPostingBatchUseCase",
   "GetSupplierLedgerUseCase",
   "RecordSupplierPaymentUseCase",
   "ReconcileSupplierBalanceUseCase",
@@ -63,6 +66,16 @@ const useCaseNames = [
   "GetProfitLossUseCase",
   "GetBalanceSheetUseCase",
   "InitializeAccountingUseCase",
+  "GetEmployeesUseCase",
+  "GetEmployeeByIdUseCase",
+  "CreateEmployeeUseCase",
+  "UpdateEmployeeUseCase",
+  "GetPayrollRunsUseCase",
+  "GetPayrollRunByIdUseCase",
+  "CreatePayrollRunUseCase",
+  "ApprovePayrollRunUseCase",
+  "GetProductPurchaseHistoryUseCase",
+  "GetProductSalesHistoryUseCase",
 ] as const;
 
 export type UseCaseName = (typeof useCaseNames)[number];
@@ -125,6 +138,9 @@ const state = vi.hoisted(() => {
     "ReverseEntryUseCase",
     "PostIndividualEntryUseCase",
     "UnpostIndividualEntryUseCase",
+    "GetPostingBatchesUseCase",
+    "LockPostingBatchUseCase",
+    "UnlockPostingBatchUseCase",
     "GetSupplierLedgerUseCase",
     "RecordSupplierPaymentUseCase",
     "ReconcileSupplierBalanceUseCase",
@@ -139,6 +155,16 @@ const state = vi.hoisted(() => {
     "GetProfitLossUseCase",
     "GetBalanceSheetUseCase",
     "InitializeAccountingUseCase",
+    "GetEmployeesUseCase",
+    "GetEmployeeByIdUseCase",
+    "CreateEmployeeUseCase",
+    "UpdateEmployeeUseCase",
+    "GetPayrollRunsUseCase",
+    "GetPayrollRunByIdUseCase",
+    "CreatePayrollRunUseCase",
+    "ApprovePayrollRunUseCase",
+    "GetProductPurchaseHistoryUseCase",
+    "GetProductSalesHistoryUseCase",
   ] as const;
   const registry = {} as Record<UseCaseName, UseCaseState>;
 

@@ -26,9 +26,12 @@ describe("/api/v1/suppliers", () => {
       title: "GET / returns suppliers",
       method: "GET",
       url: "/api/v1/suppliers?search=Nuqta&limit=10&offset=0",
-      setup: () => mockUseCase("GetSuppliersUseCase", { execute: [supplier] }),
-      assert: (data: (typeof supplier)[]) => {
-        expect(data[0].name).toBe(supplier.name);
+      setup: () =>
+        mockUseCase("GetSuppliersUseCase", {
+          execute: { items: [supplier], total: 1 },
+        }),
+      assert: (data: { items: (typeof supplier)[]; total: number }) => {
+        expect(data.items[0].name).toBe(supplier.name);
       },
     },
     {

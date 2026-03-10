@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { CheckInitialSetupUseCase } from "../../../packages/core/src/use-cases/CheckInitialSetupUseCase.ts";
+import { CheckInitialSetupUseCase } from "../../../packages/core/src/use-cases/auth/CheckInitialSetupUseCase.ts";
 
 describe("CheckInitialSetupUseCase", () => {
   test("prefers the explicit wizard flag when it exists", async () => {

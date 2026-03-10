@@ -50,6 +50,10 @@ export default fp(async (fastify) => {
         { name: "Supplier Ledger", description: "Supplier balance tracking" },
         { name: "Inventory", description: "Stock movements & alerts" },
         {
+          name: "HR & Payroll",
+          description: "Employee management and payroll approval",
+        },
+        {
           name: "Accounting",
           description: "Chart of accounts & journal entries",
         },

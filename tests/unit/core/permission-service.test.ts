@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PermissionService } from "../../../packages/core/src/services/PermissionService.ts";
+import { PermissionService } from "../../../packages/core/src/shared/services/PermissionService.ts";
 
 describe("PermissionService", () => {
   test("returns the permissions for a role", () => {
@@ -37,6 +37,7 @@ describe("PermissionService", () => {
     expect(all).toContain("sales:create");
     expect(all).toContain("users:delete");
     expect(all).toContain("accounting:read");
+    expect(all).toContain("payroll:approve");
   });
 
   // ── Covers L138-141: getAllRoles() ──

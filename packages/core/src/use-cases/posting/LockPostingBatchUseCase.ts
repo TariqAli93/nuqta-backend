@@ -3,7 +3,7 @@
  * Locks a posting batch to prevent modifications.
  */
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
-import { NotFoundError, InvalidStateError } from "../../errors/DomainErrors.js";
+import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 
 export class LockPostingBatchUseCase {
   constructor(private postingRepo: IPostingRepository) {}

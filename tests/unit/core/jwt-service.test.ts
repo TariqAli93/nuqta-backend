@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { JwtService } from "../../../packages/core/src/services/JwtService.ts";
+import { JwtService } from "../../../packages/core/src/shared/services/JwtService.ts";
 
 describe("JwtService", () => {
   afterEach(() => {

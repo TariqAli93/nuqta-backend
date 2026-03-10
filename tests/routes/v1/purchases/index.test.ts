@@ -26,9 +26,12 @@ describe("/api/v1/purchases", () => {
       title: "GET / returns purchases",
       method: "GET",
       url: "/api/v1/purchases?search=PUR&status=received&limit=10&offset=0",
-      setup: () => mockUseCase("GetPurchasesUseCase", { execute: [purchase] }),
-      assert: (data: (typeof purchase)[]) => {
-        expect(data[0].invoiceNumber).toBe(purchase.invoiceNumber);
+      setup: () =>
+        mockUseCase("GetPurchasesUseCase", {
+          execute: { items: [purchase], total: 1 },
+        }),
+      assert: (data: { items: (typeof purchase)[]; total: number }) => {
+        expect(data.items[0].invoiceNumber).toBe(purchase.invoiceNumber);
       },
     },
     {
@@ -212,7 +215,7 @@ describe("/api/v1/purchases", () => {
 
   // ── Covers L32-33: limit/offset ternary fallback branches ──
   test("GET /purchases without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetPurchasesUseCase", { execute: [] });
+    mockUseCase("GetPurchasesUseCase", { execute: { items: [], total: 0 } });
 
     const response = await ctx.app.inject({
       method: "GET",

@@ -72,8 +72,10 @@ describe("/api/v1/auth", () => {
   test("GET /setup-status returns the setup status payload", async () => {
     mockUseCase("CheckInitialSetupUseCase", {
       execute: {
+        isInitialized: false,
         hasUsers: true,
-        isSetupComplete: false,
+        hasCompanyInfo: false,
+        wizardCompleted: false,
       },
     });
 
@@ -82,9 +84,14 @@ describe("/api/v1/auth", () => {
       url: "/api/v1/auth/setup-status",
     });
 
-    const data = expectOk<{ hasUsers: boolean; isSetupComplete: boolean }>(response);
+    const data = expectOk<{
+      isInitialized: boolean;
+      hasUsers: boolean;
+      hasCompanyInfo: boolean;
+      wizardCompleted: boolean;
+    }>(response);
     expect(data.hasUsers).toBe(true);
-    expect(data.isSetupComplete).toBe(false);
+    expect(data.isInitialized).toBe(false);
   });
 
   test.each([

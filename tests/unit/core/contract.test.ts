@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   ConflictError,
   NotFoundError,
-} from "../../../packages/core/src/errors/DomainErrors.ts";
+} from "../../../packages/core/src/shared/errors/DomainErrors.ts";
 import {
   fail,
   failWith,
@@ -11,7 +11,7 @@ import {
   mapErrorToResult,
   ok,
   toApiError,
-} from "../../../packages/core/src/contract.ts";
+} from "../../../packages/core/src/shared/contracts/contract.ts";
 
 describe("contract helpers", () => {
   test("wraps successful results", () => {

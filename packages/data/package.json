@@ -13,8 +13,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "db:generate": "drizzle-kit generate --config ./drizzle.config.ts",
-    "db:migrate": "tsx ./src/migrate.ts",
-    "db:seed": "tsx ./src/seed.ts",
+    "db:migrate": "tsx ./src/db/migrate.ts",
+    "db:seed": "tsx ./src/db/seed.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -23,8 +23,7 @@
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
-    "pg": "^8.19.0",
-    "postgres": "^3.4.8"
+    "pg": "^8.19.0"
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",

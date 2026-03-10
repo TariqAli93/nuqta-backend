@@ -1,7 +1,7 @@
 /**
  * GenerateBackupTokenUseCase — Generates a one-time download token for a backup
  */
-import { JwtService } from "../../services/JwtService.js";
+import { JwtService } from "../../shared/services/JwtService.js";
 
 export interface BackupToken {
   token: string;

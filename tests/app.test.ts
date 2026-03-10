@@ -136,6 +136,7 @@ describe("app bootstrap", () => {
           "/api/v1/users/",
           "/api/v1/products/{id}/adjust-stock",
           "/api/v1/accounting/status",
+          "/api/v1/hr/employees",
         ]),
       );
     } finally {

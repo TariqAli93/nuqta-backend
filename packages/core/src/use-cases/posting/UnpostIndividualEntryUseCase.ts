@@ -1,6 +1,7 @@
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { JournalEntry } from "../../entities/Accounting.js";
+import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 
 export class UnpostIndividualEntryUseCase {
   constructor(
@@ -12,11 +13,11 @@ export class UnpostIndividualEntryUseCase {
     const entry = await this.accountingRepo.getEntryById(entryId);
 
     if (!entry) {
-      throw new Error(`Journal entry ${entryId} not found`);
+      throw new NotFoundError(`Journal entry ${entryId} not found`, { entryId });
     }
 
     if (!entry.isPosted) {
-      throw new Error(`Journal entry ${entryId} is not posted`);
+      throw new InvalidStateError(`Journal entry ${entryId} is not posted`, { entryId });
     }
 
     if (entry.postingBatchId) {
@@ -24,8 +25,9 @@ export class UnpostIndividualEntryUseCase {
         entry.postingBatchId,
       );
       if (isLocked) {
-        throw new Error(
-          `Cannot unpost entry ${entryId} because its posting batch ${entry.postingBatchId} is locked`,
+        throw new InvalidStateError(
+          `Cannot unpost entry in a locked posting batch`,
+          { entryId, postingBatchId: entry.postingBatchId },
         );
       }
     }

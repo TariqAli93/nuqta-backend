@@ -1,6 +1,10 @@
 /**
  * Common / shared JSON schemas used across all route modules.
  * Registered once via fastify.addSchema() and referenced via $ref.
+ *
+ * Route-level helpers (ErrorResponses, successEnvelope, etc.) live in
+ * src/shared/schema-helpers.ts and are imported directly by each
+ * colocated route schema file.
  */
 
 // ─── ID param (e.g. /:id) ──────────────────────────────────────────
@@ -73,7 +77,13 @@ export const SuccessResponseSchema = {
   required: ["ok", "data"],
   properties: {
     ok: { type: "boolean", const: true },
-    data: {},
+    data: {
+      oneOf: [
+        { type: "object" as const },
+        { type: "array" as const },
+        { type: "null" as const },
+      ],
+    },
   },
 } as const;
 
@@ -96,110 +106,6 @@ export const ErrorResponseSchema = {
   properties: {
     ok: { type: "boolean", const: false },
     error: { $ref: "ErrorDetail#" },
-  },
-} as const;
-
-// ─── Pre-built error responses for route schemas ───────────────────
-export const ErrorResponses = {
-  400: {
-    description: "Validation error",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-  401: {
-    description: "Unauthorized – missing or invalid token",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-  403: {
-    description: "Forbidden – insufficient permissions",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-  404: {
-    description: "Resource not found",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-  409: {
-    description: "Conflict",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-  500: {
-    description: "Internal server error",
-    type: "object" as const,
-    required: ["ok", "error"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: false },
-      error: { $ref: "ErrorDetail#" },
-    },
-  },
-} as const;
-
-/** Helper to build a `{ ok: true, data: <schema> }` response */
-export function successEnvelope(
-  dataSchema: Record<string, unknown>,
-  description = "Successful response",
-) {
-  return {
-    description,
-    type: "object" as const,
-    required: ["ok", "data"] as const,
-    properties: {
-      ok: { type: "boolean" as const, const: true },
-      data: dataSchema,
-    },
-  };
-}
-
-/** Helper to build a `{ ok: true, data: [<schema>] }` array response */
-export function successArrayEnvelope(
-  itemSchema: Record<string, unknown>,
-  description = "Successful response",
-) {
-  return successEnvelope(
-    { type: "array" as const, items: itemSchema },
-    description,
-  );
-}
-
-/** Helper to build a `{ ok: true, data: null }` response (deletes etc.) */
-export const SuccessNullResponse = {
-  description: "Operation completed",
-  type: "object" as const,
-  required: ["ok", "data"] as const,
-  properties: {
-    ok: { type: "boolean" as const, const: true },
-    data: { type: "null" as const },
-  },
-} as const;
-
-// ─── Security header schema (used by routes needing auth) ──────────
-export const BearerHeaderSchema = {
-  type: "object" as const,
-  properties: {
-    authorization: { type: "string", pattern: "^Bearer .+$" },
   },
 } as const;
 

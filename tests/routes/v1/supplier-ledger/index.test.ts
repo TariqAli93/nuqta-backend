@@ -38,7 +38,7 @@ describe("/api/v1/supplier-ledger", () => {
       setup: () =>
         mockUseCase("GetSupplierLedgerUseCase", { execute: supplierLedger }),
       assert: (data: typeof supplierLedger) => {
-        expect(data.balance).toBe(supplierLedger.balance);
+        expect(data.total).toBe(supplierLedger.total);
       },
     },
     {
@@ -224,7 +224,7 @@ describe("/api/v1/supplier-ledger", () => {
   // ── Covers L33-34: limit/offset ternary fallback branches ──
   test("GET /supplier-ledger/:id without optional query params hits default fallbacks", async () => {
     mockUseCase("GetSupplierLedgerUseCase", {
-      execute: { entries: [], balance: 0 },
+      execute: { items: [], total: 0 },
     });
 
     const response = await ctx.app.inject({

@@ -14,23 +14,9 @@ import {
   SetDefaultProductUnitUseCase,
   GetProductBatchesUseCase,
   CreateProductBatchUseCase,
+  GetProductPurchaseHistoryUseCase,
+  GetProductSalesHistoryUseCase,
 } from "@nuqta/core";
-import {
-  getProductsSchema,
-  getProductByIdSchema,
-  createProductSchema,
-  updateProductSchema,
-  deleteProductSchema,
-  adjustStockSchema,
-  reconcileStockSchema,
-  getProductUnitsSchema,
-  createProductUnitSchema,
-  updateProductUnitSchema,
-  deleteProductUnitSchema,
-  setDefaultUnitSchema,
-  getProductBatchesSchema,
-  createProductBatchSchema,
-} from "../../../schemas/products.js";
 import { requirePermission } from "../../../middleware/rbac.js";
 
 const products: FastifyPluginAsync = async (fastify) => {
@@ -40,7 +26,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
     {
-      schema: getProductsSchema,
+      schema: {},
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -54,11 +40,13 @@ const products: FastifyPluginAsync = async (fastify) => {
         lowStockOnly?: string;
         expiringSoonOnly?: string;
       };
+      const page = query.page ? parseInt(query.page, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
       const uc = new GetProductsUseCase(fastify.repos.product);
       const data = await uc.execute({
         search: query.search,
-        page: query.page ? parseInt(query.page, 10) : undefined,
-        limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        page,
+        limit,
         categoryId: query.categoryId
           ? parseInt(query.categoryId, 10)
           : undefined,
@@ -69,7 +57,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         lowStockOnly: query.lowStockOnly === "true",
         expiringSoonOnly: query.expiringSoonOnly === "true",
       });
-      return { ok: true, data };
+      return { ok: true, data: { ...data, page, limit } };
     },
   );
 
@@ -77,7 +65,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: getProductByIdSchema,
+      schema: {},
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -92,7 +80,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/",
     {
-      schema: createProductSchema,
+      schema: {},
       preHandler: requirePermission("products:create"),
     },
     async (request) => {
@@ -110,7 +98,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.put<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: updateProductSchema,
+      schema: {},
       preHandler: requirePermission("products:update"),
     },
     async (request) => {
@@ -129,7 +117,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: deleteProductSchema,
+      schema: {},
       preHandler: requirePermission("products:delete"),
     },
     async (request) => {
@@ -147,7 +135,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/adjust-stock",
     {
-      schema: adjustStockSchema,
+      schema: {},
       preHandler: requirePermission("inventory:update"),
     },
     async (request) => {
@@ -176,7 +164,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/reconcile",
     {
-      schema: reconcileStockSchema,
+      schema: {},
       preHandler: requirePermission("inventory:reconcile"),
     },
     async (request) => {
@@ -195,7 +183,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>(
     "/:id/units",
     {
-      schema: getProductUnitsSchema,
+      schema: {},
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -210,7 +198,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/units",
     {
-      schema: createProductUnitSchema,
+      schema: {},
       preHandler: requirePermission("products:create"),
     },
     async (request) => {
@@ -226,7 +214,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.put<{ Params: { id: string } }>(
     "/units/:id",
     {
-      schema: updateProductUnitSchema,
+      schema: {},
       preHandler: requirePermission("products:update"),
     },
     async (request) => {
@@ -242,7 +230,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>(
     "/units/:id",
     {
-      schema: deleteProductUnitSchema,
+      schema: {},
       preHandler: requirePermission("products:delete"),
     },
     async (request) => {
@@ -257,7 +245,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string; uid: string } }>(
     "/:id/units/:uid/set-default",
     {
-      schema: setDefaultUnitSchema,
+      schema: {},
       preHandler: requirePermission("products:update"),
     },
     async (request) => {
@@ -275,7 +263,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>(
     "/:id/batches",
     {
-      schema: getProductBatchesSchema,
+      schema: {},
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -290,7 +278,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/batches",
     {
-      schema: createProductBatchSchema,
+      schema: {},
       preHandler: requirePermission("products:create"),
     },
     async (request) => {
@@ -299,6 +287,50 @@ const products: FastifyPluginAsync = async (fastify) => {
       const uc = new CreateProductBatchUseCase(fastify.repos.product);
       const data = await uc.execute(productId, body);
       return { ok: true, data };
+    },
+  );
+
+  // GET /products/:id/sales-history
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { limit?: string; offset?: string };
+  }>(
+    "/:id/sales-history",
+    {
+      schema: {},
+      preHandler: requirePermission("products:read"),
+    },
+    async (request) => {
+      const productId = parseInt(request.params.id, 10);
+      const limit = parseInt(request.query.limit || "50", 10);
+      const offset = parseInt(request.query.offset || "0", 10);
+      const uc = new GetProductSalesHistoryUseCase(
+        fastify.repos.productWorkspace,
+      );
+      const result = await uc.execute(productId, { limit, offset });
+      return { ok: true, data: { data: result.items } };
+    },
+  );
+
+  // GET /products/:id/purchase-history
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { limit?: string; offset?: string };
+  }>(
+    "/:id/purchase-history",
+    {
+      schema: {},
+      preHandler: requirePermission("products:read"),
+    },
+    async (request) => {
+      const productId = parseInt(request.params.id, 10);
+      const limit = parseInt(request.query.limit || "50", 10);
+      const offset = parseInt(request.query.offset || "0", 10);
+      const uc = new GetProductPurchaseHistoryUseCase(
+        fastify.repos.productWorkspace,
+      );
+      const result = await uc.execute(productId, { limit, offset });
+      return { ok: true, data: { data: result.items } };
     },
   );
 };

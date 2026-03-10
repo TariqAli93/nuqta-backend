@@ -12,7 +12,7 @@
  */
 
 import { eq, sql, and } from "drizzle-orm";
-import { DbClient } from "../db.js";
+import { DbClient } from "../db/db.js";
 import {
   products,
   productBatches,

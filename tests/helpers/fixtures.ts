@@ -43,6 +43,18 @@ export const customer = {
   createdBy: 1,
 };
 
+export const employee = {
+  id: 13,
+  name: "Sara Ali",
+  salary: 1500000,
+  position: "Accountant",
+  department: "Finance",
+  isActive: true,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  createdBy: 1,
+};
+
 export const supplier = {
   id: 4,
   name: "Nuqta Supplies",
@@ -216,12 +228,22 @@ export const moduleSettings = {
 };
 
 export const dashboardStats = {
-  totalSales: 12,
-  totalRevenue: 120000,
-  totalProducts: 42,
+  salesToday: {
+    revenue: 20000,
+    count: 2,
+    cash: 15000,
+    card: 5000,
+    transfer: 0,
+  },
   lowStockCount: 3,
-  todaySales: 2,
-  todayRevenue: 20000,
+  topProducts: [
+    {
+      productId: 5,
+      productName: "Arabica Coffee",
+      quantity: 10,
+      revenue: 100000,
+    },
+  ],
 };
 
 export const inventoryMovement = {
@@ -272,7 +294,7 @@ export const postingBatch = {
 };
 
 export const supplierLedger = {
-  entries: [
+  items: [
     {
       id: 51,
       supplierId: supplier.id,
@@ -287,11 +309,11 @@ export const supplierLedger = {
       createdBy: 1,
     },
   ],
-  balance: 35000,
+  total: 1,
 };
 
 export const customerLedger = {
-  entries: [
+  items: [
     {
       id: 61,
       customerId: customer.id,
@@ -306,7 +328,7 @@ export const customerLedger = {
       createdBy: 1,
     },
   ],
-  balance: 20000,
+  total: 1,
 };
 
 export const account = {
@@ -364,6 +386,43 @@ export const trialBalanceRow = {
 export const accountingStatus = {
   isInitialized: true,
   accountCount: 12,
+};
+
+export const payrollRun = {
+  id: 101,
+  periodYear: 2026,
+  periodMonth: 3,
+  paymentDate: timestamp,
+  status: "draft",
+  totalGrossPay: 1500000,
+  totalDeductions: 50000,
+  totalBonuses: 100000,
+  totalNetPay: 1550000,
+  salaryExpenseAccountCode: "5002",
+  deductionsLiabilityAccountCode: "2101",
+  paymentAccountCode: "1001",
+  journalEntryId: null,
+  notes: "March payroll",
+  createdAt: timestamp,
+  createdBy: 1,
+  approvedAt: null,
+  approvedBy: null,
+  items: [
+    {
+      id: 1,
+      payrollRunId: 101,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      position: employee.position,
+      department: employee.department,
+      grossPay: employee.salary,
+      deductions: 50000,
+      bonuses: 100000,
+      netPay: 1550000,
+      notes: "Overtime",
+      createdAt: timestamp,
+    },
+  ],
 };
 
 export const paymentResult = {

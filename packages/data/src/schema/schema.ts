@@ -370,6 +370,85 @@ export const inventoryMovements = pgTable(
 // CHART OF ACCOUNTS (Double-Entry Accounting)
 // ═══════════════════════════════════════════════════════════════
 
+export const employees = pgTable(
+  "employees",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    salary: integer("salary").notNull(),
+    position: text("position").notNull(),
+    department: text("department").notNull(),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+    createdBy: integer("created_by"),
+  },
+  (table) => [
+    index("idx_employees_name").on(table.name),
+    index("idx_employees_department").on(table.department),
+    index("idx_employees_active").on(table.isActive),
+  ],
+);
+
+export const payrollRuns = pgTable(
+  "payroll_runs",
+  {
+    id: serial("id").primaryKey(),
+    periodYear: integer("period_year").notNull(),
+    periodMonth: integer("period_month").notNull(),
+    paymentDate: timestamp("payment_date", { mode: "string" }),
+    status: text("status").notNull().default("draft"),
+    totalGrossPay: integer("total_gross_pay").notNull().default(0),
+    totalDeductions: integer("total_deductions").notNull().default(0),
+    totalBonuses: integer("total_bonuses").notNull().default(0),
+    totalNetPay: integer("total_net_pay").notNull().default(0),
+    salaryExpenseAccountCode: text("salary_expense_account_code").notNull(),
+    deductionsLiabilityAccountCode: text(
+      "deductions_liability_account_code",
+    ).notNull(),
+    paymentAccountCode: text("payment_account_code").notNull(),
+    journalEntryId: integer("journal_entry_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    createdBy: integer("created_by"),
+    approvedAt: timestamp("approved_at", { mode: "string" }),
+    approvedBy: integer("approved_by"),
+  },
+  (table) => [
+    uniqueIndex("idx_payroll_runs_period").on(
+      table.periodYear,
+      table.periodMonth,
+    ),
+    index("idx_payroll_runs_status").on(table.status),
+  ],
+);
+
+export const payrollRunItems = pgTable(
+  "payroll_run_items",
+  {
+    id: serial("id").primaryKey(),
+    payrollRunId: integer("payroll_run_id").notNull(),
+    employeeId: integer("employee_id").notNull(),
+    employeeName: text("employee_name").notNull(),
+    position: text("position").notNull(),
+    department: text("department").notNull(),
+    grossPay: integer("gross_pay").notNull(),
+    deductions: integer("deductions").notNull().default(0),
+    bonuses: integer("bonuses").notNull().default(0),
+    netPay: integer("net_pay").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    index("idx_payroll_run_items_run").on(table.payrollRunId),
+    index("idx_payroll_run_items_employee").on(table.employeeId),
+    uniqueIndex("idx_payroll_run_items_unique").on(
+      table.payrollRunId,
+      table.employeeId,
+    ),
+  ],
+);
+
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   code: text("code").notNull().unique(),
@@ -420,7 +499,9 @@ export const journalEntries = pgTable(
   {
     id: serial("id").primaryKey(),
     entryNumber: text("entry_number").notNull().unique(),
-    entryDate: timestamp("entry_date", { mode: "string" }).notNull().defaultNow(),
+    entryDate: timestamp("entry_date", { mode: "string" })
+      .notNull()
+      .defaultNow(),
     description: text("description").notNull(),
     sourceType: text("source_type"),
     sourceId: integer("source_id"),
@@ -558,7 +639,7 @@ export const barcodePrintJobs = pgTable(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// SETTINGS
+// SETTINGS (Legacy KV Store — kept for backward compatibility)
 // ═══════════════════════════════════════════════════════════════
 
 export const currencySettings = pgTable("currency_settings", {
@@ -577,6 +658,107 @@ export const settings = pgTable("settings", {
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   description: text("description"),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+// ═══════════════════════════════════════════════════════════════
+// SYSTEM SETTINGS (Singleton — general system configuration)
+// ═══════════════════════════════════════════════════════════════
+
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  companyName: text("company_name").notNull().default(""),
+  companyAddress: text("company_address"),
+  companyPhone: text("company_phone"),
+  companyPhone2: text("company_phone2"),
+  companyEmail: text("company_email"),
+  companyTaxId: text("company_tax_id"),
+  companyLogo: text("company_logo"),
+  defaultCurrency: text("default_currency").notNull().default("IQD"),
+  lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
+  accountingEnabled: boolean("accounting_enabled").notNull().default(false),
+  purchasesEnabled: boolean("purchases_enabled").notNull().default(true),
+  ledgersEnabled: boolean("ledgers_enabled").notNull().default(true),
+  unitsEnabled: boolean("units_enabled").notNull().default(false),
+  paymentsOnInvoicesEnabled: boolean("payments_on_invoices_enabled")
+    .notNull()
+    .default(true),
+  expiryAlertDays: integer("expiry_alert_days").notNull().default(30),
+  debtReminderCount: integer("debt_reminder_count").notNull().default(3),
+  debtReminderIntervalDays: integer("debt_reminder_interval_days")
+    .notNull()
+    .default(7),
+  setupWizardCompleted: boolean("setup_wizard_completed")
+    .notNull()
+    .default(false),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ACCOUNTING SETTINGS (Singleton — accounting configuration)
+// ═══════════════════════════════════════════════════════════════
+
+export const accountingSettings = pgTable("accounting_settings", {
+  id: serial("id").primaryKey(),
+  taxEnabled: boolean("tax_enabled").notNull().default(false),
+  defaultTaxRate: real("default_tax_rate").notNull().default(0),
+  taxRegistrationNumber: text("tax_registration_number"),
+  fiscalYearStartMonth: integer("fiscal_year_start_month").notNull().default(1),
+  fiscalYearStartDay: integer("fiscal_year_start_day").notNull().default(1),
+  autoPosting: boolean("auto_posting").notNull().default(false),
+  costMethod: text("cost_method").notNull().default("fifo"),
+  currencyCode: text("currency_code").notNull().default("IQD"),
+  usdExchangeRate: real("usd_exchange_rate").notNull().default(1480),
+  roundingMethod: text("rounding_method").notNull().default("round"),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+// ═══════════════════════════════════════════════════════════════
+// POS SETTINGS (Singleton — point-of-sale configuration)
+// ═══════════════════════════════════════════════════════════════
+
+export const posSettings = pgTable("pos_settings", {
+  id: serial("id").primaryKey(),
+  invoicePrefix: text("invoice_prefix").notNull().default("INV"),
+  invoiceTemplateId: text("invoice_template_id").notNull().default("default"),
+  paperSize: text("paper_size").notNull().default("thermal"),
+  layoutDirection: text("layout_direction").notNull().default("rtl"),
+  showQr: boolean("show_qr").notNull().default(false),
+  showBarcode: boolean("show_barcode").notNull().default(false),
+  invoiceLogo: text("invoice_logo").notNull().default(""),
+  invoiceFooterNotes: text("invoice_footer_notes").notNull().default(""),
+  defaultPrinterName: text("default_printer_name"),
+  receiptHeader: text("receipt_header"),
+  receiptFooter: text("receipt_footer"),
+  quickSaleEnabled: boolean("quick_sale_enabled").notNull().default(true),
+  soundEnabled: boolean("sound_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BARCODE SETTINGS (Singleton — barcode configuration)
+// ═══════════════════════════════════════════════════════════════
+
+export const barcodeSettings = pgTable("barcode_settings", {
+  id: serial("id").primaryKey(),
+  defaultBarcodeType: text("default_barcode_type").notNull().default("CODE128"),
+  defaultWidth: integer("default_width").notNull().default(200),
+  defaultHeight: integer("default_height").notNull().default(100),
+  showPrice: boolean("show_price").notNull().default(true),
+  showProductName: boolean("show_product_name").notNull().default(true),
+  showExpiryDate: boolean("show_expiry_date").notNull().default(false),
+  encoding: text("encoding").notNull().default("UTF-8"),
+  printDpi: integer("print_dpi").notNull().default(203),
+  labelWidthMm: integer("label_width_mm").notNull().default(50),
+  labelHeightMm: integer("label_height_mm").notNull().default(30),
+  marginTop: integer("margin_top").notNull().default(2),
+  marginBottom: integer("margin_bottom").notNull().default(2),
+  marginLeft: integer("margin_left").notNull().default(2),
+  marginRight: integer("margin_right").notNull().default(2),
   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   updatedBy: integer("updated_by"),
 });

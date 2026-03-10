@@ -8,6 +8,7 @@ function createRepos() {
     category: {},
     customer: {},
     supplier: {},
+    employee: {},
     product: {},
     sale: {},
     purchase: {},
@@ -21,6 +22,7 @@ function createRepos() {
     customerLedger: {},
     supplierLedger: {},
     posting: {},
+    payroll: {},
     productWorkspace: {},
     backup: {},
   };
@@ -74,6 +76,7 @@ describe("db plugin", () => {
       CategoryRepository: MockRepo,
       CustomerRepository: MockRepo,
       SupplierRepository: MockRepo,
+      EmployeeRepository: MockRepo,
       ProductRepository: MockRepo,
       SaleRepository: MockRepo,
       PurchaseRepository: MockRepo,
@@ -87,6 +90,7 @@ describe("db plugin", () => {
       CustomerLedgerRepository: MockRepo,
       SupplierLedgerRepository: MockRepo,
       PostingRepository: MockRepo,
+      PayrollRepository: MockRepo,
       ProductWorkspaceRepository: MockRepo,
       BackupRepository: MockRepo,
     }));

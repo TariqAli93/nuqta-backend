@@ -2,13 +2,12 @@ import { ISupplierLedgerRepository } from "../../interfaces/ISupplierLedgerRepos
 import { ISupplierRepository } from "../../interfaces/ISupplierRepository.js";
 import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
+import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
-import { NotFoundError, ValidationError } from "../../errors/DomainErrors.js";
+import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { SupplierLedgerEntry } from "../../entities/Ledger.js";
-import { AuditService } from "../../services/AuditService.js";
-
-const ACCT_CASH = "1001";
-const AP_ACCOUNT_CODES = ["2001", "2100"];
+import { AuditService } from "../../shared/services/AuditService.js";
+import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 
 export interface RecordSupplierPaymentInput {
   supplierId: number;
@@ -27,6 +26,7 @@ export class RecordSupplierPaymentUseCase {
     private paymentRepo: IPaymentRepository,
     private accountingRepo: IAccountingRepository,
     auditRepo?: IAuditRepository,
+    private settingsRepo?: ISettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
@@ -90,8 +90,21 @@ export class RecordSupplierPaymentUseCase {
       createdBy: userId,
     });
 
-    await this.createJournalEntry(payment.id!, data.amount, userId);
+    // Update cached currentBalance on supplier record
+    await this.supplierRepo.updatePayable(data.supplierId, balanceAfter);
+
+    // Create journal entry only if accounting is enabled
+    if (await this.isAccountingEnabled()) {
+      await this.createJournalEntry(payment.id!, data.amount, userId);
+    }
+
     return entry;
+  }
+
+  private async isAccountingEnabled(): Promise<boolean> {
+    if (!this.settingsRepo) return true;
+    const settings = new SettingsAccessor(this.settingsRepo);
+    return settings.isAccountingEnabled();
   }
 
   private async createJournalEntry(
@@ -99,12 +112,15 @@ export class RecordSupplierPaymentUseCase {
     amount: number,
     userId: number,
   ): Promise<void> {
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
-    let apAcct = null;
-    for (const code of AP_ACCOUNT_CODES) {
-      apAcct = await this.accountingRepo.findAccountByCode(code);
-      if (apAcct) break;
-    }
+    // Resolve account codes from settings
+    const settings = this.settingsRepo
+      ? new SettingsAccessor(this.settingsRepo)
+      : null;
+    const cashCode = settings ? await settings.getCashAccountCode() : "1001";
+    const apCode = settings ? await settings.getApAccountCode() : "2100";
+
+    const cashAcct = await this.accountingRepo.findAccountByCode(cashCode);
+    const apAcct = await this.accountingRepo.findAccountByCode(apCode);
 
     if (!cashAcct?.id || !apAcct?.id) {
       console.warn(

@@ -20,6 +20,10 @@ export interface IAccountingRepository {
   getTrialBalance(params?: { dateFrom?: string; dateTo?: string }): Promise<
     {
       accountId: number;
+      accountCode: string;
+      accountName: string;
+      accountType: string;
+      debitTotal: number;
       creditTotal: number;
       balance: number;
     }[]

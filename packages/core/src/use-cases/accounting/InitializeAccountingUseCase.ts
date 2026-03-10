@@ -7,6 +7,9 @@ export const ACCOUNTING_SETTING_KEYS = {
   coaSeeded: "accounting.coaSeeded",
   baseCurrency: "currency.base",
   cashAccountCode: "accounting.cashAccountCode",
+  salaryExpenseAccountCode: "accounting.salaryExpenseAccountCode",
+  deductionsLiabilityAccountCode:
+    "accounting.deductionsLiabilityAccountCode",
   inventoryAccountCode: "accounting.inventoryAccountCode",
   arAccountCode: "accounting.arAccountCode",
   apAccountCode: "accounting.apAccountCode",
@@ -18,6 +21,8 @@ export const ACCOUNTING_SETTING_KEYS = {
 
 export const DEFAULT_ACCOUNTING_CODES = {
   cashAccountCode: "1001",
+  salaryExpenseAccountCode: "5002",
+  deductionsLiabilityAccountCode: "2101",
   arAccountCode: "1100",
   inventoryAccountCode: "1200",
   vatInputAccountCode: "1300",
@@ -29,6 +34,8 @@ export const DEFAULT_ACCOUNTING_CODES = {
 
 export interface AccountingCodeSelections {
   cashAccountCode: string;
+  salaryExpenseAccountCode: string;
+  deductionsLiabilityAccountCode: string;
   inventoryAccountCode: string;
   arAccountCode: string;
   apAccountCode: string;
@@ -50,6 +57,8 @@ export interface AccountingSetupStatus {
 export interface InitializeAccountingInput {
   baseCurrency?: string;
   cashAccountCode?: string;
+  salaryExpenseAccountCode?: string;
+  deductionsLiabilityAccountCode?: string;
   inventoryAccountCode?: string;
   arAccountCode?: string;
   apAccountCode?: string;
@@ -78,6 +87,18 @@ const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
     name: "الصندوق",
     nameAr: "الصندوق",
     accountType: "asset",
+  },
+  {
+    selectionKey: "salaryExpenseAccountCode",
+    name: "Salary Expense",
+    nameAr: "Salary Expense",
+    accountType: "expense",
+  },
+  {
+    selectionKey: "deductionsLiabilityAccountCode",
+    name: "Payroll Deductions Payable",
+    nameAr: "Payroll Deductions Payable",
+    accountType: "liability",
   },
   {
     selectionKey: "arAccountCode",
@@ -261,6 +282,14 @@ export class InitializeAccountingUseCase {
       selected.cashAccountCode,
     );
     await this.settingsRepo.set(
+      ACCOUNTING_SETTING_KEYS.salaryExpenseAccountCode,
+      selected.salaryExpenseAccountCode,
+    );
+    await this.settingsRepo.set(
+      ACCOUNTING_SETTING_KEYS.deductionsLiabilityAccountCode,
+      selected.deductionsLiabilityAccountCode,
+    );
+    await this.settingsRepo.set(
       ACCOUNTING_SETTING_KEYS.inventoryAccountCode,
       selected.inventoryAccountCode,
     );
@@ -298,6 +327,16 @@ export class InitializeAccountingUseCase {
         input.cashAccountCode,
         ACCOUNTING_SETTING_KEYS.cashAccountCode,
         DEFAULT_ACCOUNTING_CODES.cashAccountCode,
+      ),
+      salaryExpenseAccountCode: await this.resolveCode(
+        input.salaryExpenseAccountCode,
+        ACCOUNTING_SETTING_KEYS.salaryExpenseAccountCode,
+        DEFAULT_ACCOUNTING_CODES.salaryExpenseAccountCode,
+      ),
+      deductionsLiabilityAccountCode: await this.resolveCode(
+        input.deductionsLiabilityAccountCode,
+        ACCOUNTING_SETTING_KEYS.deductionsLiabilityAccountCode,
+        DEFAULT_ACCOUNTING_CODES.deductionsLiabilityAccountCode,
       ),
       inventoryAccountCode: await this.resolveCode(
         input.inventoryAccountCode,

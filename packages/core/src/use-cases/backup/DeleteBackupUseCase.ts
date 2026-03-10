@@ -3,7 +3,7 @@
  */
 import { IBackupRepository } from "../../interfaces/IBackupRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
-import { NotFoundError } from "../../errors/DomainErrors.js";
+import { NotFoundError } from "../../shared/errors/DomainErrors.js";
 import { AuditEvent } from "../../entities/AuditEvent.js";
 
 export class DeleteBackupUseCase {

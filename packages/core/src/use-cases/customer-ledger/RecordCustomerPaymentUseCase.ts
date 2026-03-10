@@ -2,13 +2,12 @@ import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepos
 import { ICustomerRepository } from "../../interfaces/ICustomerRepository.js";
 import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
+import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
-import { NotFoundError, ValidationError } from "../../errors/DomainErrors.js";
+import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { CustomerLedgerEntry } from "../../entities/Ledger.js";
-import { AuditService } from "../../services/AuditService.js";
-
-const ACCT_CASH = "1001";
-const ACCT_AR = "1100";
+import { AuditService } from "../../shared/services/AuditService.js";
+import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 
 export interface RecordPaymentInput {
   customerId: number;
@@ -27,6 +26,7 @@ export class RecordCustomerPaymentUseCase {
     private paymentRepo: IPaymentRepository,
     private accountingRepo: IAccountingRepository,
     auditRepo?: IAuditRepository,
+    private settingsRepo?: ISettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
@@ -90,8 +90,21 @@ export class RecordCustomerPaymentUseCase {
       createdBy: userId,
     });
 
-    await this.createJournalEntry(payment.id!, data.amount, userId);
+    // Update cached totalDebt on customer record
+    await this.customerRepo.updateDebt(data.customerId, balanceAfter);
+
+    // Create journal entry only if accounting is enabled
+    if (await this.isAccountingEnabled()) {
+      await this.createJournalEntry(payment.id!, data.amount, userId);
+    }
+
     return entry;
+  }
+
+  private async isAccountingEnabled(): Promise<boolean> {
+    if (!this.settingsRepo) return true;
+    const settings = new SettingsAccessor(this.settingsRepo);
+    return settings.isAccountingEnabled();
   }
 
   private async createJournalEntry(
@@ -99,8 +112,15 @@ export class RecordCustomerPaymentUseCase {
     amount: number,
     userId: number,
   ): Promise<void> {
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
-    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR);
+    // Resolve account codes from settings
+    const settings = this.settingsRepo
+      ? new SettingsAccessor(this.settingsRepo)
+      : null;
+    const cashCode = settings ? await settings.getCashAccountCode() : "1001";
+    const arCode = settings ? await settings.getArAccountCode() : "1100";
+
+    const cashAcct = await this.accountingRepo.findAccountByCode(cashCode);
+    const arAcct = await this.accountingRepo.findAccountByCode(arCode);
     if (!cashAcct?.id || !arAcct?.id) {
       console.warn(
         "[RecordCustomerPaymentUseCase] Missing cash/AR accounts, skipping journal",

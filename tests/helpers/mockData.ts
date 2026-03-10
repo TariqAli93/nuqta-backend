@@ -4,6 +4,7 @@ const repositoryNames = [
   "CategoryRepository",
   "CustomerRepository",
   "SupplierRepository",
+  "EmployeeRepository",
   "ProductRepository",
   "SaleRepository",
   "PurchaseRepository",
@@ -17,6 +18,7 @@ const repositoryNames = [
   "CustomerLedgerRepository",
   "SupplierLedgerRepository",
   "PostingRepository",
+  "PayrollRepository",
   "ProductWorkspaceRepository",
 ] as const;
 
@@ -27,6 +29,7 @@ const state = vi.hoisted(() => {
     "CategoryRepository",
     "CustomerRepository",
     "SupplierRepository",
+    "EmployeeRepository",
     "ProductRepository",
     "SaleRepository",
     "PurchaseRepository",
@@ -40,6 +43,7 @@ const state = vi.hoisted(() => {
     "CustomerLedgerRepository",
     "SupplierLedgerRepository",
     "PostingRepository",
+    "PayrollRepository",
     "ProductWorkspaceRepository",
   ] as const;
   const repoInstances = {} as Record<RepositoryName, unknown[][]>;

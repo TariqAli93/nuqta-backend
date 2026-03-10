@@ -1,15 +1,21 @@
 import fp from "fastify-plugin";
-import { JwtService, type IBackupRepository } from "@nuqta/core";
+import { JwtService } from "@nuqta/core";
 import type {
   AccountingRepository,
+  AccountingSettingsRepository,
   AuditRepository,
+  BackupRepository,
   BarcodeRepository,
+  BarcodeSettingsRepository,
   CategoryRepository,
   CustomerLedgerRepository,
   CustomerRepository,
   DbConnection,
+  EmployeeRepository,
   InventoryRepository,
   PaymentRepository,
+  PayrollRepository,
+  PosSettingsRepository,
   PostingRepository,
   ProductRepository,
   ProductWorkspaceRepository,
@@ -18,6 +24,7 @@ import type {
   SettingsRepository,
   SupplierLedgerRepository,
   SupplierRepository,
+  SystemSettingsRepository,
   UserRepository,
 } from "@nuqta/data";
 import type { AppOptions } from "../app.js";
@@ -26,12 +33,17 @@ export interface Repositories {
   category: CategoryRepository;
   customer: CustomerRepository;
   supplier: SupplierRepository;
+  employee: EmployeeRepository;
   product: ProductRepository;
   sale: SaleRepository;
   purchase: PurchaseRepository;
   payment: PaymentRepository;
   inventory: InventoryRepository;
   settings: SettingsRepository;
+  systemSettings: SystemSettingsRepository;
+  accountingSettings: AccountingSettingsRepository;
+  posSettings: PosSettingsRepository;
+  barcodeSettings: BarcodeSettingsRepository;
   user: UserRepository;
   audit: AuditRepository;
   barcode: BarcodeRepository;
@@ -39,8 +51,9 @@ export interface Repositories {
   customerLedger: CustomerLedgerRepository;
   supplierLedger: SupplierLedgerRepository;
   posting: PostingRepository;
+  payroll: PayrollRepository;
   productWorkspace: ProductWorkspaceRepository;
-  backup: IBackupRepository;
+  backup: BackupRepository;
 }
 
 export default fp<AppOptions>(async (fastify, opts) => {
@@ -55,12 +68,17 @@ export default fp<AppOptions>(async (fastify, opts) => {
       category: new data.CategoryRepository(connection),
       customer: new data.CustomerRepository(connection),
       supplier: new data.SupplierRepository(connection),
+      employee: new data.EmployeeRepository(connection),
       product: new data.ProductRepository(connection),
       sale: new data.SaleRepository(connection),
       purchase: new data.PurchaseRepository(connection),
       payment: new data.PaymentRepository(connection),
       inventory: new data.InventoryRepository(connection),
       settings: new data.SettingsRepository(connection),
+      systemSettings: new data.SystemSettingsRepository(connection),
+      accountingSettings: new data.AccountingSettingsRepository(connection),
+      posSettings: new data.PosSettingsRepository(connection),
+      barcodeSettings: new data.BarcodeSettingsRepository(connection),
       user: new data.UserRepository(connection),
       audit: new data.AuditRepository(connection),
       barcode: new data.BarcodeRepository(connection),
@@ -68,10 +86,9 @@ export default fp<AppOptions>(async (fastify, opts) => {
       customerLedger: new data.CustomerLedgerRepository(connection),
       supplierLedger: new data.SupplierLedgerRepository(connection),
       posting: new data.PostingRepository(connection),
+      payroll: new data.PayrollRepository(connection),
       productWorkspace: new data.ProductWorkspaceRepository(connection),
-      backup: (data as any).BackupRepository
-        ? new (data as any).BackupRepository(connection)
-        : ({} as IBackupRepository),
+      backup: new data.BackupRepository(),
     } as Repositories;
   }
 

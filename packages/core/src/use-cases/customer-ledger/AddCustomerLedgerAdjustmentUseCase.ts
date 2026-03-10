@@ -1,9 +1,9 @@
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
 import { ICustomerRepository } from "../../interfaces/ICustomerRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
-import { NotFoundError, ValidationError } from "../../errors/DomainErrors.js";
+import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { CustomerLedgerEntry } from "../../entities/Ledger.js";
-import { AuditService } from "../../services/AuditService.js";
+import { AuditService } from "../../shared/services/AuditService.js";
 
 export interface LedgerAdjustmentInput {
   customerId: number;

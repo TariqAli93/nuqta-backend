@@ -47,9 +47,11 @@ describe("/api/v1/accounting", () => {
       method: "GET",
       url: "/api/v1/accounting/journal-entries?sourceType=sale&dateFrom=2026-03-01&dateTo=2026-03-02&isPosted=true&limit=10&offset=0",
       setup: () =>
-        mockUseCase("GetJournalEntriesUseCase", { execute: [journalEntry] }),
-      assert: (data: (typeof journalEntry)[]) => {
-        expect(data[0].entryNumber).toBe(journalEntry.entryNumber);
+        mockUseCase("GetJournalEntriesUseCase", {
+          execute: { items: [journalEntry], total: 1 },
+        }),
+      assert: (data: { items: (typeof journalEntry)[]; total: number }) => {
+        expect(data.items[0].entryNumber).toBe(journalEntry.entryNumber);
       },
     },
     {
@@ -208,7 +210,9 @@ describe("/api/v1/accounting", () => {
 
   // ── Covers L51-53: isPosted/limit/offset ternary fallback branches ──
   test("GET /journal-entries without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetJournalEntriesUseCase", { execute: [] });
+    mockUseCase("GetJournalEntriesUseCase", {
+      execute: { items: [], total: 0 },
+    });
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -219,44 +223,41 @@ describe("/api/v1/accounting", () => {
     expectOk(response);
   });
 
-  test(
-    "POST /initialize without a body falls back to an empty object (covers src/routes/v1/accounting/index.ts:126)",
-    async () => {
-      const unsetBodyPlugin: FastifyPluginAsync = async (app) => {
-        app.addHook("preHandler", async (request) => {
-          if (request.url === "/api/v1/accounting/initialize") {
-            Object.defineProperty(request, "body", {
-              configurable: true,
-              enumerable: true,
-              get: () => undefined,
-            });
-          }
-        });
-      };
-      mockUseCase("InitializeAccountingUseCase", {
-        execute: genericOperationResult,
+  test("POST /initialize without a body falls back to an empty object (covers src/routes/v1/accounting/index.ts:126)", async () => {
+    const unsetBodyPlugin: FastifyPluginAsync = async (app) => {
+      app.addHook("preHandler", async (request) => {
+        if (request.url === "/api/v1/accounting/initialize") {
+          Object.defineProperty(request, "body", {
+            configurable: true,
+            enumerable: true,
+            get: () => undefined,
+          });
+        }
+      });
+    };
+    mockUseCase("InitializeAccountingUseCase", {
+      execute: genericOperationResult,
+    });
+
+    const branchCtx = await buildApp({
+      plugins: [unsetBodyPlugin],
+    });
+
+    try {
+      const response = await branchCtx.app.inject({
+        method: "POST",
+        url: "/api/v1/accounting/initialize",
+        payload: {},
+        headers: branchCtx.authHeaders(),
       });
 
-      const branchCtx = await buildApp({
-        plugins: [unsetBodyPlugin],
-      });
-
-      try {
-        const response = await branchCtx.app.inject({
-          method: "POST",
-          url: "/api/v1/accounting/initialize",
-          payload: {},
-          headers: branchCtx.authHeaders(),
-        });
-
-        const data = expectOk(response);
-        expect(data).toMatchObject({ updated: true });
-        expect(
-          getUseCaseMock("InitializeAccountingUseCase", "execute"),
-        ).toHaveBeenCalledWith({});
-      } finally {
-        await branchCtx.close();
-      }
-    },
-  );
+      const data = expectOk(response);
+      expect(data).toMatchObject({ updated: true });
+      expect(
+        getUseCaseMock("InitializeAccountingUseCase", "execute"),
+      ).toHaveBeenCalledWith({});
+    } finally {
+      await branchCtx.close();
+    }
+  });
 });

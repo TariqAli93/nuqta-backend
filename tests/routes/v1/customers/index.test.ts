@@ -30,9 +30,12 @@ describe("/api/v1/customers", () => {
       title: "GET / returns the customer list",
       method: "GET",
       url: "/api/v1/customers?search=Layla&page=1&limit=10",
-      setup: () => mockUseCase("GetCustomersUseCase", { execute: [customer] }),
-      assert: (data: (typeof customer)[]) => {
-        expect(data[0].name).toBe(customer.name);
+      setup: () =>
+        mockUseCase("GetCustomersUseCase", {
+          execute: { items: [customer], total: 1 },
+        }),
+      assert: (data: { items: (typeof customer)[]; total: number }) => {
+        expect(data.items[0].name).toBe(customer.name);
       },
     },
     {
@@ -154,7 +157,7 @@ describe("/api/v1/customers", () => {
 
   // ── Covers L29-32: limit/page/nested-limit ternary fallback branches ──
   test("GET /customers without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetCustomersUseCase", { execute: [] });
+    mockUseCase("GetCustomersUseCase", { execute: { items: [], total: 0 } });
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -165,28 +168,31 @@ describe("/api/v1/customers", () => {
     expectOk(response);
   });
 
-  test(
-    "GET /customers with page but no limit uses the default page-size offset (covers src/routes/v1/customers/index.ts:32)",
-    async () => {
-      mockUseCase("GetCustomersUseCase", { execute: [customer] });
+  test("GET /customers with page but no limit uses the default page-size offset (covers src/routes/v1/customers/index.ts:32)", async () => {
+    mockUseCase("GetCustomersUseCase", {
+      execute: { items: [customer], total: 1 },
+    });
 
-      const response = await ctx.app.inject({
-        method: "GET",
-        url: "/api/v1/customers?page=2",
-        headers: ctx.authHeaders(),
-      });
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/customers?page=2",
+      headers: ctx.authHeaders(),
+    });
 
-      const data = expectOk(response);
-      expect(Array.isArray(data)).toBe(true);
-      expect((data as (typeof customer)[])[0]).toMatchObject({
-        id: customer.id,
-        name: customer.name,
-      });
-      expect(getUseCaseMock("GetCustomersUseCase", "execute")).toHaveBeenCalledWith({
-        search: undefined,
-        limit: undefined,
-        offset: 20,
-      });
-    },
-  );
+    const data = expectOk<{ items: (typeof customer)[]; total: number }>(
+      response,
+    );
+    expect(Array.isArray(data.items)).toBe(true);
+    expect(data.items[0]).toMatchObject({
+      id: customer.id,
+      name: customer.name,
+    });
+    expect(
+      getUseCaseMock("GetCustomersUseCase", "execute"),
+    ).toHaveBeenCalledWith({
+      search: undefined,
+      limit: undefined,
+      offset: 20,
+    });
+  });
 });

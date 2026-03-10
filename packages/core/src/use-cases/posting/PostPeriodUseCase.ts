@@ -4,7 +4,7 @@ import { PostingBatch } from "../../entities/PostingBatch.js";
 import {
   InvalidStateError,
   ValidationError,
-} from "../../errors/DomainErrors.js";
+} from "../../shared/errors/DomainErrors.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 
 export interface PostPeriodInput {

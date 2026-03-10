@@ -30,7 +30,8 @@ describe("/api/v1/settings", () => {
       title: "GET /company returns company settings",
       method: "GET",
       url: "/api/v1/settings/company",
-      setup: () => mockUseCase("GetCompanySettingsUseCase", { execute: companySettings }),
+      setup: () =>
+        mockUseCase("GetCompanySettingsUseCase", { execute: companySettings }),
       assert: (data: typeof companySettings) => {
         expect(data.name).toBe(companySettings.name);
       },
@@ -40,7 +41,10 @@ describe("/api/v1/settings", () => {
       method: "PUT",
       url: "/api/v1/settings/company",
       payload: companySettings,
-      setup: () => mockUseCase("SetCompanySettingsUseCase", { execute: null }),
+      setup: () => {
+        mockUseCase("SetCompanySettingsUseCase", { execute: null });
+        mockUseCase("GetCompanySettingsUseCase", { execute: companySettings });
+      },
       assert: (data: typeof companySettings) => {
         expect(data.currency).toBe(companySettings.currency);
       },
@@ -49,7 +53,10 @@ describe("/api/v1/settings", () => {
       title: "GET /currency returns currency settings",
       method: "GET",
       url: "/api/v1/settings/currency",
-      setup: () => mockUseCase("GetCurrencySettingsUseCase", { execute: currencySettings }),
+      setup: () =>
+        mockUseCase("GetCurrencySettingsUseCase", {
+          execute: currencySettings,
+        }),
       assert: (data: typeof currencySettings) => {
         expect(data.currencyCode).toBe(currencySettings.currencyCode);
       },
@@ -58,7 +65,8 @@ describe("/api/v1/settings", () => {
       title: "GET /modules returns module settings",
       method: "GET",
       url: "/api/v1/settings/modules",
-      setup: () => mockUseCase("GetModuleSettingsUseCase", { execute: moduleSettings }),
+      setup: () =>
+        mockUseCase("GetModuleSettingsUseCase", { execute: moduleSettings }),
       assert: (data: typeof moduleSettings) => {
         expect(data.accountingEnabled).toBe(true);
       },
@@ -79,7 +87,8 @@ describe("/api/v1/settings", () => {
       title: "GET /:key returns one setting",
       method: "GET",
       url: "/api/v1/settings/theme",
-      setup: () => mockUseCase("GetSettingUseCase", { execute: { value: "light" } }),
+      setup: () =>
+        mockUseCase("GetSettingUseCase", { execute: { value: "light" } }),
       assert: (data: { value: string }) => {
         expect(data.value).toBe("light");
       },

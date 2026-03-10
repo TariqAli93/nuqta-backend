@@ -1,6 +1,6 @@
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
 import { JournalEntry } from "../../entities/Accounting.js";
-import { NotFoundError, InvalidStateError } from "../../errors/DomainErrors.js";
+import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 
 /**

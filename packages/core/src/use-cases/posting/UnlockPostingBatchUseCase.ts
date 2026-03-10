@@ -3,7 +3,7 @@
  * Unlocks a previously locked posting batch.
  */
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
-import { NotFoundError, InvalidStateError } from "../../errors/DomainErrors.js";
+import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 
 export class UnlockPostingBatchUseCase {
   constructor(private postingRepo: IPostingRepository) {}

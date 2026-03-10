@@ -42,6 +42,7 @@ function createMockRepos(): RepoMap {
     category: {},
     customer: {},
     supplier: {},
+    employee: {},
     product: {},
     sale: {
       findAll: async () => ({
@@ -62,6 +63,7 @@ function createMockRepos(): RepoMap {
     customerLedger: {},
     supplierLedger: {},
     posting: {},
+    payroll: {},
     productWorkspace: {},
     backup: {},
   };
@@ -104,6 +106,7 @@ async function loadTestModules() {
     customerLedger,
     customers,
     dashboard,
+    hr,
     inventory,
     posting,
     products,
@@ -129,6 +132,7 @@ async function loadTestModules() {
     import("../../src/routes/v1/customer-ledger/index.ts"),
     import("../../src/routes/v1/customers/index.ts"),
     import("../../src/routes/v1/dashboard/index.ts"),
+    import("../../src/routes/v1/hr/index.ts"),
     import("../../src/routes/v1/inventory/index.ts"),
     import("../../src/routes/v1/posting/index.ts"),
     import("../../src/routes/v1/products/index.ts"),
@@ -159,6 +163,7 @@ async function loadTestModules() {
       { prefix: "/customer-ledger", plugin: customerLedger.default },
       { prefix: "/customers", plugin: customers.default },
       { prefix: "/dashboard", plugin: dashboard.default },
+      { prefix: "/hr", plugin: hr.default },
       { prefix: "/inventory", plugin: inventory.default },
       { prefix: "/posting", plugin: posting.default },
       { prefix: "/products", plugin: products.default },

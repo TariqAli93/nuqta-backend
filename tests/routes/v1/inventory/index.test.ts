@@ -31,10 +31,13 @@ describe("/api/v1/inventory", () => {
       url: "/api/v1/inventory/movements?productId=5&movementType=in&limit=10&offset=0",
       setup: () =>
         mockUseCase("GetInventoryMovementsUseCase", {
-          execute: [inventoryMovement],
+          execute: { items: [inventoryMovement], total: 1 },
         }),
-      assert: (data: (typeof inventoryMovement)[]) => {
-        expect(data[0].movementType).toBe("in");
+      assert: (data: {
+        items: (typeof inventoryMovement)[];
+        total: number;
+      }) => {
+        expect(data.items[0].movementType).toBe("in");
       },
     },
     {
