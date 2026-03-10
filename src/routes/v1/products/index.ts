@@ -90,6 +90,12 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute(body);
+
+      fastify.eventBus.emit("product:created", {
+        id: data.id,
+        name: data.name,
+      });
+
       return { ok: true, data };
     },
   );
@@ -109,6 +115,12 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute(id, body);
+
+      fastify.eventBus.emit("product:updated", {
+        id: data.id,
+        name: data.name,
+      });
+
       return { ok: true, data };
     },
   );
@@ -127,6 +139,9 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       await uc.execute(id);
+
+      fastify.eventBus.emit("product:deleted", { id });
+
       return { ok: true, data: null };
     },
   );
@@ -156,6 +171,12 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute({ productId: id, ...body }, userId);
+
+      fastify.eventBus.emit("inventory:adjusted", {
+        productId: id,
+        quantityChange: body.quantityChange,
+      });
+
       return { ok: true, data };
     },
   );

@@ -322,6 +322,14 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fifoService,
       );
       const result = await uc.executeCommitPhase(body, userId);
+
+      // Emit real-time event for other terminals
+      fastify.eventBus.emit("sale:created", {
+        id: result.createdSale.id,
+        total: result.createdSale.total,
+        itemCount: result.createdSale.items?.length ?? 0,
+      });
+
       return { ok: true, data: result.createdSale };
     },
   );
@@ -360,6 +368,9 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const userId = request.user?.sub || 1;
       const uc = new CancelSaleUseCase(fastify.repos.sale);
       await uc.execute(saleId, userId);
+
+      fastify.eventBus.emit("sale:cancelled", { id: saleId });
+
       return { ok: true, data: null };
     },
   );
