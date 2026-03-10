@@ -252,6 +252,9 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       // Repair mode: fix all drift in a single batch UPDATE
       if (query.repair === "true") {
         const corrected = await uc.repair();
+
+        fastify.eventBus.emit("inventory:reconciled", { corrected });
+
         return {
           ok: true,
           data: { items: [], total: 0, totalDrift: 0, corrected },
