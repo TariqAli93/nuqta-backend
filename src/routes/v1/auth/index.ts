@@ -215,7 +215,7 @@ const auth: FastifyPluginAsync = async (fastify) => {
   }
 
   // ── POST /auth/login ──────────────────────────────────────────────
-  fastify.post("/login", { schema: loginSchema }, async (request, reply) => {
+  fastify.post("/login", { schema: loginSchema, config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request, reply) => {
     const { username, password } = request.body as {
       username: string;
       password: string;
@@ -242,7 +242,7 @@ const auth: FastifyPluginAsync = async (fastify) => {
   // ── POST /auth/register (first user only) ─────────────────────────
   fastify.post(
     "/register",
-    { schema: registerSchema },
+    { schema: registerSchema, config: { rateLimit: { max: 5, timeWindow: 60_000 } } },
     async (request, reply) => {
       const body = request.body as {
         username: string;
@@ -292,7 +292,7 @@ const auth: FastifyPluginAsync = async (fastify) => {
   // Does NOT require the `authenticate` preHandler (the refresh token is self-contained).
   fastify.post(
     "/refresh",
-    { schema: refreshSchema },
+    { schema: refreshSchema, config: { rateLimit: { max: 20, timeWindow: 60_000 } } },
     async (request, reply) => {
       const { refreshToken } = request.body as { refreshToken?: string };
 

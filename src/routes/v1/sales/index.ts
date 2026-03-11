@@ -388,6 +388,12 @@ const sales: FastifyPluginAsync = async (fastify) => {
         { saleId, amount: body.amount, reason: body.reason },
         userId,
       );
+
+      fastify.eventBus.emit("sale:refunded", {
+        id: saleId,
+        refundedAmount: data.refundedAmount,
+      });
+
       return { ok: true, data };
     },
   );

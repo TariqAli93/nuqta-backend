@@ -2,6 +2,7 @@
 export * from "./db/db.js";
 export { DbConnection as DatabaseType } from "./db/db.js";
 export * from "./db/seed.js";
+export * from "./db/transaction.js";
 
 // ── Schema ──
 export * as schema from "./schema/schema.js";
