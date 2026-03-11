@@ -118,7 +118,7 @@ async function loadTestModules() {
     users,
   ] = await Promise.all([
     import("../../src/plugins/aa-swagger.ts"),
-    import("../../src/plugins/ab-caching.ts"),
+    import("../../src/plugins/cache-headers.ts"),
     import("../../src/plugins/ab-cors.ts"),
     import("../../src/plugins/ab-helmet.ts"),
     import("../../src/plugins/ab-rate-limit.ts"),
