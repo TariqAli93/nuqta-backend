@@ -1,6 +1,7 @@
 // ── Shared: Contracts, Errors, Services, Utils ──
 export * from "./shared/contracts/contract.js";
 export * from "./shared/errors/DomainErrors.js";
+export * from "./shared/errors/error-codes.js";
 export * from "./shared/services/PermissionService.js";
 export * from "./shared/services/AuditService.js";
 export * from "./shared/services/JwtService.js";

@@ -34,6 +34,7 @@
   "dependencies": {
     "@fastify/autoload": "^6.0.0",
     "@fastify/caching": "^9.0.3",
+    "@fastify/compress": "^8.3.1",
     "@fastify/cors": "^11.2.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
