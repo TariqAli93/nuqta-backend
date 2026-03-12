@@ -3,6 +3,7 @@ import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { ISupplierLedgerRepository } from "../../interfaces/ISupplierLedgerRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import {
   NotFoundError,
@@ -15,6 +16,7 @@ import type { PaymentMethod } from "../../entities/Payment.js";
 import type { JournalLine } from "../../entities/Accounting.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
+import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 
 const ACCT_CASH = "1001";
 const ACCT_AP = "2100";
@@ -50,6 +52,7 @@ export class AddPurchasePaymentUseCase {
     private accountingRepo: IAccountingRepository,
     private settingsRepo?: ISettingsRepository,
     auditRepo?: IAuditRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
@@ -234,6 +237,8 @@ export class AddPurchasePaymentUseCase {
       return;
     }
 
+    const autoPost = await this.resolveAutoPosting();
+
     const lines: JournalLine[] = [
       {
         accountId: apAcct.id,
@@ -255,7 +260,7 @@ export class AddPurchasePaymentUseCase {
       description: `Supplier payment #${paymentId} for purchase #${purchaseId}`,
       sourceType: "payment",
       sourceId: paymentId,
-      isPosted: false,
+      isPosted: autoPost,
       isReversed: false,
       totalAmount: amount,
       currency,
@@ -312,6 +317,13 @@ export class AddPurchasePaymentUseCase {
       (await this.settingsRepo.get(MODULE_SETTING_KEYS.LEDGERS_ENABLED)) ??
       (await this.settingsRepo.get("modules.ledgers.enabled"));
     return value !== "false";
+  }
+
+  private async resolveAutoPosting(): Promise<boolean> {
+    return SettingsAccessor.resolveAutoPosting(
+      this.settingsRepo,
+      this.accountingSettingsRepo,
+    );
   }
 
   private async findPurchaseSync(id: number): Promise<Purchase | null> {

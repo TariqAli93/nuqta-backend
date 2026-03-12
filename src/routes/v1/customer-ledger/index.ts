@@ -203,6 +203,7 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
         fastify.repos.audit,
         fastify.repos.settings,
+        fastify.repos.accountingSettings,
       );
       const data = await uc.execute({ customerId, ...body }, userId);
       return { ok: true, data };

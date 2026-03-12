@@ -320,6 +320,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.customerLedger,
         fastify.repos.audit,
         fifoService,
+        fastify.repos.accountingSettings,
       );
       const result = await uc.executeCommitPhase(body, userId);
 
@@ -353,6 +354,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
         fastify.repos.settings,
         fastify.repos.audit,
+        fastify.repos.accountingSettings,
       );
       const result = await uc.execute({ saleId, ...body }, userId);
       return { ok: true, data: result };

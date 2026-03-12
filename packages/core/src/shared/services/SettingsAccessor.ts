@@ -4,9 +4,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import type { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 
 export class SettingsAccessor {
-  constructor(private repo: ISettingsRepository) {}
+  constructor(
+    private repo: ISettingsRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
+  ) {}
 
   // ── System ──────────────────────────────────────────────────
   async getLanguage(): Promise<string> {
@@ -35,6 +39,19 @@ export class SettingsAccessor {
   }
 
   // ── Accounting ──────────────────────────────────────────────
+  async isAutoPostingEnabled(): Promise<boolean> {
+    if (this.accountingSettingsRepo) {
+      try {
+        const settings = await this.accountingSettingsRepo.get();
+        return settings.autoPosting ?? false;
+      } catch {
+        return false;
+      }
+    }
+    const value = await this.repo.get("accounting.autoPosting");
+    return value === "true";
+  }
+
   async isAccountingEnabled(): Promise<boolean> {
     const value =
       (await this.repo.get("accounting.enabled")) ??
@@ -150,5 +167,15 @@ export class SettingsAccessor {
 
   async set(key: string, value: string): Promise<void> {
     await this.repo.set(key, value);
+  }
+
+  // ── Static helper for resolving auto-posting across use cases ──
+  static async resolveAutoPosting(
+    settingsRepo?: ISettingsRepository,
+    accountingSettingsRepo?: IAccountingSettingsRepository,
+  ): Promise<boolean> {
+    if (!settingsRepo) return false;
+    const accessor = new SettingsAccessor(settingsRepo, accountingSettingsRepo);
+    return accessor.isAutoPostingEnabled();
   }
 }
