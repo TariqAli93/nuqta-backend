@@ -168,4 +168,14 @@ export class SettingsAccessor {
   async set(key: string, value: string): Promise<void> {
     await this.repo.set(key, value);
   }
+
+  // ── Static helper for resolving auto-posting across use cases ──
+  static async resolveAutoPosting(
+    settingsRepo?: ISettingsRepository,
+    accountingSettingsRepo?: IAccountingSettingsRepository,
+  ): Promise<boolean> {
+    if (!settingsRepo) return false;
+    const accessor = new SettingsAccessor(settingsRepo, accountingSettingsRepo);
+    return accessor.isAutoPostingEnabled();
+  }
 }

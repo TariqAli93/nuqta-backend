@@ -814,11 +814,10 @@ export class CreateSaleUseCase {
   }
 
   private async resolveAutoPosting(): Promise<boolean> {
-    const settings = new SettingsAccessor(
+    return SettingsAccessor.resolveAutoPosting(
       this.settingsRepo,
       this.accountingSettingsRepo,
     );
-    return settings.isAutoPostingEnabled();
   }
 
   async executeSideEffectsPhase(

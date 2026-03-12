@@ -410,11 +410,9 @@ export class CreatePurchaseUseCase {
   }
 
   private async resolveAutoPosting(): Promise<boolean> {
-    if (!this.settingsRepository) return false;
-    const settings = new SettingsAccessor(
+    return SettingsAccessor.resolveAutoPosting(
       this.settingsRepository,
       this.accountingSettingsRepo,
     );
-    return settings.isAutoPostingEnabled();
   }
 }

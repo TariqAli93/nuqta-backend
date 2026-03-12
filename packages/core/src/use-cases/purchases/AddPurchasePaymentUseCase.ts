@@ -320,12 +320,10 @@ export class AddPurchasePaymentUseCase {
   }
 
   private async resolveAutoPosting(): Promise<boolean> {
-    if (!this.settingsRepo) return false;
-    const settings = new SettingsAccessor(
+    return SettingsAccessor.resolveAutoPosting(
       this.settingsRepo,
       this.accountingSettingsRepo,
     );
-    return settings.isAutoPostingEnabled();
   }
 
   private async findPurchaseSync(id: number): Promise<Purchase | null> {
