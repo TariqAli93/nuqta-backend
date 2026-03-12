@@ -3,6 +3,7 @@ import { ICustomerRepository } from "../../interfaces/ICustomerRepository.js";
 import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { CustomerLedgerEntry } from "../../entities/Ledger.js";
@@ -27,6 +28,7 @@ export class RecordCustomerPaymentUseCase {
     private accountingRepo: IAccountingRepository,
     auditRepo?: IAuditRepository,
     private settingsRepo?: ISettingsRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
@@ -107,6 +109,15 @@ export class RecordCustomerPaymentUseCase {
     return settings.isAccountingEnabled();
   }
 
+  private async resolveAutoPosting(): Promise<boolean> {
+    if (!this.settingsRepo) return false;
+    const settings = new SettingsAccessor(
+      this.settingsRepo,
+      this.accountingSettingsRepo,
+    );
+    return settings.isAutoPostingEnabled();
+  }
+
   private async createJournalEntry(
     paymentId: number,
     amount: number,
@@ -114,7 +125,7 @@ export class RecordCustomerPaymentUseCase {
   ): Promise<void> {
     // Resolve account codes from settings
     const settings = this.settingsRepo
-      ? new SettingsAccessor(this.settingsRepo)
+      ? new SettingsAccessor(this.settingsRepo, this.accountingSettingsRepo)
       : null;
     const cashCode = settings ? await settings.getCashAccountCode() : "1001";
     const arCode = settings ? await settings.getArAccountCode() : "1100";
@@ -128,13 +139,15 @@ export class RecordCustomerPaymentUseCase {
       return;
     }
 
+    const autoPost = await this.resolveAutoPosting();
+
     await this.accountingRepo.createJournalEntrySync({
       entryNumber: `JE-CPAY-${paymentId}`,
       entryDate: new Date(),
       description: `Customer payment #${paymentId}`,
       sourceType: "payment",
       sourceId: paymentId,
-      isPosted: false,
+      isPosted: autoPost,
       isReversed: false,
       totalAmount: amount,
       currency: "IQD",

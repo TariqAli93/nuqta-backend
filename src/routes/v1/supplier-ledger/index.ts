@@ -174,6 +174,7 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
         fastify.repos.audit,
         fastify.repos.settings,
+        fastify.repos.accountingSettings,
       );
       const data = await uc.execute({ supplierId, ...body }, userId);
       return { ok: true, data };

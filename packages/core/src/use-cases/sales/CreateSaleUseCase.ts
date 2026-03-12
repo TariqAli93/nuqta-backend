@@ -6,6 +6,7 @@ import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { IInventoryRepository } from "../../interfaces/IInventoryRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { Sale } from "../../entities/Sale.js";
 import type { PaymentMethod } from "../../entities/Payment.js";
@@ -93,6 +94,7 @@ export class CreateSaleUseCase {
     private customerLedgerRepo: ICustomerLedgerRepository,
     auditRepo?: IAuditRepository,
     private fifoService?: IFifoDepletionService,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
@@ -783,13 +785,15 @@ export class CreateSaleUseCase {
       };
     }
 
+    const autoPost = await this.resolveAutoPosting();
+
     await this.accountingRepo.createJournalEntrySync({
       entryNumber,
       entryDate: new Date(),
       description: `Sale #${sale.invoiceNumber}`,
       sourceType: "sale",
       sourceId: sale.id,
-      isPosted: false,
+      isPosted: autoPost,
       isReversed: false,
       totalAmount: sale.total,
       currency,
@@ -807,6 +811,14 @@ export class CreateSaleUseCase {
   private async isLedgersEnabled(): Promise<boolean> {
     const settings = new SettingsAccessor(this.settingsRepo);
     return settings.isLedgersEnabled();
+  }
+
+  private async resolveAutoPosting(): Promise<boolean> {
+    const settings = new SettingsAccessor(
+      this.settingsRepo,
+      this.accountingSettingsRepo,
+    );
+    return settings.isAutoPostingEnabled();
   }
 
   async executeSideEffectsPhase(

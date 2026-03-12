@@ -251,6 +251,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
         fastify.repos.settings,
         fastify.repos.audit,
+        fastify.repos.accountingSettings,
       );
       const result = await uc.execute(body, userId);
       return { ok: true, data: result };
@@ -275,6 +276,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
         fastify.repos.settings,
         fastify.repos.audit,
+        fastify.repos.accountingSettings,
       );
       const result = await uc.execute({ purchaseId, ...body }, userId);
       return { ok: true, data: result };

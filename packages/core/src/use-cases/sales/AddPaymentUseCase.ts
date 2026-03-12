@@ -4,6 +4,7 @@ import { ICustomerRepository } from "../../interfaces/ICustomerRepository.js";
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import {
   NotFoundError,
@@ -16,6 +17,7 @@ import type { PaymentMethod } from "../../entities/Payment.js";
 import type { JournalLine } from "../../entities/Accounting.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
+import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 
 const ACCT_CASH = "1001";
 const ACCT_AR = "1100";
@@ -47,6 +49,7 @@ export class AddPaymentUseCase {
     private accountingRepo: IAccountingRepository,
     private settingsRepo?: ISettingsRepository,
     auditRepo?: IAuditRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
@@ -226,6 +229,8 @@ export class AddPaymentUseCase {
       return;
     }
 
+    const autoPost = await this.resolveAutoPosting();
+
     const lines: JournalLine[] = [
       {
         accountId: cashAcct.id,
@@ -247,7 +252,7 @@ export class AddPaymentUseCase {
       description: `Customer payment #${paymentId}`,
       sourceType: "payment",
       sourceId: paymentId,
-      isPosted: false,
+      isPosted: autoPost,
       isReversed: false,
       totalAmount: amount,
       currency,
@@ -301,5 +306,14 @@ export class AddPaymentUseCase {
       (await this.settingsRepo.get(MODULE_SETTING_KEYS.LEDGERS_ENABLED)) ??
       (await this.settingsRepo.get("modules.ledgers.enabled"));
     return value !== "false";
+  }
+
+  private async resolveAutoPosting(): Promise<boolean> {
+    if (!this.settingsRepo) return false;
+    const settings = new SettingsAccessor(
+      this.settingsRepo,
+      this.accountingSettingsRepo,
+    );
+    return settings.isAutoPostingEnabled();
   }
 }

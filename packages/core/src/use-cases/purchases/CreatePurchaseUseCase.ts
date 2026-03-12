@@ -7,6 +7,7 @@ import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
 import { ISupplierLedgerRepository } from "../../interfaces/ISupplierLedgerRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
@@ -54,6 +55,7 @@ export class CreatePurchaseUseCase {
     private accountingRepository: IAccountingRepository,
     private settingsRepository?: ISettingsRepository,
     auditRepo?: IAuditRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo as IAuditRepository);
@@ -348,13 +350,15 @@ export class CreatePurchaseUseCase {
       return;
     }
 
+    const autoPost = await this.resolveAutoPosting();
+
     await this.accountingRepository.createJournalEntrySync({
       entryNumber: `JE-PUR-${purchase.id || Date.now()}`,
       entryDate: new Date(),
       description: `Purchase #${purchase.invoiceNumber}`,
       sourceType: "purchase",
       sourceId: purchase.id,
-      isPosted: false,
+      isPosted: autoPost,
       isReversed: false,
       totalAmount: purchase.total,
       currency: purchase.currency || "IQD",
@@ -403,5 +407,14 @@ export class CreatePurchaseUseCase {
     if (!this.settingsRepository) return true;
     const settings = new SettingsAccessor(this.settingsRepository);
     return settings.isLedgersEnabled();
+  }
+
+  private async resolveAutoPosting(): Promise<boolean> {
+    if (!this.settingsRepository) return false;
+    const settings = new SettingsAccessor(
+      this.settingsRepository,
+      this.accountingSettingsRepo,
+    );
+    return settings.isAutoPostingEnabled();
   }
 }

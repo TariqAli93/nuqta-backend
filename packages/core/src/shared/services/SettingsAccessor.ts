@@ -4,9 +4,13 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import type { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 
 export class SettingsAccessor {
-  constructor(private repo: ISettingsRepository) {}
+  constructor(
+    private repo: ISettingsRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
+  ) {}
 
   // ── System ──────────────────────────────────────────────────
   async getLanguage(): Promise<string> {
@@ -35,6 +39,19 @@ export class SettingsAccessor {
   }
 
   // ── Accounting ──────────────────────────────────────────────
+  async isAutoPostingEnabled(): Promise<boolean> {
+    if (this.accountingSettingsRepo) {
+      try {
+        const settings = await this.accountingSettingsRepo.get();
+        return settings.autoPosting ?? false;
+      } catch {
+        return false;
+      }
+    }
+    const value = await this.repo.get("accounting.autoPosting");
+    return value === "true";
+  }
+
   async isAccountingEnabled(): Promise<boolean> {
     const value =
       (await this.repo.get("accounting.enabled")) ??
