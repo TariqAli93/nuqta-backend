@@ -54,14 +54,14 @@ export interface PresetSupplier {
   notes: string;
 }
 
-interface PresetPurchaseItem {
+export interface PresetPurchaseItem {
   productRef: string; // SKU
   quantity: number;
   unitCost: number;
   unit?: string; // Optional: specify a unit like 'carton'
 }
 
-interface PresetPurchase {
+export interface PresetPurchase {
   supplierRef: string; // matches supplier name
   invoiceNumber: string;
   items: PresetPurchaseItem[];
@@ -69,13 +69,13 @@ interface PresetPurchase {
   notes: string;
 }
 
-interface PresetSaleItem {
+export interface PresetSaleItem {
   productRef: string; // SKU
   quantity: number;
   unit?: string; // Optional: specify a unit
 }
 
-interface PresetSale {
+export interface PresetSale {
   customerRef: number; // index into customers array
   discount: number;
   paymentType: 'cash' | 'credit' | 'mixed';

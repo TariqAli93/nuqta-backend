@@ -11,7 +11,7 @@ export default fp(async (fastify) => {
     threshold: 1024,
     // Prefer brotli when supported, fall back to gzip
     encodings: ["br", "gzip", "deflate"],
-    // Don't compress SSE streams
+    // Keep streaming responses flexible; SSE routes also opt out explicitly.
     removeContentLengthHeader: true,
   });
 });

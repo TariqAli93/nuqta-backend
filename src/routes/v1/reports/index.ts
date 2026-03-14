@@ -144,7 +144,7 @@ const reports: FastifyPluginAsync = async (fastify) => {
         "stock",
         "minStock",
         "costPrice",
-        "salePrice",
+        "sellingPrice",
         "categoryId",
       ];
       const csv = toCsv(headers, items);

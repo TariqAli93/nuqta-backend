@@ -10,23 +10,31 @@ import { randomUUID } from "crypto";
 export default fp(async (fastify) => {
   // Attach a unique request ID and set child logger with correlation
   fastify.addHook("onRequest", async (request) => {
-    request.requestId =
-      (request.headers["x-request-id"] as string) ?? randomUUID();
+    const headerRequestId = request.headers["x-request-id"];
+    request.requestId = Array.isArray(headerRequestId)
+      ? (headerRequestId[0] ?? randomUUID())
+      : (headerRequestId ?? randomUUID());
 
     // Enrich Pino child logger with request context for all downstream logs
     request.log = request.log.child({
       requestId: request.requestId,
-      userId: request.user?.sub ?? null,
+      method: request.method,
+      url: request.url,
     });
+  });
+
+  fastify.addHook("preHandler", async (request) => {
+    if (request.user?.sub !== undefined) {
+      request.log = request.log.child({
+        userId: request.user.sub,
+      });
+    }
   });
 
   // Log duration on response with structured fields
   fastify.addHook("onResponse", async (request, reply) => {
     const duration = reply.elapsedTime; // Fastify built-in (ms)
     const logData: Record<string, unknown> = {
-      requestId: request.requestId,
-      method: request.method,
-      url: request.url,
       statusCode: reply.statusCode,
       durationMs: Math.round(duration),
       userId: request.user?.sub ?? null,
@@ -36,13 +44,15 @@ export default fp(async (fastify) => {
     // Include content-length for POST/PUT/PATCH
     const contentLength = request.headers["content-length"];
     if (contentLength) {
-      logData.contentLength = Number(contentLength);
+      logData.contentLength = Number(
+        Array.isArray(contentLength) ? contentLength[0] : contentLength,
+      );
     }
 
     if (reply.statusCode >= 400) {
-      fastify.log.warn(logData, "request completed with error");
+      request.log.warn(logData, "request completed with error");
     } else {
-      fastify.log.info(logData, "request completed");
+      request.log.info(logData, "request completed");
     }
   });
 });

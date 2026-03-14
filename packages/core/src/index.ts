@@ -28,6 +28,7 @@ export * from "./entities/ProductHistory.js";
 export * from "./entities/ProductUnit.js";
 export * from "./entities/Purchase.js";
 export * from "./entities/Sale.js";
+export * from "./entities/SaleReceipt.js";
 export * from "./entities/Settings.js";
 export * from "./entities/SystemSettings.js";
 export * from "./entities/AccountingSettings.js";

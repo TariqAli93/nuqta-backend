@@ -1,6 +1,14 @@
 import { join } from "node:path";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest, FastifyServerOptions } from "fastify";
+import type {
+  FastifyPluginAsync,
+  FastifyPluginCallback,
+  FastifyReply,
+  FastifyRequest,
+  FastifyServerOptions,
+} from "fastify";
+
+type TestPlugin = FastifyPluginAsync | FastifyPluginCallback;
 
 export interface AppTestOverrides {
   db?: unknown;
@@ -9,10 +17,10 @@ export interface AppTestOverrides {
     sign(payload: Record<string, unknown>): string;
     verify(token: string): unknown;
   };
-  plugins?: FastifyPluginAsync[];
+  plugins?: TestPlugin[];
   routes?: Array<{
     prefix: string;
-    plugin: FastifyPluginAsync;
+    plugin: TestPlugin;
   }>;
   authenticate?: (
     request: FastifyRequest,

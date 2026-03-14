@@ -10,6 +10,7 @@ const events: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/stream",
     {
+      compress: false,
       schema: {
         tags: ["Events"],
         summary: "SSE event stream",
@@ -27,6 +28,7 @@ const events: FastifyPluginAsync = async (fastify) => {
         Connection: "keep-alive",
         "X-Accel-Buffering": "no", // Disable Nginx buffering
       });
+      fastify.trackSseConnection(reply.raw);
 
       // Send initial connection event
       reply.raw.write(
@@ -52,10 +54,13 @@ const events: FastifyPluginAsync = async (fastify) => {
       const unsubscribe = fastify.eventBus.subscribe(handler);
 
       // Cleanup on disconnect
-      request.raw.on("close", () => {
+      const cleanup = () => {
         clearInterval(heartbeat);
         unsubscribe();
-      });
+      };
+
+      request.raw.once("close", cleanup);
+      reply.raw.once("close", cleanup);
 
       // Prevent Fastify from ending the response
       await reply;

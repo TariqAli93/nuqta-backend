@@ -1,12 +1,22 @@
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import {
-  sales,
-  saleItems,
-  saleItemDepletions,
+  customers,
+  posSettings,
   productBatches,
+  saleItemDepletions,
+  saleItems,
+  sales,
+  settings,
+  systemSettings,
+  users,
 } from "../../schema/schema.js";
-import { ISaleRepository, Sale, SaleItemDepletion } from "@nuqta/core";
+import {
+  ISaleRepository,
+  Sale,
+  SaleItemDepletion,
+  SaleReceipt,
+} from "@nuqta/core";
 
 export class SaleRepository implements ISaleRepository {
   constructor(private db: DbConnection) {}
@@ -202,30 +212,241 @@ export class SaleRepository implements ISaleRepository {
     }));
   }
 
-  async generateReceipt(saleId: number): Promise<string> {
+  async getReceiptData(saleId: number): Promise<SaleReceipt | null> {
     const sale = await this.findById(saleId);
-    if (!sale) return "";
+    if (!sale?.id) return null;
 
+    const [system, pos, customer, cashier, legacySettings] = await Promise.all([
+      this.db.select().from(systemSettings).limit(1),
+      this.db.select().from(posSettings).limit(1),
+      sale.customerId
+        ? this.db
+            .select()
+            .from(customers)
+            .where(eq(customers.id, sale.customerId))
+            .limit(1)
+        : Promise.resolve([]),
+      sale.createdBy
+        ? this.db
+            .select()
+            .from(users)
+            .where(eq(users.id, sale.createdBy))
+            .limit(1)
+        : Promise.resolve([]),
+      this.db.select().from(settings),
+    ]);
+
+    const legacyMap = new Map(
+      legacySettings.map((row) => [row.key, row.value]),
+    );
+    const receipt: SaleReceipt = {
+      saleId: sale.id,
+      invoiceNumber: sale.invoiceNumber,
+      createdAt: this.toIsoString(sale.createdAt),
+      subtotal: sale.subtotal,
+      discount: sale.discount ?? 0,
+      tax: sale.tax ?? 0,
+      total: sale.total,
+      currency: sale.currency || system[0]?.defaultCurrency || "IQD",
+      customer: {
+        id: customer[0]?.id ?? sale.customerId ?? null,
+        name: customer[0]?.name ?? "Walk-in Customer",
+        phone: customer[0]?.phone ?? "",
+      },
+      cashier: {
+        id: cashier[0]?.id ?? sale.createdBy ?? null,
+        name: cashier[0]?.fullName ?? "",
+      },
+      branch: {
+        id: null,
+        name: legacyMap.get("branch_name") || "",
+      },
+      store: {
+        companyName:
+          system[0]?.companyName || legacyMap.get("company_name") || "",
+        companyNameAr: legacyMap.get("company_name_ar") || "",
+        phone: system[0]?.companyPhone || legacyMap.get("company_phone") || "",
+        mobile:
+          system[0]?.companyPhone2 ||
+          legacyMap.get("company_mobile") ||
+          legacyMap.get("company_phone2") ||
+          "",
+        address:
+          system[0]?.companyAddress || legacyMap.get("company_address") || "",
+        receiptWidth: this.resolveReceiptWidth(
+          pos[0]?.paperSize,
+          legacyMap.get("receipt_width") || undefined,
+        ),
+        footerNote:
+          pos[0]?.receiptFooter ||
+          pos[0]?.invoiceFooterNotes ||
+          legacyMap.get("invoice.footerNotes") ||
+          legacyMap.get("invoice.footer_notes") ||
+          "",
+      },
+      items: (sale.items ?? []).map((item) => ({
+        productId: item.productId ?? null,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        subtotal: item.subtotal,
+        discount: item.discount ?? 0,
+        tax: 0,
+      })),
+    };
+
+    return {
+      ...receipt,
+      receiptText: this.renderReceiptText(receipt),
+    };
+  }
+
+  private resolveReceiptWidth(
+    paperSize?: string | null,
+    explicitWidth?: string,
+  ): string {
+    if (explicitWidth?.trim()) return explicitWidth.trim();
+
+    switch ((paperSize || "").toLowerCase()) {
+      case "a4":
+        return "210mm";
+      case "a5":
+        return "148mm";
+      case "thermal":
+      default:
+        return "80mm";
+    }
+  }
+
+  private toIsoString(value: string | Date | undefined): string {
+    const date = value ? new Date(value) : new Date();
+    return Number.isNaN(date.getTime())
+      ? new Date().toISOString()
+      : date.toISOString();
+  }
+
+  private renderReceiptText(receipt: SaleReceipt): string {
+    const width = 40;
     const lines: string[] = [];
-    lines.push("=".repeat(40));
-    lines.push(`Invoice: ${sale.invoiceNumber}`);
-    lines.push(`Date: ${sale.createdAt ?? new Date().toISOString()}`);
-    lines.push("-".repeat(40));
 
-    if (sale.items) {
-      for (const item of sale.items) {
-        lines.push(
-          `${item.productName} x${item.quantity} @ ${item.unitPrice} = ${item.subtotal}`,
-        );
+    const repeat = (char: string, count: number): string => char.repeat(count);
+
+    const center = (text: string, lineWidth = width): string => {
+      const value = String(text).trim();
+      if (value.length >= lineWidth) return value.slice(0, lineWidth);
+      const left = Math.floor((lineWidth - value.length) / 2);
+      return " ".repeat(left) + value;
+    };
+
+    const leftRight = (
+      left: string,
+      right: string,
+      lineWidth = width,
+    ): string => {
+      const l = String(left ?? "").trim();
+      const r = String(right ?? "").trim();
+
+      if (l.length + r.length + 1 <= lineWidth) {
+        return l + " ".repeat(lineWidth - l.length - r.length) + r;
       }
+
+      const maxLeft = Math.max(1, lineWidth - r.length - 1);
+      return l.slice(0, maxLeft) + " " + r;
+    };
+
+    const wrap = (text: string, lineWidth = width): string[] => {
+      const value = String(text ?? "").trim();
+      if (!value) return [""];
+
+      const words = value.split(/\s+/);
+      const result: string[] = [];
+      let current = "";
+
+      for (const word of words) {
+        const next = current ? `${current} ${word}` : word;
+        if (next.length <= lineWidth) {
+          current = next;
+        } else {
+          if (current) result.push(current);
+
+          if (word.length > lineWidth) {
+            for (let i = 0; i < word.length; i += lineWidth) {
+              result.push(word.slice(i, i + lineWidth));
+            }
+            current = "";
+          } else {
+            current = word;
+          }
+        }
+      }
+
+      if (current) result.push(current);
+      return result;
+    };
+
+    const money = (value: unknown): string => {
+      const num = Number(value ?? 0);
+      return Number.isFinite(num) ? num.toLocaleString("en-US") : "0";
+    };
+
+    const formatDate = (value: unknown): string => {
+      const date = value ? new Date(String(value)) : new Date();
+      if (Number.isNaN(date.getTime())) return String(value ?? "");
+      return date.toLocaleString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    };
+
+    lines.push(center(receipt.store.companyName || "STORE RECEIPT"));
+    if (receipt.store.companyNameAr) {
+      lines.push(center(receipt.store.companyNameAr));
+    }
+    lines.push(repeat("=", width));
+    lines.push(leftRight("Invoice", receipt.invoiceNumber || "-"));
+    lines.push(leftRight("Date", formatDate(receipt.createdAt)));
+    lines.push(repeat("-", width));
+
+    for (const item of receipt.items) {
+      const nameLines = wrap(String(item.productName ?? "Item"), width);
+      lines.push(...nameLines);
+
+      lines.push(
+        leftRight(
+          `${money(item.unitPrice)} x ${item.quantity}`,
+          money(item.subtotal),
+        ),
+      );
+
+      if (Number(item.discount ?? 0) > 0) {
+        lines.push(leftRight("Discount", money(item.discount)));
+      }
+
+      lines.push(repeat("-", width));
     }
 
-    lines.push("-".repeat(40));
-    lines.push(`Subtotal: ${sale.subtotal}`);
-    if (sale.discount) lines.push(`Discount: ${sale.discount}`);
-    if (sale.tax) lines.push(`Tax: ${sale.tax}`);
-    lines.push(`Total: ${sale.total}`);
-    lines.push("=".repeat(40));
+    lines.push(leftRight("Subtotal", money(receipt.subtotal)));
+
+    if (Number(receipt.discount ?? 0) > 0) {
+      lines.push(leftRight("Discount", money(receipt.discount)));
+    }
+
+    if (Number(receipt.tax ?? 0) > 0) {
+      lines.push(leftRight("Tax", money(receipt.tax)));
+    }
+
+    lines.push(leftRight("Total", money(receipt.total)));
+    if (receipt.cashier.name) {
+      lines.push(leftRight("Cashier", receipt.cashier.name));
+    }
+    if (receipt.customer.name) {
+      lines.push(leftRight("Customer", receipt.customer.name));
+    }
+    lines.push(repeat("=", width));
+    lines.push(center(receipt.store.footerNote || "Thank you"));
 
     return lines.join("\n");
   }

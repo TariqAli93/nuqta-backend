@@ -17,7 +17,12 @@ export default fp<FastifyCorsOptions>(async (fastify) => {
   await fastify.register(cors, {
     origin: allowedOrigins.includes("*") ? true : allowedOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cache-Control",
+      "Last-Event-ID",
+    ],
     credentials: true,
     maxAge: 86_400, // 24 h preflight cache
   });

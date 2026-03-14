@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, SQL } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import {
   inventoryMovements,
@@ -11,19 +11,52 @@ import {
   StockReconciliationResult,
 } from "@nuqta/core";
 
+/* ──────────────────────────────────────────────────────────────────
+ * Shared helpers
+ * ────────────────────────────────────────────────────────────────── */
+
+/** Reusable WHERE fragment for "batches expiring within N days". */
+function expiringBatchesCondition(days = 30): SQL {
+  return and(
+    sql`${productBatches.quantityOnHand} > 0`,
+    sql`${productBatches.expiryDate} IS NOT NULL`,
+    sql`${productBatches.expiryDate}::date <= CURRENT_DATE + INTERVAL '${sql.raw(String(days))} days'`,
+    sql`${productBatches.expiryDate}::date >= CURRENT_DATE`,
+  )!;
+}
+
+/** Ledger SUM expression reused by reconciliation + repair. */
+const LEDGER_SUM_EXPR = sql`
+  SUM(CASE
+    WHEN movement_type = 'in'     THEN quantity_base
+    WHEN movement_type = 'out'    THEN -quantity_base
+    WHEN movement_type = 'adjust' THEN quantity_base
+    ELSE 0
+  END)`;
+
+/* ──────────────────────────────────────────────────────────────────
+ * Repository
+ * ────────────────────────────────────────────────────────────────── */
+
 export class InventoryRepository implements IInventoryRepository {
   constructor(private db: DbConnection) {}
+
+  /* ── Movements ──────────────────────────────────────────────── */
 
   async createMovement(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
   ): Promise<InventoryMovement> {
     const [created] = await this.db
       .insert(inventoryMovements)
-      .values(movement as any)
+      .values(movement as typeof inventoryMovements.$inferInsert)
       .returning();
-    return created as unknown as InventoryMovement;
+    return created as InventoryMovement;
   }
 
+  /**
+   * @deprecated Alias kept for interface compat — just delegates to
+   * the async `createMovement`.  Remove once call-sites are updated.
+   */
   async createMovementSync(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
   ): Promise<InventoryMovement> {
@@ -40,7 +73,8 @@ export class InventoryRepository implements IInventoryRepository {
     limit?: number;
     offset?: number;
   }): Promise<{ items: InventoryMovement[]; total: number }> {
-    const conditions: any[] = [];
+    const conditions: SQL[] = [];
+
     if (params?.productId)
       conditions.push(eq(inventoryMovements.productId, params.productId));
     if (params?.movementType)
@@ -49,28 +83,26 @@ export class InventoryRepository implements IInventoryRepository {
       conditions.push(eq(inventoryMovements.sourceType, params.sourceType));
     if (params?.sourceId)
       conditions.push(eq(inventoryMovements.sourceId, params.sourceId));
+
+    // Compare date strings directly — the input is already in local date
+    // format (YYYY-MM-DD) and the DB column stores timestamptz, so we
+    // cast the column to DATE to avoid UTC-shift mismatches.
     if (params?.dateFrom)
       conditions.push(
-        gte(
-          inventoryMovements.createdAt,
-          new Date(params.dateFrom).toISOString(),
-        ),
+        gte(sql`${inventoryMovements.createdAt}::date`, params.dateFrom),
       );
     if (params?.dateTo)
       conditions.push(
-        lte(
-          inventoryMovements.createdAt,
-          new Date(params.dateTo).toISOString(),
-        ),
+        lte(sql`${inventoryMovements.createdAt}::date`, params.dateTo),
       );
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const totalResult = await this.db
+    const [countRow] = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(inventoryMovements)
       .where(where);
-    const total = Number(totalResult[0]?.count ?? 0);
+    const total = Number(countRow?.count ?? 0);
 
     let query = this.db
       .select()
@@ -78,27 +110,33 @@ export class InventoryRepository implements IInventoryRepository {
       .where(where)
       .orderBy(desc(inventoryMovements.id))
       .$dynamic();
+
     if (params?.limit) query = query.limit(params.limit);
     if (params?.offset) query = query.offset(params.offset);
 
     const rows = await query;
-    return { items: rows as unknown as InventoryMovement[], total };
+    return { items: rows as InventoryMovement[], total };
   }
+
+  /* ── Dashboard ──────────────────────────────────────────────── */
 
   async getDashboardStats(): Promise<{
     totalValuation: number;
     lowStockCount: number;
     expiryAlertCount: number;
-    topMovingProducts: any[];
+    topMovingProducts: {
+      productId: number;
+      productName: string;
+      totalQuantity: number;
+    }[];
   }> {
-    // Total valuation: sum(stock * costPrice) for all active products
+    // Total valuation
     const [valuationRow] = await this.db
       .select({
         total: sql<number>`COALESCE(SUM(${products.stock} * ${products.costPrice}), 0)`,
       })
       .from(products)
       .where(eq(products.isActive, true));
-    const totalValuation = Number(valuationRow?.total ?? 0);
 
     // Low stock count
     const [lowStockRow] = await this.db
@@ -111,95 +149,79 @@ export class InventoryRepository implements IInventoryRepository {
           sql`${products.minStock} > 0`,
         ),
       );
-    const lowStockCount = Number(lowStockRow?.count ?? 0);
 
-    // Expiry alerts: batches expiring within 30 days
+    // Expiry alert count — uses shared condition
     const [expiryRow] = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(productBatches)
-      .where(
-        and(
-          sql`${productBatches.quantityOnHand} > 0`,
-          sql`${productBatches.expiryDate} IS NOT NULL`,
-          sql`${productBatches.expiryDate}::date <= CURRENT_DATE + INTERVAL '30 days'`,
-          sql`${productBatches.expiryDate}::date >= CURRENT_DATE`,
-        ),
-      );
-    const expiryAlertCount = Number(expiryRow?.count ?? 0);
+      .where(expiringBatchesCondition());
 
-    // Top moving products (by total movement quantity, last 30 days)
-    const topMoving = await this.db
+    // Top moving products — single query with JOIN (no N+1)
+    const topMovingProducts = await this.db
       .select({
         productId: inventoryMovements.productId,
-        totalQty: sql<number>`SUM(ABS(${inventoryMovements.quantityBase}))`,
+        productName: products.name,
+        totalQuantity: sql<number>`SUM(ABS(${inventoryMovements.quantityBase}))`,
       })
       .from(inventoryMovements)
+      .innerJoin(products, eq(products.id, inventoryMovements.productId))
       .where(
         sql`${inventoryMovements.createdAt} >= CURRENT_DATE - INTERVAL '30 days'`,
       )
-      .groupBy(inventoryMovements.productId)
+      .groupBy(inventoryMovements.productId, products.name)
       .orderBy(sql`SUM(ABS(${inventoryMovements.quantityBase})) DESC`)
       .limit(5);
 
-    const topMovingProducts = await Promise.all(
-      topMoving.map(async (tm) => {
-        const [product] = await this.db
-          .select({ name: products.name })
-          .from(products)
-          .where(eq(products.id, tm.productId));
-        return {
-          productId: tm.productId,
-          productName: product?.name ?? "Unknown",
-          totalQuantity: Number(tm.totalQty),
-        };
-      }),
-    );
-
     return {
-      totalValuation,
-      lowStockCount,
-      expiryAlertCount,
-      topMovingProducts,
+      totalValuation: Number(valuationRow?.total ?? 0),
+      lowStockCount: Number(lowStockRow?.count ?? 0),
+      expiryAlertCount: Number(expiryRow?.count ?? 0),
+      topMovingProducts: topMovingProducts.map((r) => ({
+        productId: r.productId,
+        productName: r.productName ?? "Unknown",
+        totalQuantity: Number(r.totalQuantity),
+      })),
     };
   }
 
-  async getExpiryAlerts(): Promise<any[]> {
+  /* ── Expiry alerts ──────────────────────────────────────────── */
+
+  async getExpiryAlerts(): Promise<
+    {
+      batchId: number;
+      productId: number;
+      productName: string;
+      batchNumber: string | null;
+      expiryDate: string | null;
+      quantityOnHand: number;
+    }[]
+  > {
+    // Single query with JOIN — no N+1
     const rows = await this.db
       .select({
         batchId: productBatches.id,
         productId: productBatches.productId,
+        productName: products.name,
         batchNumber: productBatches.batchNumber,
         expiryDate: productBatches.expiryDate,
         quantityOnHand: productBatches.quantityOnHand,
       })
       .from(productBatches)
-      .where(
-        and(
-          sql`${productBatches.quantityOnHand} > 0`,
-          sql`${productBatches.expiryDate} IS NOT NULL`,
-          sql`${productBatches.expiryDate}::date <= CURRENT_DATE + INTERVAL '30 days'`,
-          sql`${productBatches.expiryDate}::date >= CURRENT_DATE`,
-        ),
-      )
+      .innerJoin(products, eq(products.id, productBatches.productId))
+      .where(expiringBatchesCondition())
       .orderBy(productBatches.expiryDate);
 
-    return Promise.all(
-      rows.map(async (row) => {
-        const [product] = await this.db
-          .select({ name: products.name })
-          .from(products)
-          .where(eq(products.id, row.productId));
-        return {
-          ...row,
-          productName: product?.name ?? "Unknown",
-        };
-      }),
-    );
+    return rows.map((r) => ({
+      batchId: r.batchId,
+      productId: r.productId,
+      productName: r.productName ?? "Unknown",
+      batchNumber: r.batchNumber,
+      expiryDate: r.expiryDate,
+      quantityOnHand: Number(r.quantityOnHand),
+    }));
   }
 
-  /* ────────────────────────────────────────────────────────────────
-   * Stock Reconciliation — optimised single-query approach
-   * ──────────────────────────────────────────────────────────────── */
+  /* ── Stock Reconciliation ───────────────────────────────────── */
 
   async getStockReconciliation(params?: {
     driftOnly?: boolean;
@@ -211,7 +233,7 @@ export class InventoryRepository implements IInventoryRepository {
     const offset = params?.offset ?? 0;
     const driftOnly = params?.driftOnly ?? true;
 
-    // Sub-query: sum movements per product in a single pass
+    // Sub-query: sum movements per product
     const ledgerSub = this.db
       .select({
         productId: inventoryMovements.productId,
@@ -227,42 +249,36 @@ export class InventoryRepository implements IInventoryRepository {
       .groupBy(inventoryMovements.productId)
       .as("ledger");
 
-    // Build WHERE conditions
-    const conditions: ReturnType<typeof eq>[] = [eq(products.isActive, true)];
+    const conditions: SQL[] = [eq(products.isActive, true)];
 
     if (params?.search) {
-      conditions.push(
-        sql`${products.name} ILIKE ${"%" + params.search + "%"}` as any,
-      );
+      conditions.push(sql`${products.name} ILIKE ${"%" + params.search + "%"}`);
     }
 
     if (driftOnly) {
       conditions.push(
-        sql`COALESCE(${products.stock}, 0) != COALESCE(${ledgerSub.ledgerStock}, 0)` as any,
+        sql`COALESCE(${products.stock}, 0) != COALESCE(${ledgerSub.ledgerStock}, 0)`,
       );
     }
 
     const where = and(...conditions);
 
-    // Count query (total matching rows)
     const [countRow] = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(products)
       .leftJoin(ledgerSub, eq(products.id, ledgerSub.productId))
       .where(where);
-    const total = Number(countRow?.count ?? 0);
 
-    // Sum of absolute drift for summary
     const [driftSumRow] = await this.db
       .select({
-        totalDrift: sql<number>`COALESCE(SUM(ABS(COALESCE(${products.stock}, 0) - COALESCE(${ledgerSub.ledgerStock}, 0))), 0)`,
+        totalDrift: sql<number>`COALESCE(SUM(ABS(
+          COALESCE(${products.stock}, 0) - COALESCE(${ledgerSub.ledgerStock}, 0)
+        )), 0)`,
       })
       .from(products)
       .leftJoin(ledgerSub, eq(products.id, ledgerSub.productId))
       .where(where);
-    const totalDrift = Number(driftSumRow?.totalDrift ?? 0);
 
-    // Data query with pagination, ordered by product id for stable keyset
     const rows = await this.db
       .select({
         productId: products.id,
@@ -286,33 +302,37 @@ export class InventoryRepository implements IInventoryRepository {
         ledgerStock: Number(r.ledgerStock),
         drift: Number(r.drift),
       })),
-      total,
-      totalDrift,
+      total: Number(countRow?.count ?? 0),
+      totalDrift: Number(driftSumRow?.totalDrift ?? 0),
     };
   }
 
+  /* ── Drift repair ───────────────────────────────────────────── */
+
   async repairStockDrift(): Promise<number> {
-    // Single UPDATE … FROM (sub-query) — no N+1
+    // Uses a LEFT JOIN so products with zero movements get stock → 0.
+    // The original INNER JOIN silently skipped those products.
     const result = await this.db.execute(sql`
       UPDATE products AS p
       SET stock = COALESCE(m.ledger_stock, 0)
       FROM (
         SELECT
-          product_id,
-          SUM(CASE
-            WHEN movement_type = 'in'     THEN quantity_base
-            WHEN movement_type = 'out'    THEN -quantity_base
-            WHEN movement_type = 'adjust' THEN quantity_base
-            ELSE 0
-          END) AS ledger_stock
-        FROM inventory_movements
-        GROUP BY product_id
+          pr.id AS product_id,
+          COALESCE(mv.ledger_stock, 0) AS ledger_stock
+        FROM products pr
+        LEFT JOIN (
+          SELECT
+            product_id,
+            ${LEDGER_SUM_EXPR} AS ledger_stock
+          FROM inventory_movements
+          GROUP BY product_id
+        ) mv ON mv.product_id = pr.id
+        WHERE pr.is_active = true
+          AND COALESCE(pr.stock, 0) != COALESCE(mv.ledger_stock, 0)
       ) m
       WHERE p.id = m.product_id
-        AND p.is_active = true
-        AND COALESCE(p.stock, 0) != COALESCE(m.ledger_stock, 0)
     `);
 
-    return Number((result as any).rowCount ?? (result as any).length ?? 0);
+    return Number((result as { rowCount?: number }).rowCount ?? 0);
   }
 }

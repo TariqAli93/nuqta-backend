@@ -17,6 +17,7 @@ import {
   SuccessNullResponse,
 } from "../../../shared/schema-helpers.js";
 import { requirePermission } from "../../../middleware/rbac.js";
+import { SaleReceiptSchema } from "../../../schemas/sale-receipt.js";
 
 const SaleItemSchema = {
   type: "object" as const,
@@ -249,13 +250,13 @@ const refundSaleSchema = {
   },
 } as const;
 
-const getSaleReceiptSchema = {
+export const getSaleReceiptSchema = {
   tags: ["Sales"],
   summary: "Get sale receipt",
   security: [{ bearerAuth: [] }],
   params: { $ref: "IdParams#" },
   response: {
-    200: successEnvelope({ type: "string" }, "Receipt content"),
+    200: successEnvelope(SaleReceiptSchema, "Receipt data"),
     ...ErrorResponses,
   },
 } as const;

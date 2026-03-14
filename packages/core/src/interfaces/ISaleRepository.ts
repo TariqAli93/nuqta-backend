@@ -1,4 +1,5 @@
 import { Sale, SaleItemDepletion } from "../entities/Sale.js";
+import { SaleReceipt } from "../entities/SaleReceipt.js";
 
 export interface ISaleRepository {
   create(sale: Sale): Promise<Sale>;
@@ -38,5 +39,5 @@ export interface ISaleRepository {
     }[]
   >;
 
-  generateReceipt(saleId: number): Promise<string>;
+  getReceiptData(saleId: number): Promise<SaleReceipt | null>;
 }

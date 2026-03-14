@@ -165,6 +165,9 @@ const backup: FastifyPluginAsync = async (fastify) => {
     {
       schema: createBackupSchema,
       preHandler: requirePermission("backup:create"),
+      config: {
+        rateLimit: { max: 5, timeWindow: 60_000 },
+      },
     },
     async (request) => {
       const uc = new CreateBackupUseCase(
@@ -230,6 +233,10 @@ const backup: FastifyPluginAsync = async (fastify) => {
     {
       schema: restoreBackupSchema,
       preHandler: requirePermission("backup:restore"),
+      bodyLimit: 50 * 1024 * 1024,
+      config: {
+        rateLimit: { max: 5, timeWindow: 60_000 },
+      },
     },
     async (request) => {
       const { backupName } = request.body as { backupName: string };

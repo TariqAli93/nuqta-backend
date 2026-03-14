@@ -28,6 +28,51 @@ import {
 import { mockUseCase, resetMockCore } from "../../helpers/mockCore.ts";
 import { resetMockData } from "../../helpers/mockData.ts";
 
+const receiptData = {
+  saleId: 11,
+  invoiceNumber: "INV-1773374462618-373",
+  createdAt: "2026-03-13T07:01:02.618Z",
+  subtotal: 10000,
+  discount: 0,
+  tax: 0,
+  total: 10000,
+  currency: "IQD",
+  customer: {
+    id: 1,
+    name: "Walk-in Customer",
+    phone: "",
+  },
+  cashier: {
+    id: 5,
+    name: "Tariq",
+  },
+  branch: {
+    id: null,
+    name: "",
+  },
+  store: {
+    companyName: "My Store",
+    companyNameAr: "متجري",
+    phone: "0770xxxxxxx",
+    mobile: "0780xxxxxxx",
+    address: "Baghdad, Iraq",
+    receiptWidth: "80mm",
+    footerNote: "Thank you for your visit",
+  },
+  items: [
+    {
+      productId: 10,
+      productName: "شال قطني",
+      quantity: 1,
+      unitPrice: 10000,
+      subtotal: 10000,
+      discount: 0,
+      tax: 0,
+    },
+  ],
+  receiptText: "optional plain text fallback",
+};
+
 // ── Schemas under test ─────────────────────────────────────────────
 import { getPurchasesSchema } from "../../../src/routes/v1/purchases/index.ts";
 import { getCustomerLedgerSchema } from "../../../src/routes/v1/customer-ledger/index.ts";
@@ -38,8 +83,12 @@ import {
   getProductPurchaseHistorySchema,
   getProductSalesHistorySchema,
 } from "../../../src/routes/v1/products/index.ts";
-import { getSalesSchema } from "../../../src/routes/v1/sales/index.ts";
+import {
+  getSalesSchema,
+  getSaleReceiptSchema,
+} from "../../../src/routes/v1/sales/index.ts";
 import { getInventoryMovementsSchema } from "../../../src/routes/v1/inventory/index.ts";
+import { afterPaySchema } from "../../../src/routes/v1/pos/index.ts";
 import { getPostingBatchesSchema } from "../../../src/routes/v1/posting/index.ts";
 
 // Dashboard and auth schemas use additionalProperties: true or loose shapes,
@@ -230,6 +279,37 @@ describe("Response contract validation", () => {
     assertMatchesSchema(
       response,
       getSalesSchema.response[200] as Record<string, unknown>,
+    );
+  });
+
+  test("GET /sales/:id/receipt response matches getSaleReceiptSchema", async () => {
+    ctx.repos.sale.getReceiptData = async () => receiptData;
+
+    const response = await ctx.app.inject({
+      method: "GET",
+      url: "/api/v1/sales/11/receipt",
+      headers: ctx.authHeaders(),
+    });
+
+    assertMatchesSchema(
+      response,
+      getSaleReceiptSchema.response[200] as Record<string, unknown>,
+    );
+  });
+
+  test("POST /pos/after-pay response matches afterPaySchema", async () => {
+    ctx.repos.sale.getReceiptData = async () => receiptData;
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/pos/after-pay",
+      payload: { saleId: 11 },
+      headers: ctx.authHeaders({ permissions: ["sales:read"] }),
+    });
+
+    assertMatchesSchema(
+      response,
+      afterPaySchema.response[200] as Record<string, unknown>,
     );
   });
 

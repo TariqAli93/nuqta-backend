@@ -5,6 +5,7 @@ import {
   successEnvelope,
 } from "../../../shared/schema-helpers.js";
 import { requirePermission } from "../../../middleware/rbac.js";
+import { SaleReceiptSchema } from "../../../schemas/sale-receipt.js";
 
 const AfterPayBodySchema = {
   type: "object" as const,
@@ -16,22 +17,24 @@ const AfterPayBodySchema = {
   additionalProperties: false,
 } as const;
 
-const afterPaySchema = {
+export const afterPaySchema = {
   tags: ["POS"],
-  summary: "Post-sale hook: generate receipt for printing",
+  summary: "Post-sale hook: generate structured receipt data for printing",
   security: [{ bearerAuth: [] }],
   body: AfterPayBodySchema,
   response: {
     200: successEnvelope(
       {
         type: "object" as const,
+        required: ["saleId", "receipt", "printerName"],
         properties: {
           saleId: { type: "integer" },
-          receipt: { type: "string" },
+          receipt: SaleReceiptSchema,
           printerName: { type: "string", nullable: true },
         },
+        additionalProperties: false,
       },
-      "Receipt generated",
+      "Receipt data generated",
     ),
     ...ErrorResponses,
   },
