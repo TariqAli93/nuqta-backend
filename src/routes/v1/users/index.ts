@@ -4,7 +4,7 @@ import {
   UpdateUserUseCase,
   NotFoundError,
   type User,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

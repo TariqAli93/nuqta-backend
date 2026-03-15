@@ -13,7 +13,7 @@ import type {
   FastifyRequest,
   preHandlerHookHandler,
 } from "fastify";
-import { hasAnyPermission, type UserRole } from "@nuqta/core";
+import { hasAnyPermission, type UserRole } from "../domain/index.js";
 
 /**
  * Returns a Fastify preHandler that verifies the authenticated user

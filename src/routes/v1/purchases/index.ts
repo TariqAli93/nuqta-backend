@@ -5,7 +5,7 @@ import {
   NotFoundError,
   type CreatePurchaseInput,
   type AddPurchasePaymentInput,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

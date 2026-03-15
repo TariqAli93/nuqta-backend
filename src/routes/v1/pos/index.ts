@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { GetSaleReceiptUseCase } from "@nuqta/core";
+import { GetSaleReceiptUseCase } from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

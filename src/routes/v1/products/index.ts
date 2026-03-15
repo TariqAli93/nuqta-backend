@@ -13,7 +13,7 @@ import {
   CreateProductBatchUseCase,
   GetProductPurchaseHistoryUseCase,
   GetProductSalesHistoryUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import { requirePermission } from "../../../middleware/rbac.js";
 
 const products: FastifyPluginAsync = async (fastify) => {

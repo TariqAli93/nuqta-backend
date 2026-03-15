@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { NotFoundError, PermissionDeniedError } from "../../../../src/domain/index.js";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { category } from "../../../helpers/fixtures.ts";

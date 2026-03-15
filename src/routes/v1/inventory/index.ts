@@ -4,7 +4,7 @@ import {
   GetInventoryDashboardUseCase,
   GetExpiryAlertsUseCase,
   ReconcileStockUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

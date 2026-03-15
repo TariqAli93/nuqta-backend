@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import {
   InitializeAccountingUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

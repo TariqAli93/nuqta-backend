@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import { CreatePayrollRunUseCase } from "../../../packages/core/src/use-cases/hr/CreatePayrollRunUseCase.ts";
-import { ApprovePayrollRunUseCase } from "../../../packages/core/src/use-cases/hr/ApprovePayrollRunUseCase.ts";
+import { CreatePayrollRunUseCase } from "../../../src/domain/use-cases/hr/CreatePayrollRunUseCase.ts";
+import { ApprovePayrollRunUseCase } from "../../../src/domain/use-cases/hr/ApprovePayrollRunUseCase.ts";
 import {
   ACCOUNTING_SETTING_KEYS,
-} from "../../../packages/core/src/use-cases/accounting/InitializeAccountingUseCase.ts";
+} from "../../../src/domain/use-cases/accounting/InitializeAccountingUseCase.ts";
 
 describe("payroll use cases", () => {
   test("CreatePayrollRunUseCase calculates monthly totals from salary, deductions, and bonuses", async () => {

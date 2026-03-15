@@ -3,7 +3,7 @@ import {
   RecordCustomerPaymentUseCase,
   AddCustomerLedgerAdjustmentUseCase,
   ReconcileCustomerDebtUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

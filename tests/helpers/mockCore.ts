@@ -137,8 +137,8 @@ const state = vi.hoisted(() => {
   return { registry };
 });
 
-vi.mock("@nuqta/core", async () => {
-  const actual = await vi.importActual<typeof import("@nuqta/core")>("@nuqta/core");
+vi.mock("../../src/domain/index.js", async () => {
+  const actual = await vi.importActual<typeof import("../../src/domain/index.js")>("../../src/domain/index.js");
   const names = Object.keys(state.registry) as UseCaseName[];
 
   const mockedUseCases = Object.fromEntries(

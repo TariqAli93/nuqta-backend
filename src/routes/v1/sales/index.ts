@@ -8,8 +8,8 @@ import {
   NotFoundError,
   type CreateSaleInput,
   type AddPaymentInput,
-} from "@nuqta/core";
-import { FifoService } from "@nuqta/data";
+} from "../../../domain/index.js";
+import { FifoService } from "../../../data/index.js";
 import {
   ErrorResponses,
   successEnvelope,

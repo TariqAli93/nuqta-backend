@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { NotFoundError } from "@nuqta/core";
+import { NotFoundError } from "../../src/domain/index.js";
 import { afterEach, describe, expect, test } from "vitest";
 import errorHandlerPlugin from "../../src/plugins/error-handler.ts";
 

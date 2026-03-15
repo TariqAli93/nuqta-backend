@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import rateLimit, { RateLimitPluginOptions } from "@fastify/rate-limit";
-import { DomainError } from "@nuqta/core";
+import { DomainError } from "../domain/index.js";
 
 /**
  * Global rate-limiter.

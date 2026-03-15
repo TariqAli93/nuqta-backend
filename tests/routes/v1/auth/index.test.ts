@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { UnauthorizedError } from "@nuqta/core";
+import { UnauthorizedError } from "../../../../src/domain/index.js";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { authPayload, user } from "../../../helpers/fixtures.ts";
