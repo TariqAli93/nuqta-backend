@@ -7,8 +7,13 @@ import type {
   FastifyRequest,
   FastifyServerOptions,
 } from "fastify";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 type TestPlugin = FastifyPluginAsync | FastifyPluginCallback;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface AppTestOverrides {
   db?: unknown;
