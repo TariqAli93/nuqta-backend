@@ -13,18 +13,46 @@ export class UnifiedSettingsService {
     private systemSettings: ISystemSettingsRepository,
   ) {}
 
-  getAccounting() { return this.accountingSettings.get(); }
-  updateAccounting(data: Parameters<IAccountingSettingsRepository["update"]>[0]) { return this.accountingSettings.update(data); }
-  getPos() { return this.posSettings.get(); }
-  updatePos(data: Parameters<IPosSettingsRepository["update"]>[0]) { return this.posSettings.update(data); }
-  getBarcode() { return this.barcodeSettings.get(); }
-  updateBarcode(data: Parameters<IBarcodeSettingsRepository["update"]>[0]) { return this.barcodeSettings.update(data); }
-  getSystem() { return this.systemSettings.get(); }
-  updateSystem(data: Parameters<ISystemSettingsRepository["update"]>[0]) { return this.systemSettings.update(data); }
-  getValue(key: string) { return this.kvSettings.get(key); }
-  setValue(key: string, v: string) { return this.kvSettings.set(key, v); }
-  getCompany() { return this.kvSettings.getCompanySettings(); }
-  setCompany(data: Parameters<ISettingsRepository["setCompanySettings"]>[0]) { return this.kvSettings.setCompanySettings(data); }
-  getCurrency() { return this.kvSettings.getCurrencySettings(); }
-  getAll() { return this.kvSettings.getAll(); }
+  getAccounting() {
+    return this.accountingSettings.get();
+  }
+  updateAccounting(data: Parameters<IAccountingSettingsRepository["update"]>[0]) {
+    return this.accountingSettings.update(data);
+  }
+  getPos() {
+    return this.posSettings.get();
+  }
+  updatePos(data: Parameters<IPosSettingsRepository["update"]>[0]) {
+    return this.posSettings.update(data);
+  }
+  getBarcode() {
+    return this.barcodeSettings.get();
+  }
+  updateBarcode(data: Parameters<IBarcodeSettingsRepository["update"]>[0]) {
+    return this.barcodeSettings.update(data);
+  }
+  getSystem() {
+    return this.systemSettings.get();
+  }
+  updateSystem(data: Parameters<ISystemSettingsRepository["update"]>[0]) {
+    return this.systemSettings.update(data);
+  }
+  getValue(key: string) {
+    return this.kvSettings.get(key);
+  }
+  setValue(key: string, v: string) {
+    return this.kvSettings.set(key, v);
+  }
+  getCompany() {
+    return this.kvSettings.getCompanySettings();
+  }
+  setCompany(data: Parameters<ISettingsRepository["setCompanySettings"]>[0]) {
+    return this.kvSettings.setCompanySettings(data);
+  }
+  getCurrency() {
+    return this.kvSettings.getCurrencySettings();
+  }
+  getAll() {
+    return this.kvSettings.getAll();
+  }
 }
