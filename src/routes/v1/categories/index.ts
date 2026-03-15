@@ -1,9 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetCategoriesUseCase,
   CreateCategoryUseCase,
   UpdateCategoryUseCase,
-  DeleteCategoryUseCase,
   type Category,
 } from "@nuqta/core";
 import {
@@ -102,8 +100,7 @@ const categories: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("categories:read"),
     },
     async (request) => {
-      const uc = new GetCategoriesUseCase(fastify.repos.category);
-      const data = await uc.execute();
+      const data = await fastify.repos.category.findAll();
       return { ok: true, data };
     },
   );
@@ -148,8 +145,7 @@ const categories: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new DeleteCategoryUseCase(fastify.repos.category);
-      await uc.execute(id);
+      await fastify.repos.category.delete(id);
       return { ok: true, data: null };
     },
   );

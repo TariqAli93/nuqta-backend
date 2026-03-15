@@ -88,8 +88,6 @@ export * from "./use-cases/backup/RestoreBackupUseCase.js";
 
 // ── Use Cases: Categories ──
 export * from "./use-cases/categories/CreateCategoryUseCase.js";
-export * from "./use-cases/categories/DeleteCategoryUseCase.js";
-export * from "./use-cases/categories/GetCategoriesUseCase.js";
 export * from "./use-cases/categories/UpdateCategoryUseCase.js";
 
 // ── Use Cases: Customer Ledger ──
@@ -201,6 +199,4 @@ export * from "./use-cases/system/InitializeAppUseCase.js";
 
 // ── Use Cases: Users ──
 export * from "./use-cases/users/CreateUserUseCase.js";
-export * from "./use-cases/users/GetUserByIdUseCase.js";
-export * from "./use-cases/users/GetUsersUseCase.js";
 export * from "./use-cases/users/UpdateUserUseCase.js";

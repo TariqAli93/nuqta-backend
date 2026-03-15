@@ -2,8 +2,6 @@ import fp from "fastify-plugin";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { commonSchemas } from "../schemas/common.js";
-import "dotenv/config";
-
 /**
  * Swagger / OpenAPI 3.x plugin.
  *
