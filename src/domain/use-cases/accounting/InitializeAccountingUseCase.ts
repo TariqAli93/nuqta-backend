@@ -1,6 +1,7 @@
 import type { Account } from "../../entities/Accounting.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export const ACCOUNTING_SETTING_KEYS = {
   enabled: "accounting.enabled",
@@ -144,11 +145,13 @@ const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
   },
 ];
 
-export class InitializeAccountingUseCase {
+export class InitializeAccountingUseCase extends WriteUseCase<InitializeAccountingInput, InitializeAccountingResult, InitializeAccountingResult> {
   constructor(
     private settingsRepo: ISettingsRepository,
     private accountingRepo: IAccountingRepository,
-  ) {}
+  ) {
+    super();
+  }
 
   async getStatus(): Promise<AccountingSetupStatus> {
     const enabled = await this.readEnabled();
@@ -177,8 +180,9 @@ export class InitializeAccountingUseCase {
     };
   }
 
-  async execute(
-    input: InitializeAccountingInput = {},
+  async executeCommitPhase(
+    input: InitializeAccountingInput,
+    _userId: string,
   ): Promise<InitializeAccountingResult> {
     await this.persistConfiguration(input);
 
@@ -264,6 +268,14 @@ export class InitializeAccountingUseCase {
       createdCodes,
       existingCodes,
     };
+  }
+
+  executeSideEffectsPhase(_result: InitializeAccountingResult, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: InitializeAccountingResult): InitializeAccountingResult {
+    return result;
   }
 
   private async persistConfiguration(

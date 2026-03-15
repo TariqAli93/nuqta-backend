@@ -4,12 +4,17 @@
  */
 import { ISaleRepository } from "../../interfaces/ISaleRepository.js";
 import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class CancelSaleUseCase {
-  constructor(private saleRepo: ISaleRepository) {}
+type TInput = { saleId: number };
 
-  async execute(saleId: number, userId: number): Promise<void> {
-    const sale = await this.saleRepo.findById(saleId);
+export class CancelSaleUseCase extends WriteUseCase<TInput, void, void> {
+  constructor(private saleRepo: ISaleRepository) {
+    super();
+  }
+
+  async executeCommitPhase(input: TInput, _userId: string): Promise<void> {
+    const sale = await this.saleRepo.findById(input.saleId);
     if (!sale) {
       throw new NotFoundError("الفاتورة غير موجودة");
     }
@@ -18,6 +23,14 @@ export class CancelSaleUseCase {
       throw new InvalidStateError("الفاتورة ملغية بالفعل");
     }
 
-    await this.saleRepo.updateStatus(saleId, "cancelled");
+    await this.saleRepo.updateStatus(input.saleId, "cancelled");
+  }
+
+  executeSideEffectsPhase(_r: void, _u: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: void): void {
+    return result;
   }
 }

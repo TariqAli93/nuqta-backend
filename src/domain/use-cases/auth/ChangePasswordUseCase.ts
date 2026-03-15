@@ -6,6 +6,7 @@
 import { IUserRepository } from "../../interfaces/IUserRepository.js";
 import { UnauthorizedError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { comparePassword, hashPassword } from "../../shared/utils/helpers.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface ChangePasswordInput {
   userId: number;
@@ -13,10 +14,12 @@ export interface ChangePasswordInput {
   newPassword: string;
 }
 
-export class ChangePasswordUseCase {
-  constructor(private userRepo: IUserRepository) {}
+export class ChangePasswordUseCase extends WriteUseCase<ChangePasswordInput, void, void> {
+  constructor(private userRepo: IUserRepository) {
+    super();
+  }
 
-  async execute(input: ChangePasswordInput): Promise<void> {
+  async executeCommitPhase(input: ChangePasswordInput, _userId: string): Promise<void> {
     const user = await this.userRepo.findById(input.userId);
 
     if (!user) {
@@ -36,5 +39,13 @@ export class ChangePasswordUseCase {
 
     const hashedPassword = await hashPassword(input.newPassword);
     await this.userRepo.update(input.userId, { password: hashedPassword });
+  }
+
+  executeSideEffectsPhase(_r: void, _u: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: void): void {
+    return result;
   }
 }

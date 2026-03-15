@@ -7,16 +7,19 @@ import {
   type SetupWizardSettings,
 } from '../../entities/ModuleSettings.js';
 import { ValidationError } from '../../shared/errors/DomainErrors.js';
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 /**
  * CompleteSetupWizardUseCase
  * Atomically writes all setup wizard settings to the KV store.
  * Called when the user finishes the 6-step wizard.
  */
-export class CompleteSetupWizardUseCase {
-  constructor(private settingsRepo: ISettingsRepository) {}
+export class CompleteSetupWizardUseCase extends WriteUseCase<SetupWizardSettings, void, void> {
+  constructor(private settingsRepo: ISettingsRepository) {
+    super();
+  }
 
-  execute(input: SetupWizardSettings): void {
+  async executeCommitPhase(input: SetupWizardSettings, _userId: string): Promise<void> {
     if (!input.modules || !input.notifications || !input.invoice) {
       throw new ValidationError('Wizard settings are incomplete');
     }
@@ -110,5 +113,13 @@ export class CompleteSetupWizardUseCase {
     // Mark wizard as completed
     this.settingsRepo.set(SETUP_SETTING_KEYS.WIZARD_COMPLETED, 'true');
     this.settingsRepo.set('setup.wizard_completed', 'true');
+  }
+
+  executeSideEffectsPhase(_r: void, _u: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: void): void {
+    return result;
   }
 }

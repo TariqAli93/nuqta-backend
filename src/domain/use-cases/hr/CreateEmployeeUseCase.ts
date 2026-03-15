@@ -1,13 +1,24 @@
 import { Employee } from "../../entities/Employee.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
 import { IEmployeeRepository } from "../../interfaces/IEmployeeRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class CreateEmployeeUseCase {
-  constructor(private employeeRepo: IEmployeeRepository) {}
+export class CreateEmployeeUseCase extends WriteUseCase<Employee, Employee, Employee> {
+  constructor(private employeeRepo: IEmployeeRepository) {
+    super();
+  }
 
-  async execute(employee: Employee) {
+  async executeCommitPhase(employee: Employee, _userId: string): Promise<Employee> {
     this.validate(employee);
     return await this.employeeRepo.create(employee);
+  }
+
+  executeSideEffectsPhase(_result: Employee, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: Employee): Employee {
+    return result;
   }
 
   private validate(employee: Employee) {

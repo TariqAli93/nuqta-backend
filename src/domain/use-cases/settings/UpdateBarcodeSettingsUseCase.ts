@@ -4,12 +4,16 @@ import type {
   UpdateBarcodeSettingsInput,
 } from "../../entities/BarcodeSettings.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdateBarcodeSettingsUseCase {
-  constructor(private repo: IBarcodeSettingsRepository) {}
+export class UpdateBarcodeSettingsUseCase extends WriteUseCase<UpdateBarcodeSettingsInput, BarcodeSettingsEntity, BarcodeSettingsEntity> {
+  constructor(private repo: IBarcodeSettingsRepository) {
+    super();
+  }
 
-  async execute(
+  async executeCommitPhase(
     input: UpdateBarcodeSettingsInput,
+    _userId: string,
   ): Promise<BarcodeSettingsEntity> {
     if (input.defaultWidth !== undefined && input.defaultWidth < 1) {
       throw new ValidationError("Barcode width must be at least 1");
@@ -32,5 +36,13 @@ export class UpdateBarcodeSettingsUseCase {
     }
 
     return this.repo.update(input);
+  }
+
+  executeSideEffectsPhase(_result: BarcodeSettingsEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: BarcodeSettingsEntity): BarcodeSettingsEntity {
+    return result;
   }
 }

@@ -8,6 +8,7 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 // ═══════════════════════════════════════════════════════════════
@@ -106,6 +107,8 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
   createdBy: integer("created_by"),
+  /** Optimistic locking version — incremented on every stock update. */
+  version: integer("version").notNull().default(1),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -150,6 +153,8 @@ export const productBatches = pgTable(
     status: text("status").notNull().default("active"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    /** Optimistic locking version — incremented on every depletion. */
+    version: integer("version").notNull().default(1),
   },
   (table) => [
     index("idx_batches_product").on(table.productId),
@@ -780,3 +785,22 @@ export const auditLogs = pgTable("audit_logs", {
   userAgent: text("user_agent"),
   metadata: text("metadata"),
 });
+
+// ═══════════════════════════════════════════════════════════════
+// REVOKED TOKENS (JWT revocation list)
+// ═══════════════════════════════════════════════════════════════
+
+export const revokedTokens = pgTable(
+  "revoked_tokens",
+  {
+    jti: uuid("jti").primaryKey(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+  },
+  (table) => [index("idx_revoked_tokens_expires_at").on(table.expiresAt)],
+);

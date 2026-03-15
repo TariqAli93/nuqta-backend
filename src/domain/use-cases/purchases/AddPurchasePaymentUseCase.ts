@@ -17,6 +17,7 @@ import type { JournalLine } from "../../entities/Accounting.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 const ACCT_CASH = "1001";
 const ACCT_AP = "2100";
@@ -42,7 +43,7 @@ export interface AddPurchasePaymentInput {
  * 4) insert supplier ledger entry (if ledgers are enabled)
  * 5) create draft journal entry (if accounting is enabled)
  */
-export class AddPurchasePaymentUseCase {
+export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentInput, { updatedPurchase: Purchase }, Purchase> {
   private auditService?: AuditService;
 
   constructor(
@@ -54,6 +55,7 @@ export class AddPurchasePaymentUseCase {
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
     }
@@ -61,8 +63,9 @@ export class AddPurchasePaymentUseCase {
 
   async executeCommitPhase(
     input: AddPurchasePaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<{ updatedPurchase: Purchase }> {
+    const numUserId = Number(userId) || 0;
     // Idempotency check
     if (input.idempotencyKey) {
       const existing = await this.paymentRepo.findByIdempotencyKey(
@@ -173,7 +176,7 @@ export class AddPurchasePaymentUseCase {
       paymentMethod: input.paymentMethod || "cash",
       referenceNumber: input.referenceNumber,
       notes: input.notes,
-      createdBy: userId,
+      createdBy: numUserId,
       status: "completed",
       paymentDate: new Date(),
       idempotencyKey: input.idempotencyKey,
@@ -197,7 +200,7 @@ export class AddPurchasePaymentUseCase {
         purchaseId: input.purchaseId,
         paymentId: payment.id,
         notes: input.notes || `Payment for purchase #${input.purchaseId}`,
-        createdBy: userId,
+        createdBy: numUserId,
       });
     }
 
@@ -206,7 +209,7 @@ export class AddPurchasePaymentUseCase {
         payment.id!,
         amount,
         currency,
-        userId,
+        numUserId,
         input.purchaseId,
       );
     }
@@ -269,38 +272,32 @@ export class AddPurchasePaymentUseCase {
     });
   }
 
-  async execute(
-    input: AddPurchasePaymentInput,
-    userId: number,
-  ): Promise<Purchase> {
-    const result = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(result, input, userId);
-    return result.updatedPurchase;
-  }
-
   async executeSideEffectsPhase(
     result: { updatedPurchase: Purchase },
-    input: AddPurchasePaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     if (!this.auditService) return;
+    const numUserId = Number(userId) || 0;
+    const purchase = result.updatedPurchase;
     try {
       await this.auditService.logAction(
-        userId,
+        numUserId,
         "purchase:payment:add",
         "Purchase",
-        input.purchaseId,
-        `Payment added to purchase #${input.purchaseId}`,
+        purchase.id!,
+        `Payment added to purchase #${purchase.id}`,
         {
-          purchaseId: input.purchaseId,
-          amount: input.amount,
-          paymentMethod: input.paymentMethod,
-          remainingAmount: result.updatedPurchase.remainingAmount,
+          purchaseId: purchase.id,
+          remainingAmount: purchase.remainingAmount,
         },
       );
     } catch (error) {
       console.warn("Audit logging failed for purchase payment:", error);
     }
+  }
+
+  toEntity(result: { updatedPurchase: Purchase }): Purchase {
+    return result.updatedPurchase;
   }
 
   private async isAccountingEnabled(): Promise<boolean> {

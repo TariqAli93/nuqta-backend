@@ -4,11 +4,14 @@ import type {
   UpdateSystemSettingsInput,
 } from "../../entities/SystemSettings.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdateSystemSettingsUseCase {
-  constructor(private repo: ISystemSettingsRepository) {}
+export class UpdateSystemSettingsUseCase extends WriteUseCase<UpdateSystemSettingsInput, SystemSettings, SystemSettings> {
+  constructor(private repo: ISystemSettingsRepository) {
+    super();
+  }
 
-  async execute(input: UpdateSystemSettingsInput): Promise<SystemSettings> {
+  async executeCommitPhase(input: UpdateSystemSettingsInput, _userId: string): Promise<SystemSettings> {
     if (
       input.companyName !== undefined &&
       input.companyName.trim().length === 0
@@ -43,5 +46,13 @@ export class UpdateSystemSettingsUseCase {
     }
 
     return this.repo.update(input);
+  }
+
+  executeSideEffectsPhase(_result: SystemSettings, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: SystemSettings): SystemSettings {
+    return result;
   }
 }

@@ -6,6 +6,7 @@ import {
   ValidationError,
 } from "../../shared/errors/DomainErrors.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface PostPeriodInput {
   periodType: "day" | "month" | "year";
@@ -24,13 +25,15 @@ export interface PostPeriodInput {
  * - Accounting must be enabled
  * - Period must be valid (start <= end)
  */
-export class PostPeriodUseCase {
+export class PostPeriodUseCase extends WriteUseCase<PostPeriodInput, PostingBatch, PostingBatch> {
   constructor(
     private postingRepo: IPostingRepository,
     private settingsRepo: ISettingsRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(input: PostPeriodInput, userId: number): Promise<PostingBatch> {
+  async executeCommitPhase(input: PostPeriodInput, _userId: string): Promise<PostingBatch> {
     // Check accounting is enabled
     const accountingEnabled =
       (await this.settingsRepo.get(MODULE_SETTING_KEYS.ACCOUNTING_ENABLED)) ??
@@ -103,7 +106,7 @@ export class PostPeriodUseCase {
       totalAmount,
       status: "posted",
       postedAt: new Date(),
-      postedBy: userId,
+      postedBy: 0,
       notes: input.notes,
     });
 
@@ -111,5 +114,13 @@ export class PostPeriodUseCase {
     await this.postingRepo.markEntriesAsPosted(entryIds, batch.id!);
 
     return batch;
+  }
+
+  executeSideEffectsPhase(_result: PostingBatch, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: PostingBatch): PostingBatch {
+    return result;
   }
 }

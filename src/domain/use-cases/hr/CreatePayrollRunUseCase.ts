@@ -10,6 +10,7 @@ import {
   ACCOUNTING_SETTING_KEYS,
   DEFAULT_ACCOUNTING_CODES,
 } from "../accounting/InitializeAccountingUseCase.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface CreatePayrollRunInput {
   periodYear: number;
@@ -27,14 +28,18 @@ export interface CreatePayrollRunInput {
   }[];
 }
 
-export class CreatePayrollRunUseCase {
+type TEntity = Awaited<ReturnType<IPayrollRepository["create"]>>;
+
+export class CreatePayrollRunUseCase extends WriteUseCase<CreatePayrollRunInput, TEntity, TEntity> {
   constructor(
     private employeeRepo: IEmployeeRepository,
     private payrollRepo: IPayrollRepository,
     private settingsRepo?: ISettingsRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(input: CreatePayrollRunInput, userId: number) {
+  async executeCommitPhase(input: CreatePayrollRunInput, _userId: string): Promise<TEntity> {
     this.validateInput(input);
 
     if (
@@ -98,11 +103,19 @@ export class CreatePayrollRunUseCase {
       ),
       journalEntryId: null,
       notes: input.notes,
-      createdBy: userId,
+      createdBy: Number(_userId) || 0,
       items,
     };
 
     return await this.payrollRepo.create(run);
+  }
+
+  executeSideEffectsPhase(_result: TEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: TEntity): TEntity {
+    return result;
   }
 
   private validateInput(input: CreatePayrollRunInput) {

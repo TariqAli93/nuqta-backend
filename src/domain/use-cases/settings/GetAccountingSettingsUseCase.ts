@@ -1,8 +1,11 @@
 // any key start with accounting will be considered as accounting setting
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetAccountingSettingsUseCase {
-  constructor(private settingsRepo: ISettingsRepository) {}
+export class GetAccountingSettingsUseCase extends ReadUseCase<void, Record<string, string>> {
+  constructor(private settingsRepo: ISettingsRepository) {
+    super();
+  }
 
   async execute() {
     const allSettings = await this.settingsRepo.getAll();

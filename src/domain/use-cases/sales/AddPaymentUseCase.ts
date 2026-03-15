@@ -18,6 +18,7 @@ import type { JournalLine } from "../../entities/Accounting.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 const ACCT_CASH = "1001";
 const ACCT_AR = "1100";
@@ -38,7 +39,7 @@ export interface AddPaymentCommitResult {
   updatedSale: Sale;
 }
 
-export class AddPaymentUseCase {
+export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentCommitResult, Sale> {
   private auditService?: AuditService;
 
   constructor(
@@ -51,6 +52,7 @@ export class AddPaymentUseCase {
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
     }
@@ -58,8 +60,9 @@ export class AddPaymentUseCase {
 
   async executeCommitPhase(
     input: AddPaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<AddPaymentCommitResult> {
+    const numUserId = Number(userId) || 0;
     if (input.idempotencyKey) {
       const existingPayment = await this.paymentRepo.findByIdempotencyKey(
         input.idempotencyKey,
@@ -146,7 +149,7 @@ export class AddPaymentUseCase {
       paymentMethod: input.paymentMethod || "cash",
       referenceNumber: input.referenceNumber,
       notes: input.notes,
-      createdBy: userId,
+      createdBy: numUserId,
       status: "completed",
       paymentDate: new Date(),
       idempotencyKey: input.idempotencyKey,
@@ -187,7 +190,7 @@ export class AddPaymentUseCase {
         saleId: sale.id,
         paymentId: payment.id,
         notes: input.notes || `Payment for sale #${sale.invoiceNumber}`,
-        createdBy: userId,
+        createdBy: numUserId,
       });
     } else if (!ledgersEnabled && sale.customerId) {
       // Legacy fallback when ledgers are intentionally disabled.
@@ -199,7 +202,7 @@ export class AddPaymentUseCase {
         payment.id!,
         actualPaymentAmount,
         currency,
-        userId,
+        numUserId,
       );
     }
 
@@ -261,35 +264,32 @@ export class AddPaymentUseCase {
     });
   }
 
-  async execute(input: AddPaymentInput, userId: number): Promise<Sale> {
-    const result = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(result, input, userId);
-    return result.updatedSale;
-  }
-
   async executeSideEffectsPhase(
     result: AddPaymentCommitResult,
-    input: AddPaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     if (!this.auditService) return;
+    const numUserId = Number(userId) || 0;
+    const sale = result.updatedSale;
     try {
       await this.auditService.logAction(
-        userId,
+        numUserId,
         "sale:payment:add",
         "Sale",
-        input.saleId,
-        `Payment added to sale #${input.saleId}`,
+        sale.id!,
+        `Payment added to sale #${sale.id}`,
         {
-          saleId: input.saleId,
-          amount: input.amount,
-          paymentMethod: input.paymentMethod,
-          remainingAmount: result.updatedSale.remainingAmount,
+          saleId: sale.id,
+          remainingAmount: sale.remainingAmount,
         },
       );
     } catch (error) {
       console.warn("Audit logging failed for sale payment:", error);
     }
+  }
+
+  toEntity(result: AddPaymentCommitResult): Sale {
+    return result.updatedSale;
   }
 
   private async isAccountingEnabled(): Promise<boolean> {

@@ -1,10 +1,13 @@
 import { FastifyPluginAsync } from "fastify";
 import {
   ApprovePayrollRunUseCase,
+  CancelPayrollUseCase,
   CreateEmployeeUseCase,
   CreatePayrollRunUseCase,
+  DisbursePayrollUseCase,
   GetEmployeeByIdUseCase,
   GetPayrollRunByIdUseCase,
+  SubmitPayrollUseCase,
   UpdateEmployeeUseCase,
   type Employee,
   type CreatePayrollRunInput,
@@ -66,7 +69,10 @@ const PayrollRunSchema = {
     periodYear: { type: "integer" },
     periodMonth: { type: "integer" },
     paymentDate: { type: "string", nullable: true, format: "date-time" },
-    status: { type: "string", enum: ["draft", "approved"] },
+    status: {
+      type: "string",
+      enum: ["draft", "submitted", "approved", "disbursed", "cancelled"],
+    },
     totalGrossPay: { type: "integer" },
     totalDeductions: { type: "integer" },
     totalBonuses: { type: "integer" },
@@ -137,7 +143,10 @@ const UpdateEmployeeBodySchema = {
 const PayrollRunListQuerySchema = {
   type: "object" as const,
   properties: {
-    status: { type: "string", enum: ["draft", "approved"] },
+    status: {
+      type: "string",
+      enum: ["draft", "submitted", "approved", "disbursed", "cancelled"],
+    },
     periodYear: { type: "string", pattern: "^\\d{4}$" },
     periodMonth: { type: "string", pattern: "^(0?[1-9]|1[0-2])$" },
     limit: { type: "string", pattern: "^\\d+$" },
@@ -346,7 +355,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as Partial<Employee>;
       const uc = new UpdateEmployeeUseCase(fastify.repos.employee);
-      const data = await uc.execute(parseInt(request.params.id, 10), body);
+      const data = await uc.execute({ id: parseInt(request.params.id, 10), employee: body });
       return { ok: true, data };
     },
   );
@@ -425,6 +434,75 @@ const hr: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
       );
       const data = await uc.execute(parseInt(request.params.id, 10), userId);
+      return { ok: true, data };
+    },
+  );
+
+  fastify.post<{ Params: { id: string } }>(
+    "/payroll-runs/:id/submit",
+    {
+      schema: {
+        tags: ["HR & Payroll"],
+        summary: "Submit payroll run for approval",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: { 200: successEnvelope(PayrollRunSchema, "Submitted payroll run"), ...ErrorResponses },
+      },
+      preHandler: requirePermission("payroll:update"),
+    },
+    async (request) => {
+      const userId = String(request.user?.sub ?? 1);
+      const uc = new SubmitPayrollUseCase(fastify.repos.payroll);
+      const data = await uc.execute(
+        { payrollRunId: parseInt(request.params.id, 10) },
+        userId,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  fastify.post<{ Params: { id: string } }>(
+    "/payroll-runs/:id/disburse",
+    {
+      schema: {
+        tags: ["HR & Payroll"],
+        summary: "Mark payroll run as disbursed",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: { 200: successEnvelope(PayrollRunSchema, "Disbursed payroll run"), ...ErrorResponses },
+      },
+      preHandler: requirePermission("payroll:approve"),
+    },
+    async (request) => {
+      const userId = String(request.user?.sub ?? 1);
+      const uc = new DisbursePayrollUseCase(fastify.repos.payroll);
+      const data = await uc.execute(
+        { payrollRunId: parseInt(request.params.id, 10) },
+        userId,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  fastify.post<{ Params: { id: string } }>(
+    "/payroll-runs/:id/cancel",
+    {
+      schema: {
+        tags: ["HR & Payroll"],
+        summary: "Cancel a payroll run",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: { 200: successEnvelope(PayrollRunSchema, "Cancelled payroll run"), ...ErrorResponses },
+      },
+      preHandler: requirePermission("payroll:approve"),
+    },
+    async (request) => {
+      const userId = String(request.user?.sub ?? 1);
+      const uc = new CancelPayrollUseCase(fastify.repos.payroll);
+      const data = await uc.execute(
+        { payrollRunId: parseInt(request.params.id, 10) },
+        userId,
+      );
       return { ok: true, data };
     },
   );

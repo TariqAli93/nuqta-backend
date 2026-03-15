@@ -80,7 +80,9 @@ type CreateSaleDiagnostics = {
   customerLedgerCreated: { created: boolean; reason: string };
 };
 
-export class CreateSaleUseCase {
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
+
+export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleCommitResult, Sale> {
   private auditService: AuditService;
 
   constructor(
@@ -96,13 +98,15 @@ export class CreateSaleUseCase {
     private fifoService?: IFifoDepletionService,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
 
   async executeCommitPhase(
     input: CreateSaleInput,
-    userId: number,
+    userId: string,
   ): Promise<CreateSaleCommitResult> {
+    const numUserId = Number(userId) || 0;
     const diagnostics: CreateSaleDiagnostics = {
       inventoryMovementsCreated: 0,
       fifoUsed: !!this.fifoService,
@@ -137,7 +141,7 @@ export class CreateSaleUseCase {
         });
         return {
           createdSale: existing,
-          userId,
+          userId: numUserId,
           currency: input.currency || currencySettings.defaultCurrency,
         };
       }
@@ -418,7 +422,7 @@ export class CreateSaleUseCase {
       interestRate: interestRateBps,
       interestAmount: roundByCurrency(interestAmount, currency),
       idempotencyKey: input.idempotencyKey,
-      createdBy: userId,
+      createdBy: numUserId,
       items: saleItems.map((si) => ({
         productId: si.productId,
         productName: si.productName,
@@ -501,7 +505,7 @@ export class CreateSaleUseCase {
             sourceType: "sale",
             sourceId: createdSale.id,
             notes: `Sale #${createdSale.invoiceNumber} (batch ${depletion.batchId})`,
-            createdBy: userId,
+            createdBy: numUserId,
           });
           diagnostics.inventoryMovementsCreated += 1;
           runningStock = newStock;
@@ -529,7 +533,7 @@ export class CreateSaleUseCase {
           sourceType: "sale",
           sourceId: createdSale.id,
           notes: `Sale #${createdSale.invoiceNumber}`,
-          createdBy: userId,
+          createdBy: numUserId,
         });
         diagnostics.inventoryMovementsCreated += 1;
 
@@ -568,7 +572,7 @@ export class CreateSaleUseCase {
         idempotencyKey: input.idempotencyKey
           ? `${input.idempotencyKey}:payment:initial`
           : undefined,
-        createdBy: userId,
+        createdBy: numUserId,
       });
       diagnostics.paymentCreated = { created: true, reason: "paidAmount>0" };
     } else {
@@ -585,7 +589,7 @@ export class CreateSaleUseCase {
           paidAmount,
           remainingAmount,
           currency,
-          userId,
+          numUserId,
         )
       : { created: false, reason: "accounting-disabled" };
 
@@ -608,7 +612,7 @@ export class CreateSaleUseCase {
         balanceAfter: newBalance,
         saleId: createdSale.id,
         notes: `Sale #${createdSale.invoiceNumber}`,
-        createdBy: userId,
+        createdBy: numUserId,
       });
       diagnostics.customerLedgerCreated = {
         created: true,
@@ -643,7 +647,7 @@ export class CreateSaleUseCase {
 
     return {
       createdSale,
-      userId,
+      userId: numUserId,
       currency,
     };
   }
@@ -797,7 +801,7 @@ export class CreateSaleUseCase {
       isReversed: false,
       totalAmount: sale.total,
       currency,
-      createdBy: userId,
+      createdBy: numUserId,
       lines,
     });
     return { created: true, reason: "created" };
@@ -822,6 +826,7 @@ export class CreateSaleUseCase {
 
   async executeSideEffectsPhase(
     commitResult: CreateSaleCommitResult,
+    _userId: string,
   ): Promise<void> {
     const { createdSale, userId, currency } = commitResult;
 
@@ -844,9 +849,7 @@ export class CreateSaleUseCase {
     }
   }
 
-  async execute(input: CreateSaleInput, userId: number): Promise<Sale> {
-    const commitResult = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(commitResult);
+  toEntity(commitResult: CreateSaleCommitResult): Sale {
     return commitResult.createdSale;
   }
 }

@@ -102,8 +102,30 @@ export class InvalidStateError extends DomainError {
 }
 
 /**
+ * OptimisticLockError (409)
+ * Thrown when a concurrent update is detected via version mismatch.
+ * The caller should re-read the entity and retry the operation.
+ */
+export class OptimisticLockError extends DomainError {
+  constructor(
+    entityType: string,
+    entityId: number | string,
+    details?: Record<string, unknown>,
+  ) {
+    super(
+      "OPTIMISTIC_LOCK",
+      `Concurrent modification detected on ${entityType} #${entityId}. Please retry.`,
+      409,
+      details,
+    );
+    this.name = "OptimisticLockError";
+    Object.setPrototypeOf(this, OptimisticLockError.prototype);
+  }
+}
+
+/**
  * Type guard to check if error is a DomainError
  */
-export function isDomainError(error: any): error is DomainError {
+export function isDomainError(error: unknown): error is DomainError {
   return error instanceof DomainError;
 }

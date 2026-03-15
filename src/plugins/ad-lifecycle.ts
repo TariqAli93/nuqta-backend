@@ -9,9 +9,37 @@ const SHUTDOWN_TIMEOUT_MS =
   Number(process.env.SHUTDOWN_TIMEOUT_MS) || 10_000;
 const SSE_SHUTDOWN_EVENT = "server.shutdown";
 
+// Purge expired revoked tokens every 6 hours
+const REVOCATION_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
 export default fp(async (fastify) => {
   let isShuttingDown = false;
   const trackedSseConnections = new Set<ServerResponse>();
+
+  // Start the revocation cleanup job after server is ready
+  fastify.addHook("onReady", async () => {
+    const cleanup = async () => {
+      try {
+        const deleted = await fastify.repos.revokedToken.deleteExpired();
+        if (deleted > 0) {
+          fastify.log.info({ deleted }, "Pruned expired revoked tokens");
+        }
+      } catch (err) {
+        fastify.log.warn(err, "Failed to prune expired revoked tokens");
+      }
+    };
+
+    const timer = setInterval(() => {
+      void cleanup();
+    }, REVOCATION_CLEANUP_INTERVAL_MS);
+
+    // Allow Node.js to exit even if this timer is pending
+    timer.unref();
+
+    fastify.addHook("onClose", async () => {
+      clearInterval(timer);
+    });
+  });
 
   const handleSigint = () => {
     void gracefulShutdown("SIGINT");

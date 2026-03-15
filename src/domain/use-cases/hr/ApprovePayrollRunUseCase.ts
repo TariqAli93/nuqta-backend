@@ -2,14 +2,22 @@ import type { JournalLine } from "../../entities/Accounting.js";
 import { InvalidStateError, NotFoundError } from "../../shared/errors/DomainErrors.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { IPayrollRepository } from "../../interfaces/IPayrollRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class ApprovePayrollRunUseCase {
+type TInput = { id: number; userId?: number } | number;
+type TEntity = Awaited<ReturnType<IPayrollRepository["approve"]>>;
+
+export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEntity> {
   constructor(
     private payrollRepo: IPayrollRepository,
     private accountingRepo: IAccountingRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(id: number, userId: number) {
+  async executeCommitPhase(input: TInput, _userId: string): Promise<TEntity> {
+    const id = typeof input === "number" ? input : input.id;
+    const userId = typeof input === "number" ? (Number(_userId) || 0) : (input.userId ?? (Number(_userId) || 0));
     const run = await this.payrollRepo.findById(id);
     if (!run) {
       throw new NotFoundError("Payroll run not found", { payrollRunId: id });
@@ -116,6 +124,14 @@ export class ApprovePayrollRunUseCase {
       approvedBy: userId,
       approvedAt: new Date(),
     });
+  }
+
+  executeSideEffectsPhase(_result: TEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: TEntity): TEntity {
+    return result;
   }
 
   private formatPeriod(year: number, month: number) {

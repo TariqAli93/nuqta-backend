@@ -105,6 +105,18 @@ export class PayrollRepository implements IPayrollRepository {
     return (await this.findById(createdRun.id)) as PayrollRun;
   }
 
+  async updateStatus(
+    id: number,
+    status: import("../../../domain/shared/PayrollStateMachine.js").PayrollStatus,
+  ): Promise<PayrollRun> {
+    await this.db
+      .update(payrollRuns)
+      .set({ status } as any)
+      .where(eq(payrollRuns.id, id));
+
+    return (await this.findById(id)) as PayrollRun;
+  }
+
   async approve(
     id: number,
     input: {

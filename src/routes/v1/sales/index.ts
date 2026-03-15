@@ -324,7 +324,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const result = await uc.executeCommitPhase(body, userId);
 
       // Emit real-time event for other terminals
-      fastify.eventBus.emit("sale:created", {
+      fastify.emitDomainEvent("sale:created", {
         id: result.createdSale.id,
         total: result.createdSale.total,
         itemCount: result.createdSale.items?.length ?? 0,
@@ -368,9 +368,9 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const saleId = parseInt(request.params.id, 10);
       const userId = request.user?.sub || 1;
       const uc = new CancelSaleUseCase(fastify.repos.sale);
-      await uc.execute(saleId, userId);
+      await uc.execute({ saleId }, userId);
 
-      fastify.eventBus.emit("sale:cancelled", { id: saleId });
+      fastify.emitDomainEvent("sale:cancelled", { id: saleId });
 
       return { ok: true, data: null };
     },
@@ -390,7 +390,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         userId,
       );
 
-      fastify.eventBus.emit("sale:refunded", {
+      fastify.emitDomainEvent("sale:refunded", {
         id: saleId,
         refundedAmount: data.refundedAmount,
       });

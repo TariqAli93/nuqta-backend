@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import {
   LoginUseCase,
+  LogoutUseCase,
   RegisterFirstUserUseCase,
   CheckInitialSetupUseCase,
   ChangePasswordUseCase,
@@ -277,12 +278,25 @@ const auth: FastifyPluginAsync = async (fastify) => {
   );
 
   // ── POST /auth/logout ─────────────────────────────────────────────
-  // Stateless JWT — the client must discard both tokens.
-  // A token blacklist (Redis / DB) can be wired here later.
   fastify.post(
     "/logout",
     { schema: logoutSchema, preHandler: fastify.authenticate },
     async (request, reply) => {
+      const authHeader = request.headers.authorization!;
+      const token = authHeader.slice(7);
+      const accessPayload = fastify.jwt.verifyAccess(token);
+
+      if (accessPayload?.jti) {
+        const uc = new LogoutUseCase(fastify.repos.revokedToken);
+        const userId = String(request.user?.sub ?? "system");
+        // exp comes from the decoded JWT; cast is safe when jti is present
+        const tokenWithClaims = accessPayload as typeof accessPayload & {
+          jti: string;
+          exp: number;
+        };
+        await uc.execute({ accessToken: tokenWithClaims }, userId);
+      }
+
       return { ok: true, data: null };
     },
   );

@@ -4,12 +4,16 @@ import type {
   UpdateAccountingSettingsInput,
 } from "../../entities/AccountingSettings.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdateAccountingSettingsUseCase {
-  constructor(private repo: IAccountingSettingsRepository) {}
+export class UpdateAccountingSettingsUseCase extends WriteUseCase<UpdateAccountingSettingsInput, AccountingSettingsEntity, AccountingSettingsEntity> {
+  constructor(private repo: IAccountingSettingsRepository) {
+    super();
+  }
 
-  async execute(
+  async executeCommitPhase(
     input: UpdateAccountingSettingsInput,
+    _userId: string,
   ): Promise<AccountingSettingsEntity> {
     if (
       input.defaultTaxRate !== undefined &&
@@ -45,5 +49,13 @@ export class UpdateAccountingSettingsUseCase {
     }
 
     return this.repo.update(input);
+  }
+
+  executeSideEffectsPhase(_result: AccountingSettingsEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: AccountingSettingsEntity): AccountingSettingsEntity {
+    return result;
   }
 }

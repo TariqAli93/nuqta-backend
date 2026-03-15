@@ -216,6 +216,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
   );
 
   // POST /posting/entries/:id/post
+
   fastify.post<{ Params: { id: string } }>(
     "/entries/:id/post",
     {
@@ -229,7 +230,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
         fastify.repos.posting,
         fastify.repos.accounting,
       );
-      const data = await uc.execute(id, userId);
+      const data = await uc.execute({ entryId: id }, userId);
       return { ok: true, data };
     },
   );
@@ -248,7 +249,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
         fastify.repos.posting,
         fastify.repos.accounting,
       );
-      const data = await uc.execute(id, userId);
+      const data = await uc.execute({ entryId: id }, userId);
       return { ok: true, data };
     },
   );
@@ -285,7 +286,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const batchId = parseInt(request.params.id, 10);
       const userId = request.user?.sub || 1;
       const uc = new LockPostingBatchUseCase(fastify.repos.posting);
-      const data = await uc.execute(batchId, userId);
+      const data = await uc.execute({ batchId }, userId);
       return { ok: true, data };
     },
   );
@@ -301,7 +302,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const batchId = parseInt(request.params.id, 10);
       const userId = request.user?.sub || 1;
       const uc = new UnlockPostingBatchUseCase(fastify.repos.posting);
-      const data = await uc.execute(batchId, userId);
+      const data = await uc.execute({ batchId }, userId);
       return { ok: true, data };
     },
   );

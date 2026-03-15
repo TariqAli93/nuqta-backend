@@ -1,43 +1,56 @@
 import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { IEmployeeRepository } from "../../interfaces/IEmployeeRepository.js";
 import { Employee } from "../../entities/Employee.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdateEmployeeUseCase {
-  constructor(private employeeRepo: IEmployeeRepository) {}
+type TInput = { id: number; employee: Partial<Employee> };
 
-  async execute(id: number, employee: Partial<Employee>) {
-    const existing = await this.employeeRepo.findById(id);
+export class UpdateEmployeeUseCase extends WriteUseCase<TInput, Employee, Employee> {
+  constructor(private employeeRepo: IEmployeeRepository) {
+    super();
+  }
+
+  async executeCommitPhase(input: TInput, _userId: string): Promise<Employee> {
+    const existing = await this.employeeRepo.findById(input.id);
     if (!existing) {
-      throw new NotFoundError("Employee not found", { employeeId: id });
+      throw new NotFoundError("Employee not found", { employeeId: input.id });
     }
 
-    if (employee.name !== undefined && employee.name.trim().length === 0) {
+    if (input.employee.name !== undefined && input.employee.name.trim().length === 0) {
       throw new ValidationError("Employee name cannot be empty");
     }
     if (
-      employee.position !== undefined &&
-      employee.position.trim().length === 0
+      input.employee.position !== undefined &&
+      input.employee.position.trim().length === 0
     ) {
       throw new ValidationError("Employee position cannot be empty");
     }
     if (
-      employee.department !== undefined &&
-      employee.department.trim().length === 0
+      input.employee.department !== undefined &&
+      input.employee.department.trim().length === 0
     ) {
       throw new ValidationError("Employee department cannot be empty");
     }
     if (
-      employee.salary !== undefined &&
-      (!Number.isInteger(employee.salary) || employee.salary < 0)
+      input.employee.salary !== undefined &&
+      (!Number.isInteger(input.employee.salary) || input.employee.salary < 0)
     ) {
       throw new ValidationError(
         "Employee salary must be a non-negative integer",
         {
-          salary: employee.salary,
+          salary: input.employee.salary,
         },
       );
     }
 
-    return await this.employeeRepo.update(id, employee);
+    return await this.employeeRepo.update(input.id, input.employee);
+  }
+
+  executeSideEffectsPhase(_result: Employee, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: Employee): Employee {
+    return result;
   }
 }
