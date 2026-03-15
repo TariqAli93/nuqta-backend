@@ -7,6 +7,7 @@ export * from "./shared/services/AuditService.js";
 export * from "./shared/services/JwtService.js";
 export * from "./shared/services/FifoDepletionService.js";
 export * from "./shared/services/SettingsAccessor.js";
+export * from "./shared/services/UnifiedSettingsService.js";
 export * from "./shared/utils/helpers.js";
 
 // ── Entities ──
@@ -64,12 +65,6 @@ export * from "./interfaces/ISupplierRepository.js";
 export * from "./interfaces/IUserRepository.js";
 
 // ── Use Cases: Accounting ──
-export * from "./use-cases/accounting/GetAccountsUseCase.js";
-export * from "./use-cases/accounting/GetBalanceSheetUseCase.js";
-export * from "./use-cases/accounting/GetEntryByIdUseCase.js";
-export * from "./use-cases/accounting/GetJournalEntriesUseCase.js";
-export * from "./use-cases/accounting/GetProfitLossUseCase.js";
-export * from "./use-cases/accounting/GetTrialBalanceUseCase.js";
 export * from "./use-cases/accounting/InitializeAccountingUseCase.js";
 
 // ── Use Cases: Auth ──
@@ -92,15 +87,12 @@ export * from "./use-cases/categories/UpdateCategoryUseCase.js";
 
 // ── Use Cases: Customer Ledger ──
 export * from "./use-cases/customer-ledger/AddCustomerLedgerAdjustmentUseCase.js";
-export * from "./use-cases/customer-ledger/GetCustomerLedgerUseCase.js";
 export * from "./use-cases/customer-ledger/ReconcileCustomerDebtUseCase.js";
 export * from "./use-cases/customer-ledger/RecordCustomerPaymentUseCase.js";
 
 // ── Use Cases: Customers ──
 export * from "./use-cases/customers/CreateCustomerUseCase.js";
-export * from "./use-cases/customers/DeleteCustomerUseCase.js";
 export * from "./use-cases/customers/GetCustomerByIdUseCase.js";
-export * from "./use-cases/customers/GetCustomersUseCase.js";
 export * from "./use-cases/customers/UpdateCustomerUseCase.js";
 
 // ── Use Cases: Dashboard ──
@@ -111,9 +103,7 @@ export * from "./use-cases/hr/ApprovePayrollRunUseCase.js";
 export * from "./use-cases/hr/CreateEmployeeUseCase.js";
 export * from "./use-cases/hr/CreatePayrollRunUseCase.js";
 export * from "./use-cases/hr/GetEmployeeByIdUseCase.js";
-export * from "./use-cases/hr/GetEmployeesUseCase.js";
 export * from "./use-cases/hr/GetPayrollRunByIdUseCase.js";
-export * from "./use-cases/hr/GetPayrollRunsUseCase.js";
 export * from "./use-cases/hr/UpdateEmployeeUseCase.js";
 
 // ── Use Cases: Inventory ──
@@ -123,7 +113,6 @@ export * from "./use-cases/inventory/GetInventoryMovementsUseCase.js";
 export * from "./use-cases/inventory/ReconcileStockUseCase.js";
 
 // ── Use Cases: Posting ──
-export * from "./use-cases/posting/GetPostingBatchesUseCase.js";
 export * from "./use-cases/posting/LockPostingBatchUseCase.js";
 export * from "./use-cases/posting/PostIndividualEntryUseCase.js";
 export * from "./use-cases/posting/PostPeriodUseCase.js";
@@ -136,14 +125,11 @@ export * from "./use-cases/products/AdjustProductStockUseCase.js";
 export * from "./use-cases/products/CreateProductBatchUseCase.js";
 export * from "./use-cases/products/CreateProductUnitUseCase.js";
 export * from "./use-cases/products/CreateProductUseCase.js";
-export * from "./use-cases/products/DeleteProductUnitUseCase.js";
 export * from "./use-cases/products/DeleteProductUseCase.js";
-export * from "./use-cases/products/GetProductBatchesUseCase.js";
 export * from "./use-cases/products/GetProductByIdUseCase.js";
 export * from "./use-cases/products/GetProductPurchaseHistoryUseCase.js";
 export * from "./use-cases/products/GetProductSalesHistoryUseCase.js";
 export * from "./use-cases/products/GetProductsUseCase.js";
-export * from "./use-cases/products/GetProductUnitsUseCase.js";
 export * from "./use-cases/products/SetDefaultProductUnitUseCase.js";
 export * from "./use-cases/products/UpdateProductUnitUseCase.js";
 export * from "./use-cases/products/UpdateProductUseCase.js";
@@ -151,47 +137,32 @@ export * from "./use-cases/products/UpdateProductUseCase.js";
 // ── Use Cases: Purchases ──
 export * from "./use-cases/purchases/AddPurchasePaymentUseCase.js";
 export * from "./use-cases/purchases/CreatePurchaseUseCase.js";
-export * from "./use-cases/purchases/GetPurchaseByIdUseCase.js";
-export * from "./use-cases/purchases/GetPurchasesUseCase.js";
 
 // ── Use Cases: Sales ──
 export * from "./use-cases/sales/AddPaymentUseCase.js";
 export * from "./use-cases/sales/CancelSaleUseCase.js";
 export * from "./use-cases/sales/CreateSaleUseCase.js";
-export * from "./use-cases/sales/GetSaleByIdUseCase.js";
 export * from "./use-cases/sales/GetSaleReceiptUseCase.js";
 export * from "./use-cases/sales/GetSaleUseCase.js";
 export * from "./use-cases/sales/RefundSaleUseCase.js";
 
 // ── Use Cases: Settings ──
 export * from "./use-cases/settings/CompleteSetupWizardUseCase.js";
-export * from "./use-cases/settings/GetCompanySettingsUseCase.js";
-export * from "./use-cases/settings/GetCurrencySettingsUseCase.js";
 export * from "./use-cases/settings/GetModuleSettingsUseCase.js";
-export * from "./use-cases/settings/GetSettingUseCase.js";
 export * from "./use-cases/settings/SetCompanySettingsUseCase.js";
-export * from "./use-cases/settings/SetSettingUseCase.js";
 export * from "./use-cases/settings/GetAccountingSettingsUseCase.js";
-export * from "./use-cases/settings/GetSystemSettingsUseCase.js";
 export * from "./use-cases/settings/UpdateSystemSettingsUseCase.js";
-export * from "./use-cases/settings/GetAccountingSettingsV2UseCase.js";
 export * from "./use-cases/settings/UpdateAccountingSettingsUseCase.js";
-export * from "./use-cases/settings/GetPosSettingsUseCase.js";
 export * from "./use-cases/settings/UpdatePosSettingsUseCase.js";
-export * from "./use-cases/settings/GetBarcodeSettingsUseCase.js";
 export * from "./use-cases/settings/UpdateBarcodeSettingsUseCase.js";
 export * from "./use-cases/settings/CompleteSetupWizardV2UseCase.js";
 
 // ── Use Cases: Supplier Ledger ──
-export * from "./use-cases/supplier-ledger/GetSupplierLedgerUseCase.js";
 export * from "./use-cases/supplier-ledger/ReconcileSupplierBalanceUseCase.js";
 export * from "./use-cases/supplier-ledger/RecordSupplierPaymentUseCase.js";
 
 // ── Use Cases: Suppliers ──
 export * from "./use-cases/suppliers/CreateSupplierUseCase.js";
-export * from "./use-cases/suppliers/DeleteSupplierUseCase.js";
-export * from "./use-cases/suppliers/GetSupplierByIdUseCase.js";
-export * from "./use-cases/suppliers/GetSuppliersUseCase.js";
 export * from "./use-cases/suppliers/UpdateSupplierUseCase.js";
 
 // ── Use Cases: System ──

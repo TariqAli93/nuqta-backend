@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { supplier } from "../../../helpers/fixtures.ts";
@@ -26,10 +26,9 @@ describe("/api/v1/suppliers", () => {
       title: "GET / returns suppliers",
       method: "GET",
       url: "/api/v1/suppliers?search=Nuqta&limit=10&offset=0",
-      setup: () =>
-        mockUseCase("GetSuppliersUseCase", {
-          execute: { items: [supplier], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.supplier.findAll = async () => ({ items: [supplier], total: 1 });
+      },
       assert: (data: { items: (typeof supplier)[]; total: number }) => {
         expect(data.items[0].name).toBe(supplier.name);
       },
@@ -38,7 +37,7 @@ describe("/api/v1/suppliers", () => {
       title: "GET /:id returns one supplier",
       method: "GET",
       url: "/api/v1/suppliers/4",
-      setup: () => mockUseCase("GetSupplierByIdUseCase", { execute: supplier }),
+      setup: () => { ctx.repos.supplier.findById = async () => supplier; },
       assert: (data: typeof supplier) => {
         expect(data.id).toBe(supplier.id);
       },
@@ -73,7 +72,7 @@ describe("/api/v1/suppliers", () => {
       title: "DELETE /:id deletes a supplier",
       method: "DELETE",
       url: "/api/v1/suppliers/4",
-      setup: () => mockUseCase("DeleteSupplierUseCase", { execute: null }),
+      setup: () => { ctx.repos.supplier.delete = async () => null; },
       assert: (data: null) => {
         expect(data).toBeNull();
       },
@@ -144,11 +143,7 @@ describe("/api/v1/suppliers", () => {
   });
 
   test("returns 404 when a supplier is missing", async () => {
-    mockUseCase("GetSupplierByIdUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.supplier.findById = async () => null;
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -161,7 +156,7 @@ describe("/api/v1/suppliers", () => {
 
   // ── Covers L31-32: limit/offset ternary fallback branches ──
   test("GET /suppliers without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetSuppliersUseCase", { execute: [] });
+    ctx.repos.supplier.findAll = async () => [];
 
     const response = await ctx.app.inject({
       method: "GET",

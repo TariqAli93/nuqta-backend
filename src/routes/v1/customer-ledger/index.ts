@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetCustomerLedgerUseCase,
   RecordCustomerPaymentUseCase,
   AddCustomerLedgerAdjustmentUseCase,
   ReconcileCustomerDebtUseCase,
@@ -168,8 +167,7 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetCustomerLedgerUseCase(fastify.repos.customerLedger);
-      const data = await uc.execute({
+      const data = await fastify.repos.customerLedger.findAll({
         customerId,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,

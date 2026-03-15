@@ -4,7 +4,6 @@ import {
   ReverseEntryUseCase,
   PostIndividualEntryUseCase,
   UnpostIndividualEntryUseCase,
-  GetPostingBatchesUseCase,
   LockPostingBatchUseCase,
   UnlockPostingBatchUseCase,
 } from "@nuqta/core";
@@ -269,8 +268,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetPostingBatchesUseCase(fastify.repos.posting);
-      const data = await uc.execute({
+      const data = await fastify.repos.posting.getBatches({
         status: query.status,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,

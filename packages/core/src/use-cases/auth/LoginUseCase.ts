@@ -1,7 +1,7 @@
 import { IUserRepository } from "../../interfaces/IUserRepository.js";
 import { User } from "../../entities/User.js";
 import { UnauthorizedError, ValidationError } from "../../shared/errors/DomainErrors.js";
-import { PermissionService, UserRole } from "../../shared/services/PermissionService.js";
+import { getPermissionsForRole, UserRole } from "../../shared/services/PermissionService.js";
 import { comparePassword } from "../../shared/utils/helpers.js";
 
 export class LoginUseCase {
@@ -30,7 +30,7 @@ export class LoginUseCase {
     // await this.userRepo.updateLastLogin(user.id as number);
     await this.userRepo.updateLastLogin(user.id as number);
 
-    const permissions = PermissionService.getPermissionsForRole(
+    const permissions = getPermissionsForRole(
       user.role as UserRole,
     );
 

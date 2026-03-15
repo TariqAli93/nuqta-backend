@@ -13,7 +13,7 @@ import type {
   FastifyRequest,
   preHandlerHookHandler,
 } from "fastify";
-import { PermissionService, type UserRole } from "@nuqta/core";
+import { hasAnyPermission, type UserRole } from "@nuqta/core";
 
 /**
  * Returns a Fastify preHandler that verifies the authenticated user
@@ -38,7 +38,7 @@ export function requirePermission(
       });
     }
 
-    const hasAccess = PermissionService.hasAnyPermission(
+    const hasAccess = hasAnyPermission(
       user.role as UserRole,
       permissions,
     );

@@ -30,10 +30,9 @@ describe("/api/v1/hr", () => {
       title: "GET /employees returns employees",
       method: "GET",
       url: "/api/v1/hr/employees?department=Finance&isActive=true&limit=10&offset=0",
-      setup: () =>
-        mockUseCase("GetEmployeesUseCase", {
-          execute: { items: [employee], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.employee.findAll = async () => ({ items: [employee], total: 1 });
+      },
       assert: (data: { items: (typeof employee)[]; total: number }) => {
         expect(data.items[0].name).toBe(employee.name);
         expect(data.total).toBe(1);
@@ -82,10 +81,9 @@ describe("/api/v1/hr", () => {
       title: "GET /payroll-runs returns payroll runs",
       method: "GET",
       url: "/api/v1/hr/payroll-runs?status=draft&periodYear=2026&periodMonth=3",
-      setup: () =>
-        mockUseCase("GetPayrollRunsUseCase", {
-          execute: { items: [payrollRun], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.payroll.findAll = async () => ({ items: [payrollRun], total: 1 });
+      },
       assert: (data: { items: (typeof payrollRun)[]; total: number }) => {
         expect(data.items[0].totalNetPay).toBe(payrollRun.totalNetPay);
       },

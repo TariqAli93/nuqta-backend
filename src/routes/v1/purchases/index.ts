@@ -1,7 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetPurchasesUseCase,
-  GetPurchaseByIdUseCase,
   CreatePurchaseUseCase,
   AddPurchasePaymentUseCase,
   NotFoundError,
@@ -204,8 +202,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetPurchasesUseCase(fastify.repos.purchase);
-      const data = await uc.execute({
+      const data = await fastify.repos.purchase.findAll({
         search: query.search,
         status: query.status,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
@@ -224,8 +221,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new GetPurchaseByIdUseCase(fastify.repos.purchase);
-      const data = await uc.execute(id);
+      const data = await fastify.repos.purchase.findById(id);
       if (!data) {
         throw new NotFoundError("الفاتورة غير موجودة");
       }

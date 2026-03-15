@@ -1,10 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetSuppliersUseCase,
-  GetSupplierByIdUseCase,
   CreateSupplierUseCase,
   UpdateSupplierUseCase,
-  DeleteSupplierUseCase,
   NotFoundError,
   type Supplier,
 } from "@nuqta/core";
@@ -160,8 +157,7 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetSuppliersUseCase(fastify.repos.supplier);
-      const data = await uc.execute({
+      const data = await fastify.repos.supplier.findAll({
         search: query.search,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
@@ -179,8 +175,7 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new GetSupplierByIdUseCase(fastify.repos.supplier);
-      const data = await uc.execute(id);
+      const data = await fastify.repos.supplier.findById(id);
       if (!data) {
         throw new NotFoundError("المورد غير موجود");
       }
@@ -228,8 +223,7 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new DeleteSupplierUseCase(fastify.repos.supplier);
-      await uc.execute(id);
+      await fastify.repos.supplier.delete(id);
       return { ok: true, data: null };
     },
   );

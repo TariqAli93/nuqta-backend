@@ -4,9 +4,7 @@ import {
   CreateEmployeeUseCase,
   CreatePayrollRunUseCase,
   GetEmployeeByIdUseCase,
-  GetEmployeesUseCase,
   GetPayrollRunByIdUseCase,
-  GetPayrollRunsUseCase,
   UpdateEmployeeUseCase,
   type Employee,
   type CreatePayrollRunInput,
@@ -300,8 +298,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetEmployeesUseCase(fastify.repos.employee);
-      const data = await uc.execute({
+      const data = await fastify.repos.employee.findAll({
         search: query.search,
         department: query.department,
         isActive:
@@ -368,8 +365,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetPayrollRunsUseCase(fastify.repos.payroll);
-      const data = await uc.execute({
+      const data = await fastify.repos.payroll.findAll({
         status: query.status,
         periodYear: query.periodYear
           ? parseInt(query.periodYear, 10)
