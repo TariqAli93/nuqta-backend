@@ -20,6 +20,7 @@ import {
   NotFoundError,
   InsufficientStockError,
   ConflictError,
+  OptimisticLockError,
 } from "../../shared/errors/DomainErrors.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
@@ -851,5 +852,53 @@ export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleC
 
   toEntity(commitResult: CreateSaleCommitResult): Sale {
     return commitResult.createdSale;
+  }
+
+  /**
+   * Override execute() to add retry logic for optimistic lock conflicts.
+   *
+   * Up to 3 attempts are made when `OptimisticLockError` is thrown by the
+   * FIFO depletion service (e.g. two concurrent sales competing for the same
+   * batch).  The idempotency key ensures that if the sale record was already
+   * persisted on a previous attempt the commit phase is a no-op and the
+   * existing sale is returned without double-depleting stock.
+   */
+  override async execute(
+    input: CreateSaleInput,
+    userId: string,
+  ): Promise<Sale> {
+    const MAX_RETRIES = 3;
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const result = await this.executeCommitPhase(input, userId);
+        try {
+          await this.executeSideEffectsPhase(result, userId);
+        } catch (sideEffectErr) {
+          console.error(
+            `[SideEffect Error] CreateSaleUseCase (attempt ${attempt}):`,
+            sideEffectErr,
+          );
+        }
+        return this.toEntity(result);
+      } catch (err) {
+        if (err instanceof OptimisticLockError && attempt < MAX_RETRIES) {
+          console.warn(
+            `[CreateSaleUseCase] OptimisticLockError on attempt ${attempt}/${MAX_RETRIES}, retrying...`,
+          );
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw (
+      lastError ??
+      new OptimisticLockError(
+        "Sale creation failed after retries due to concurrent batch updates",
+      )
+    );
   }
 }
