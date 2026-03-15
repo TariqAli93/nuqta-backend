@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import {
   RecordSupplierPaymentUseCase,
   ReconcileSupplierBalanceUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

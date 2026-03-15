@@ -1,5 +1,5 @@
 import fp from "fastify-plugin";
-import { JwtService, UnifiedSettingsService } from "@nuqta/core";
+import { JwtService, UnifiedSettingsService } from "../domain/index.js";
 import type {
   AccountingRepository,
   AccountingSettingsRepository,
@@ -26,7 +26,7 @@ import type {
   SupplierRepository,
   SystemSettingsRepository,
   UserRepository,
-} from "@nuqta/data";
+} from "../data/index.js";
 import type { AppOptions } from "../app.js";
 
 export interface Repositories {
@@ -62,7 +62,7 @@ export default fp<AppOptions>(async (fastify, opts) => {
   let repos = overrides?.repos as Repositories | undefined;
 
   if (!connection || !repos) {
-    const data = await import("@nuqta/data");
+    const data = await import("../data/index.js");
     connection ??= data.db as DbConnection;
     repos ??= {
       category: new data.CategoryRepository(connection),

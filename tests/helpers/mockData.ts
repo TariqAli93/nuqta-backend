@@ -1,50 +1,60 @@
 import { vi } from "vitest";
 
 const repositoryNames = [
-  "CategoryRepository",
-  "CustomerRepository",
-  "SupplierRepository",
-  "EmployeeRepository",
-  "ProductRepository",
-  "SaleRepository",
-  "PurchaseRepository",
-  "PaymentRepository",
-  "InventoryRepository",
-  "SettingsRepository",
-  "UserRepository",
-  "AuditRepository",
-  "BarcodeRepository",
   "AccountingRepository",
+  "AccountingSettingsRepository",
+  "AuditRepository",
+  "BackupRepository",
+  "BarcodeRepository",
+  "BarcodeSettingsRepository",
+  "CategoryRepository",
   "CustomerLedgerRepository",
-  "SupplierLedgerRepository",
-  "PostingRepository",
+  "CustomerRepository",
+  "EmployeeRepository",
+  "InventoryRepository",
+  "PaymentRepository",
   "PayrollRepository",
+  "PosSettingsRepository",
+  "PostingRepository",
+  "ProductRepository",
   "ProductWorkspaceRepository",
+  "PurchaseRepository",
+  "SaleRepository",
+  "SettingsRepository",
+  "SupplierLedgerRepository",
+  "SupplierRepository",
+  "SystemSettingsRepository",
+  "UserRepository",
 ] as const;
 
 type RepositoryName = (typeof repositoryNames)[number];
 
 const state = vi.hoisted(() => {
   const names = [
-    "CategoryRepository",
-    "CustomerRepository",
-    "SupplierRepository",
-    "EmployeeRepository",
-    "ProductRepository",
-    "SaleRepository",
-    "PurchaseRepository",
-    "PaymentRepository",
-    "InventoryRepository",
-    "SettingsRepository",
-    "UserRepository",
-    "AuditRepository",
-    "BarcodeRepository",
     "AccountingRepository",
+    "AccountingSettingsRepository",
+    "AuditRepository",
+    "BackupRepository",
+    "BarcodeRepository",
+    "BarcodeSettingsRepository",
+    "CategoryRepository",
     "CustomerLedgerRepository",
-    "SupplierLedgerRepository",
-    "PostingRepository",
+    "CustomerRepository",
+    "EmployeeRepository",
+    "InventoryRepository",
+    "PaymentRepository",
     "PayrollRepository",
+    "PosSettingsRepository",
+    "PostingRepository",
+    "ProductRepository",
     "ProductWorkspaceRepository",
+    "PurchaseRepository",
+    "SaleRepository",
+    "SettingsRepository",
+    "SupplierLedgerRepository",
+    "SupplierRepository",
+    "SystemSettingsRepository",
+    "UserRepository",
   ] as const;
   const repoInstances = {} as Record<RepositoryName, unknown[][]>;
 
@@ -65,7 +75,7 @@ const state = vi.hoisted(() => {
   };
 });
 
-vi.mock("@nuqta/data", () => {
+vi.mock("../../src/data/index.js", () => {
   const names = Object.keys(state.repoInstances) as RepositoryName[];
   const repoExports = Object.fromEntries(
     names.map((name) => [

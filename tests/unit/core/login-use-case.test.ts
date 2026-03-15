@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   UnauthorizedError,
   ValidationError,
-} from "../../../packages/core/src/shared/errors/DomainErrors.ts";
+} from "../../../src/domain/shared/errors/DomainErrors.ts";
 
 const comparePasswordMock = vi.hoisted(() => vi.fn());
 
-vi.mock("../../../packages/core/src/shared/utils/helpers.js", () => ({
+vi.mock("../../../src/domain/shared/utils/helpers.js", () => ({
   comparePassword: comparePasswordMock,
 }));
 
@@ -24,7 +24,7 @@ describe("LoginUseCase", () => {
 
   test("rejects missing users", async () => {
     const { LoginUseCase } =
-      await import("../../../packages/core/src/use-cases/auth/LoginUseCase.ts");
+      await import("../../../src/domain/use-cases/auth/LoginUseCase.ts");
     userRepo.findByUsername.mockResolvedValue(null);
 
     const useCase = new LoginUseCase(userRepo as never);
@@ -36,7 +36,7 @@ describe("LoginUseCase", () => {
 
   test("rejects inactive users", async () => {
     const { LoginUseCase } =
-      await import("../../../packages/core/src/use-cases/auth/LoginUseCase.ts");
+      await import("../../../src/domain/use-cases/auth/LoginUseCase.ts");
     userRepo.findByUsername.mockResolvedValue({
       id: 1,
       username: "admin",
@@ -59,7 +59,7 @@ describe("LoginUseCase", () => {
   // ── Covers L27: wrong password → UnauthorizedError ──
   test("rejects when password does not match", async () => {
     const { LoginUseCase } =
-      await import("../../../packages/core/src/use-cases/auth/LoginUseCase.ts");
+      await import("../../../src/domain/use-cases/auth/LoginUseCase.ts");
     userRepo.findByUsername.mockResolvedValue({
       id: 1,
       username: "admin",
@@ -82,7 +82,7 @@ describe("LoginUseCase", () => {
 
   test("returns a safe user plus permissions on success", async () => {
     const { LoginUseCase } =
-      await import("../../../packages/core/src/use-cases/auth/LoginUseCase.ts");
+      await import("../../../src/domain/use-cases/auth/LoginUseCase.ts");
     userRepo.findByUsername.mockResolvedValue({
       id: 1,
       username: "admin",

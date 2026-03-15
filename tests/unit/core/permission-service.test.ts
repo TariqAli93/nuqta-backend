@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { PermissionService } from "../../../packages/core/src/shared/services/PermissionService.ts";
+import { PermissionService } from "../../../src/domain/shared/services/PermissionService.ts";
 
 describe("PermissionService", () => {
   test("returns the permissions for a role", () => {

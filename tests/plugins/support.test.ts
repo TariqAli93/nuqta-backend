@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { afterEach, describe, expect, test } from "vitest";
-import { JwtService } from "@nuqta/core";
+import { JwtService } from "../../src/domain/index.js";
 import supportPlugin from "../../src/plugins/support.ts";
 
 describe("support plugin", () => {

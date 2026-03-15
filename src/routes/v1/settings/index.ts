@@ -14,7 +14,7 @@ import {
   type UpdateAccountingSettingsInput,
   type UpdatePosSettingsInput,
   type UpdateBarcodeSettingsInput,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

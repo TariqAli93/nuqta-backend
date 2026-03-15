@@ -8,7 +8,7 @@ import {
   UpdateEmployeeUseCase,
   type Employee,
   type CreatePayrollRunInput,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

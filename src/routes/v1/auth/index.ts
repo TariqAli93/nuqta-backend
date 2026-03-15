@@ -5,7 +5,7 @@ import {
   CheckInitialSetupUseCase,
   ChangePasswordUseCase,
   GetUserByIdUseCase,
-} from "@nuqta/core";
+} from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,

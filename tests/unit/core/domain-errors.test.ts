@@ -5,7 +5,7 @@ import {
   InsufficientStockError,
   InvalidStateError,
   isDomainError,
-} from "../../../packages/core/src/shared/errors/DomainErrors.ts";
+} from "../../../src/domain/shared/errors/DomainErrors.ts";
 
 describe("DomainErrors – uncovered subclasses", () => {
   // ── Covers L50-52: PermissionDeniedError ──

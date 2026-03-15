@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { JwtService } from "@nuqta/core";
+import { JwtService } from "../../src/domain/index.js";
 import dbPlugin from "../../src/plugins/db.ts";
 
 function createRepos() {
@@ -71,28 +71,32 @@ describe("db plugin", () => {
     // Mock @nuqta/data to avoid a real DB connection
     const mockDb = { mock: true };
     class MockRepo {}
-    vi.doMock("@nuqta/data", () => ({
+    vi.doMock("../../src/data/index.js", () => ({
       db: mockDb,
-      CategoryRepository: MockRepo,
-      CustomerRepository: MockRepo,
-      SupplierRepository: MockRepo,
-      EmployeeRepository: MockRepo,
-      ProductRepository: MockRepo,
-      SaleRepository: MockRepo,
-      PurchaseRepository: MockRepo,
-      PaymentRepository: MockRepo,
-      InventoryRepository: MockRepo,
-      SettingsRepository: MockRepo,
-      UserRepository: MockRepo,
-      AuditRepository: MockRepo,
-      BarcodeRepository: MockRepo,
       AccountingRepository: MockRepo,
-      CustomerLedgerRepository: MockRepo,
-      SupplierLedgerRepository: MockRepo,
-      PostingRepository: MockRepo,
-      PayrollRepository: MockRepo,
-      ProductWorkspaceRepository: MockRepo,
+      AccountingSettingsRepository: MockRepo,
+      AuditRepository: MockRepo,
       BackupRepository: MockRepo,
+      BarcodeRepository: MockRepo,
+      BarcodeSettingsRepository: MockRepo,
+      CategoryRepository: MockRepo,
+      CustomerLedgerRepository: MockRepo,
+      CustomerRepository: MockRepo,
+      EmployeeRepository: MockRepo,
+      InventoryRepository: MockRepo,
+      PaymentRepository: MockRepo,
+      PayrollRepository: MockRepo,
+      PosSettingsRepository: MockRepo,
+      PostingRepository: MockRepo,
+      ProductRepository: MockRepo,
+      ProductWorkspaceRepository: MockRepo,
+      PurchaseRepository: MockRepo,
+      SaleRepository: MockRepo,
+      SettingsRepository: MockRepo,
+      SupplierLedgerRepository: MockRepo,
+      SupplierRepository: MockRepo,
+      SystemSettingsRepository: MockRepo,
+      UserRepository: MockRepo,
     }));
 
     await app.register(dbPlugin, { testOverrides: undefined } as any);
@@ -101,6 +105,6 @@ describe("db plugin", () => {
     expect(app.repos).toBeDefined();
     expect(app.jwt).toBeDefined();
 
-    vi.doUnmock("@nuqta/data");
+    vi.doUnmock("../../src/data/index.js");
   });
 });

@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { normalizeBarcodeLayoutJson, type BarcodeTemplate } from "@nuqta/core";
+import { normalizeBarcodeLayoutJson, type BarcodeTemplate } from "../../../domain/index.js";
 import {
   ErrorResponses,
   successArrayEnvelope,

@@ -11,20 +11,13 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       include: [
         "src/**/*.ts",
-        "packages/core/src/contract.ts",
-        "packages/core/src/errors/DomainErrors.ts",
-        "packages/core/src/services/JwtService.ts",
-        "packages/core/src/services/PermissionService.ts",
-        "packages/core/src/use-cases/LoginUseCase.ts",
-        "packages/core/src/use-cases/CheckInitialSetupUseCase.ts",
       ],
       exclude: [
         "dist/**",
         "tests/**",
         "src/routes/root.ts",
         "src/schemas/index.ts",
-        "packages/core/dist/**",
-        "packages/data/**",
+        "src/data/**",
       ],
       thresholds: {
         lines: 90,

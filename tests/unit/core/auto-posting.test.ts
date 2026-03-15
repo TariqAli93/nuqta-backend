@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import { SettingsAccessor } from "../../../packages/core/src/shared/services/SettingsAccessor.ts";
-import { AddPaymentUseCase } from "../../../packages/core/src/use-cases/sales/AddPaymentUseCase.ts";
-import { AddPurchasePaymentUseCase } from "../../../packages/core/src/use-cases/purchases/AddPurchasePaymentUseCase.ts";
-import { RecordCustomerPaymentUseCase } from "../../../packages/core/src/use-cases/customer-ledger/RecordCustomerPaymentUseCase.ts";
-import { RecordSupplierPaymentUseCase } from "../../../packages/core/src/use-cases/supplier-ledger/RecordSupplierPaymentUseCase.ts";
+import { SettingsAccessor } from "../../../src/domain/shared/services/SettingsAccessor.ts";
+import { AddPaymentUseCase } from "../../../src/domain/use-cases/sales/AddPaymentUseCase.ts";
+import { AddPurchasePaymentUseCase } from "../../../src/domain/use-cases/purchases/AddPurchasePaymentUseCase.ts";
+import { RecordCustomerPaymentUseCase } from "../../../src/domain/use-cases/customer-ledger/RecordCustomerPaymentUseCase.ts";
+import { RecordSupplierPaymentUseCase } from "../../../src/domain/use-cases/supplier-ledger/RecordSupplierPaymentUseCase.ts";
 
 // ─── SettingsAccessor.isAutoPostingEnabled ─────────────────────
 

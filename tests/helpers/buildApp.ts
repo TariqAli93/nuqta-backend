@@ -5,7 +5,7 @@ import Fastify, {
   type FastifyReply,
   type FastifyRequest,
 } from "fastify";
-import { JwtService } from "@nuqta/core";
+import { JwtService } from "../../src/domain/index.js";
 import "./mockCore.ts";
 import "./mockData.ts";
 import type { AppOptions } from "../../src/app.ts";

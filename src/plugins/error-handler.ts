@@ -1,5 +1,5 @@
 import fp from "fastify-plugin";
-import { isDomainError, toApiError } from "@nuqta/core";
+import { isDomainError, toApiError } from "../domain/index.js";
 
 export default fp(async (fastify) => {
   fastify.setNotFoundHandler(async (request, reply) => {

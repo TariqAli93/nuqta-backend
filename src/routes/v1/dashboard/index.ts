@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import { GetDashboardStatsUseCase } from "@nuqta/core";
+import { GetDashboardStatsUseCase } from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,
