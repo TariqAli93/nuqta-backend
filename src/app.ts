@@ -1,3 +1,8 @@
+// Validate environment variables before anything else initialises.
+// This import is intentionally side-effectful: it exits the process
+// immediately if required vars are missing or malformed.
+import "./shared/env.js";
+
 import { join } from "node:path";
 import AutoLoad, { AutoloadPluginOptions } from "@fastify/autoload";
 import type {
