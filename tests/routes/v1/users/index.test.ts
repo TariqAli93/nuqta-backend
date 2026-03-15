@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
@@ -26,7 +26,9 @@ describe("/api/v1/users", () => {
       title: "GET / returns the user list",
       method: "GET",
       url: "/api/v1/users",
-      setup: () => mockUseCase("GetUsersUseCase", { execute: [user] }),
+      setup: () => {
+        ctx.repos.user.findAll = vi.fn().mockResolvedValue([user]);
+      },
       assert: (data: typeof user[]) => {
         expect(Array.isArray(data)).toBe(true);
         expect(data[0].username).toBe(user.username);
@@ -36,7 +38,9 @@ describe("/api/v1/users", () => {
       title: "GET /:id returns one user",
       method: "GET",
       url: "/api/v1/users/1",
-      setup: () => mockUseCase("GetUserByIdUseCase", { execute: user }),
+      setup: () => {
+        ctx.repos.user.findById = vi.fn().mockResolvedValue(user);
+      },
       assert: (data: typeof user) => {
         expect(data.id).toBe(user.id);
       },
@@ -143,11 +147,7 @@ describe("/api/v1/users", () => {
   });
 
   test("returns 404 when a user does not exist", async () => {
-    mockUseCase("GetUserByIdUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.user.findById = vi.fn().mockResolvedValue(null);
 
     const response = await ctx.app.inject({
       method: "GET",

@@ -3,7 +3,6 @@ import { promisify } from "node:util";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { IBackupRepository, BackupInfo, BackupStats } from "@nuqta/core";
-import "dotenv/config";
 
 const execFileAsync = promisify(execFile);
 

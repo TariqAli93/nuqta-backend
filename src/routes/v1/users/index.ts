@@ -1,9 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetUsersUseCase,
   CreateUserUseCase,
   UpdateUserUseCase,
-  GetUserByIdUseCase,
   NotFoundError,
   type User,
 } from "@nuqta/core";
@@ -112,8 +110,7 @@ const users: FastifyPluginAsync = async (fastify) => {
     "/",
     { schema: getUsersSchema, preHandler: requirePermission("users:read") },
     async (request) => {
-      const uc = new GetUsersUseCase(fastify.repos.user);
-      const data = await uc.execute();
+      const data = await fastify.repos.user.findAll();
       return { ok: true, data };
     },
   );
@@ -123,8 +120,7 @@ const users: FastifyPluginAsync = async (fastify) => {
     { schema: getUserByIdSchema, preHandler: requirePermission("users:read") },
     async (request) => {
       const { id } = request.params as { id: string };
-      const uc = new GetUserByIdUseCase(fastify.repos.user);
-      const data = await uc.execute(Number(id));
+      const data = await fastify.repos.user.findById(Number(id));
       if (!data) {
         throw new NotFoundError("المستخدم غير موجود");
       }

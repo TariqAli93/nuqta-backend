@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
@@ -26,7 +26,9 @@ describe("/api/v1/categories", () => {
       title: "GET / returns categories",
       method: "GET",
       url: "/api/v1/categories",
-      setup: () => mockUseCase("GetCategoriesUseCase", { execute: [category] }),
+      setup: () => {
+        ctx.repos.category.findAll = vi.fn().mockResolvedValue([category]);
+      },
       assert: (data: typeof category[]) => {
         expect(data[0].name).toBe(category.name);
       },
@@ -61,7 +63,9 @@ describe("/api/v1/categories", () => {
       title: "DELETE /:id returns a null payload",
       method: "DELETE",
       url: "/api/v1/categories/2",
-      setup: () => mockUseCase("DeleteCategoryUseCase", { execute: null }),
+      setup: () => {
+        ctx.repos.category.delete = vi.fn().mockResolvedValue(undefined);
+      },
       assert: (data: null) => {
         expect(data).toBeNull();
       },
@@ -129,11 +133,7 @@ describe("/api/v1/categories", () => {
   });
 
   test("returns 404 when deleting a missing category", async () => {
-    mockUseCase("DeleteCategoryUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.category.delete = vi.fn().mockRejectedValue(new NotFoundError("missing"));
 
     const response = await ctx.app.inject({
       method: "DELETE",
