@@ -35,8 +35,9 @@ describe("/api/v1/supplier-ledger", () => {
       title: "GET /:supplierId returns the supplier ledger",
       method: "GET",
       url: "/api/v1/supplier-ledger/4?dateFrom=2026-03-01&dateTo=2026-03-02&limit=10&offset=0",
-      setup: () =>
-        mockUseCase("GetSupplierLedgerUseCase", { execute: supplierLedger }),
+      setup: () => {
+        ctx.repos.supplierLedger.findAll = async () => supplierLedger;
+      },
       assert: (data: typeof supplierLedger) => {
         expect(data.total).toBe(supplierLedger.total);
       },
@@ -206,11 +207,7 @@ describe("/api/v1/supplier-ledger", () => {
   });
 
   test("returns 404 when the supplier ledger is missing", async () => {
-    mockUseCase("GetSupplierLedgerUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.supplierLedger.findAll = async () => { throw new NotFoundError("missing"); };
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -223,9 +220,7 @@ describe("/api/v1/supplier-ledger", () => {
 
   // ── Covers L33-34: limit/offset ternary fallback branches ──
   test("GET /supplier-ledger/:id without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetSupplierLedgerUseCase", {
-      execute: { items: [], total: 0 },
-    });
+    ctx.repos.supplierLedger.findAll = async () => ({ items: [], total: 0 });
 
     const response = await ctx.app.inject({
       method: "GET",

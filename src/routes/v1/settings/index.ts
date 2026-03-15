@@ -1,20 +1,12 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetSettingUseCase,
   GetAccountingSettingsUseCase,
-  SetSettingUseCase,
-  GetCompanySettingsUseCase,
   SetCompanySettingsUseCase,
-  GetCurrencySettingsUseCase,
   GetModuleSettingsUseCase,
   CompleteSetupWizardUseCase,
-  GetSystemSettingsUseCase,
   UpdateSystemSettingsUseCase,
-  GetAccountingSettingsV2UseCase,
   UpdateAccountingSettingsUseCase,
-  GetPosSettingsUseCase,
   UpdatePosSettingsUseCase,
-  GetBarcodeSettingsUseCase,
   UpdateBarcodeSettingsUseCase,
   CompleteSetupWizardV2UseCase,
   type CompanySettings,
@@ -433,8 +425,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     "/company",
     { schema: getCompanySettingsSchema },
     async (request) => {
-      const uc = new GetCompanySettingsUseCase(fastify.repos.settings);
-      const data = await uc.execute();
+      const data = await fastify.settings.getCompany();
       return { ok: true, data };
     },
   );
@@ -450,8 +441,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
       const body = request.body as CompanySettings;
       const setUc = new SetCompanySettingsUseCase(fastify.repos.settings);
       await setUc.execute(body);
-      const getUc = new GetCompanySettingsUseCase(fastify.repos.settings);
-      const data = await getUc.execute();
+      const data = await fastify.settings.getCompany();
       return { ok: true, data };
     },
   );
@@ -461,8 +451,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     "/currency",
     { schema: getCurrencySettingsSchema },
     async (request) => {
-      const uc = new GetCurrencySettingsUseCase(fastify.repos.settings);
-      const data = await uc.execute();
+      const data = await fastify.settings.getCurrency();
       return { ok: true, data };
     },
   );
@@ -496,8 +485,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     { schema: getSettingByKeySchema },
     async (request) => {
       console.log("Fetching setting for key:", request.params);
-      const uc = new GetSettingUseCase(fastify.repos.settings);
-      const data = await uc.execute(request.params.key);
+      const data = await fastify.settings.getValue(request.params.key);
       return { ok: true, data };
     },
   );
@@ -512,8 +500,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const { key } = request.params;
       const { value } = request.body;
-      const uc = new SetSettingUseCase(fastify.repos.settings);
-      await uc.execute({ key, value });
+      await fastify.settings.setValue(key, value);
       return { ok: true, data: null };
     },
   );
@@ -531,8 +518,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
 
   // GET /settings/system
   fastify.get("/system", { schema: getSystemSettingsSchema }, async () => {
-    const uc = new GetSystemSettingsUseCase(fastify.repos.systemSettings);
-    const data = await uc.execute();
+    const data = await fastify.settings.getSystem();
     return { ok: true, data };
   });
 
@@ -556,10 +542,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     "/accounting-v2",
     { schema: getAccountingSettingsV2Schema },
     async () => {
-      const uc = new GetAccountingSettingsV2UseCase(
-        fastify.repos.accountingSettings,
-      );
-      const data = await uc.execute();
+      const data = await fastify.settings.getAccounting();
       return { ok: true, data };
     },
   );
@@ -583,8 +566,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
 
   // GET /settings/pos
   fastify.get("/pos", { schema: getPosSettingsSchema }, async () => {
-    const uc = new GetPosSettingsUseCase(fastify.repos.posSettings);
-    const data = await uc.execute();
+    const data = await fastify.settings.getPos();
     return { ok: true, data };
   });
 
@@ -608,8 +590,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     "/barcode-config",
     { schema: getBarcodeSettingsSchema },
     async () => {
-      const uc = new GetBarcodeSettingsUseCase(fastify.repos.barcodeSettings);
-      const data = await uc.execute();
+      const data = await fastify.settings.getBarcode();
       return { ok: true, data };
     },
   );

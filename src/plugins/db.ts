@@ -1,5 +1,5 @@
 import fp from "fastify-plugin";
-import { JwtService } from "@nuqta/core";
+import { JwtService, UnifiedSettingsService } from "@nuqta/core";
 import type {
   AccountingRepository,
   AccountingSettingsRepository,
@@ -99,9 +99,20 @@ export default fp<AppOptions>(async (fastify, opts) => {
     (overrides?.jwt as JwtService | undefined) ??
     new JwtService(jwtSecret, accessTtl, refreshTtl);
 
+  const settingsFacade =
+    (overrides?.settings as UnifiedSettingsService | undefined) ??
+    new UnifiedSettingsService(
+      repos.settings,
+      repos.accountingSettings,
+      repos.posSettings,
+      repos.barcodeSettings,
+      repos.systemSettings,
+    );
+
   fastify.decorate("db", connection);
   fastify.decorate("repos", repos);
   fastify.decorate("jwt", jwtService);
+  fastify.decorate("settings", settingsFacade);
 });
 
 declare module "fastify" {
@@ -109,5 +120,6 @@ declare module "fastify" {
     db: DbConnection;
     repos: Repositories;
     jwt: JwtService;
+    settings: UnifiedSettingsService;
   }
 }

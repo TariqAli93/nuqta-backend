@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetSaleByIdUseCase,
   CreateSaleUseCase,
   AddPaymentUseCase,
   CancelSaleUseCase,
@@ -293,8 +292,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
     { schema: getSaleByIdSchema, preHandler: requirePermission("sales:read") },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new GetSaleByIdUseCase(fastify.repos.sale);
-      const data = await uc.execute(id);
+      const data = await fastify.repos.sale.findById(id);
       if (!data) {
         throw new NotFoundError("الفاتورة غير موجودة");
       }

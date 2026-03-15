@@ -116,61 +116,45 @@ const PERMISSION_MATRIX: Record<string, UserRole[]> = {
   "simpleMode:toggle": ["admin", "manager"],
 };
 
-export class PermissionService {
-  /**
-   * Get all permissions for a given role
-   */
-  static getPermissionsForRole(role: UserRole): string[] {
-    const permissions: string[] = [];
+export function getPermissionsForRole(role: UserRole): string[] {
+  const permissions: string[] = [];
 
-    for (const [permission, allowedRoles] of Object.entries(
-      PERMISSION_MATRIX,
-    )) {
-      if (allowedRoles.includes(role)) {
-        permissions.push(permission);
-      }
+  for (const [permission, allowedRoles] of Object.entries(PERMISSION_MATRIX)) {
+    if (allowedRoles.includes(role)) {
+      permissions.push(permission);
     }
-
-    return permissions;
   }
 
-  /**
-   * Check if a role has a specific permission
-   */
-  static hasPermission(role: UserRole, permission: string): boolean {
-    const allowedRoles = PERMISSION_MATRIX[permission];
-    return allowedRoles ? allowedRoles.includes(role) : false;
-  }
+  return permissions;
+}
 
-  /**
-   * Check if a role has any of the provided permissions (OR logic)
-   */
-  static hasAnyPermission(role: UserRole, permissions: string[]): boolean {
-    return permissions.some((permission) =>
-      this.hasPermission(role, permission),
-    );
-  }
+export function hasPermission(role: UserRole, permission: string): boolean {
+  const allowedRoles = PERMISSION_MATRIX[permission];
+  return allowedRoles ? allowedRoles.includes(role) : false;
+}
 
-  /**
-   * Check if a role has all of the provided permissions (AND logic)
-   */
-  static hasAllPermissions(role: UserRole, permissions: string[]): boolean {
-    return permissions.every((permission) =>
-      this.hasPermission(role, permission),
-    );
-  }
+export function hasAnyPermission(role: UserRole, permissions: string[]): boolean {
+  return permissions.some((permission) => hasPermission(role, permission));
+}
 
-  /**
-   * Get all available permissions in the system
-   */
-  static getAllPermissions(): string[] {
-    return Object.keys(PERMISSION_MATRIX);
-  }
+export function hasAllPermissions(role: UserRole, permissions: string[]): boolean {
+  return permissions.every((permission) => hasPermission(role, permission));
+}
 
-  /**
-   * Get all available roles
-   */
-  static getAllRoles(): UserRole[] {
-    return ["admin", "manager", "cashier", "viewer"];
-  }
+export function getAllPermissions(): string[] {
+  return Object.keys(PERMISSION_MATRIX);
+}
+
+export function getAllRoles(): UserRole[] {
+  return ["admin", "manager", "cashier", "viewer"];
+}
+
+/** @deprecated Use the exported functions directly */
+export class PermissionService {
+  static getPermissionsForRole = getPermissionsForRole;
+  static hasPermission = hasPermission;
+  static hasAnyPermission = hasAnyPermission;
+  static hasAllPermissions = hasAllPermissions;
+  static getAllPermissions = getAllPermissions;
+  static getAllRoles = getAllRoles;
 }

@@ -37,7 +37,7 @@ describe("/api/v1/accounting", () => {
       title: "GET /accounts returns chart of accounts",
       method: "GET",
       url: "/api/v1/accounting/accounts",
-      setup: () => mockUseCase("GetAccountsUseCase", { execute: [account] }),
+      setup: () => { ctx.repos.accounting.getAccounts = async () => [account]; },
       assert: (data: (typeof account)[]) => {
         expect(data[0].code).toBe(account.code);
       },
@@ -46,10 +46,9 @@ describe("/api/v1/accounting", () => {
       title: "GET /journal-entries returns entries",
       method: "GET",
       url: "/api/v1/accounting/journal-entries?sourceType=sale&dateFrom=2026-03-01&dateTo=2026-03-02&isPosted=true&limit=10&offset=0",
-      setup: () =>
-        mockUseCase("GetJournalEntriesUseCase", {
-          execute: { items: [journalEntry], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.accounting.getJournalEntries = async () => ({ items: [journalEntry], total: 1 });
+      },
       assert: (data: { items: (typeof journalEntry)[]; total: number }) => {
         expect(data.items[0].entryNumber).toBe(journalEntry.entryNumber);
       },
@@ -58,8 +57,7 @@ describe("/api/v1/accounting", () => {
       title: "GET /journal-entries/:id returns one entry",
       method: "GET",
       url: "/api/v1/accounting/journal-entries/81",
-      setup: () =>
-        mockUseCase("GetEntryByIdUseCase", { execute: journalEntry }),
+      setup: () => { ctx.repos.accounting.getEntryById = async () => journalEntry; },
       assert: (data: typeof journalEntry) => {
         expect(data.id).toBe(journalEntry.id);
       },
@@ -68,8 +66,7 @@ describe("/api/v1/accounting", () => {
       title: "GET /trial-balance returns rows",
       method: "GET",
       url: "/api/v1/accounting/trial-balance?dateFrom=2026-03-01&dateTo=2026-03-02",
-      setup: () =>
-        mockUseCase("GetTrialBalanceUseCase", { execute: [trialBalanceRow] }),
+      setup: () => { ctx.repos.accounting.getTrialBalance = async () => [trialBalanceRow]; },
       assert: (data: (typeof trialBalanceRow)[]) => {
         expect(data[0].accountCode).toBe(trialBalanceRow.accountCode);
       },
@@ -78,8 +75,7 @@ describe("/api/v1/accounting", () => {
       title: "GET /profit-loss returns a report",
       method: "GET",
       url: "/api/v1/accounting/profit-loss?dateFrom=2026-03-01&dateTo=2026-03-02",
-      setup: () =>
-        mockUseCase("GetProfitLossUseCase", { execute: { netProfit: 5000 } }),
+      setup: () => { ctx.repos.accounting.getProfitLoss = async () => ({ netProfit: 5000 }); },
       assert: (data: { netProfit: number }) => {
         expect(data.netProfit).toBe(5000);
       },
@@ -88,10 +84,7 @@ describe("/api/v1/accounting", () => {
       title: "GET /balance-sheet returns a report",
       method: "GET",
       url: "/api/v1/accounting/balance-sheet?fromDate=2026-03-01&toDate=2026-03-02",
-      setup: () =>
-        mockUseCase("GetBalanceSheetUseCase", {
-          execute: { assets: 5000, liabilities: 1000 },
-        }),
+      setup: () => { ctx.repos.accounting.getBalanceSheet = async () => ({ assets: 5000, liabilities: 1000 }); },
       assert: (data: { assets: number }) => {
         expect(data.assets).toBe(5000);
       },
@@ -193,11 +186,7 @@ describe("/api/v1/accounting", () => {
   });
 
   test("returns 404 when an entry is missing", async () => {
-    mockUseCase("GetEntryByIdUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.accounting.getEntryById = async () => { throw new NotFoundError("missing"); };
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -210,9 +199,7 @@ describe("/api/v1/accounting", () => {
 
   // ── Covers L51-53: isPosted/limit/offset ternary fallback branches ──
   test("GET /journal-entries without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetJournalEntriesUseCase", {
-      execute: { items: [], total: 0 },
-    });
+    ctx.repos.accounting.getJournalEntries = async () => ({ items: [], total: 0 });
 
     const response = await ctx.app.inject({
       method: "GET",

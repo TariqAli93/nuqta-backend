@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { paymentResult, purchase } from "../../../helpers/fixtures.ts";
@@ -26,10 +26,9 @@ describe("/api/v1/purchases", () => {
       title: "GET / returns purchases",
       method: "GET",
       url: "/api/v1/purchases?search=PUR&status=received&limit=10&offset=0",
-      setup: () =>
-        mockUseCase("GetPurchasesUseCase", {
-          execute: { items: [purchase], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.purchase.findAll = async () => ({ items: [purchase], total: 1 });
+      },
       assert: (data: { items: (typeof purchase)[]; total: number }) => {
         expect(data.items[0].invoiceNumber).toBe(purchase.invoiceNumber);
       },
@@ -38,7 +37,7 @@ describe("/api/v1/purchases", () => {
       title: "GET /:id returns one purchase",
       method: "GET",
       url: "/api/v1/purchases/21",
-      setup: () => mockUseCase("GetPurchaseByIdUseCase", { execute: purchase }),
+      setup: () => { ctx.repos.purchase.findById = async () => purchase; },
       assert: (data: typeof purchase) => {
         expect(data.id).toBe(purchase.id);
       },
@@ -198,11 +197,7 @@ describe("/api/v1/purchases", () => {
   });
 
   test("returns 404 when a purchase does not exist", async () => {
-    mockUseCase("GetPurchaseByIdUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.purchase.findById = async () => null;
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -215,7 +210,7 @@ describe("/api/v1/purchases", () => {
 
   // ── Covers L32-33: limit/offset ternary fallback branches ──
   test("GET /purchases without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetPurchasesUseCase", { execute: { items: [], total: 0 } });
+    ctx.repos.purchase.findAll = async () => ({ items: [], total: 0 });
 
     const response = await ctx.app.inject({
       method: "GET",

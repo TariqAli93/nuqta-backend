@@ -1,10 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetCustomersUseCase,
   GetCustomerByIdUseCase,
   CreateCustomerUseCase,
   UpdateCustomerUseCase,
-  DeleteCustomerUseCase,
   type Customer,
 } from "@nuqta/core";
 import {
@@ -155,8 +153,7 @@ const customers: FastifyPluginAsync = async (fastify) => {
         page?: string;
         limit?: string;
       };
-      const uc = new GetCustomersUseCase(fastify.repos.customer);
-      const data = await uc.execute({
+      const data = await fastify.repos.customer.findAll({
         search: query.search,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.page
@@ -223,10 +220,7 @@ const customers: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new DeleteCustomerUseCase(
-        fastify.repos.customer as unknown as any,
-      );
-      await uc.execute(id);
+      await fastify.repos.customer.delete(id);
       return { ok: true, data: null };
     },
   );

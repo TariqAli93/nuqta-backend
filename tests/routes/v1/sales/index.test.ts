@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
+import { PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { paymentResult, sale, saleList } from "../../../helpers/fixtures.ts";
@@ -82,7 +82,7 @@ describe("/api/v1/sales", () => {
       title: "GET /:id returns one sale",
       method: "GET",
       url: "/api/v1/sales/11",
-      setup: () => mockUseCase("GetSaleByIdUseCase", { execute: sale }),
+      setup: () => { ctx.repos.sale.findById = async () => sale; },
       assert: (data: typeof sale) => {
         expect(data.id).toBe(sale.id);
       },
@@ -254,11 +254,7 @@ describe("/api/v1/sales", () => {
   });
 
   test("returns 404 when a sale does not exist", async () => {
-    mockUseCase("GetSaleByIdUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.sale.findById = async () => null;
 
     const response = await ctx.app.inject({
       method: "GET",

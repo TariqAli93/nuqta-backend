@@ -1,6 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetSupplierLedgerUseCase,
   RecordSupplierPaymentUseCase,
   ReconcileSupplierBalanceUseCase,
 } from "@nuqta/core";
@@ -139,8 +138,7 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetSupplierLedgerUseCase(fastify.repos.supplierLedger);
-      const data = await uc.execute({
+      const data = await fastify.repos.supplierLedger.findAll({
         supplierId,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,

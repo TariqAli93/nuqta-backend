@@ -17,6 +17,7 @@ export interface AppTestOverrides {
     sign(payload: Record<string, unknown>): string;
     verify(token: string): unknown;
   };
+  settings?: unknown;
   plugins?: TestPlugin[];
   routes?: Array<{
     prefix: string;

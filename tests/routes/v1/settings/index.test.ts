@@ -30,8 +30,9 @@ describe("/api/v1/settings", () => {
       title: "GET /company returns company settings",
       method: "GET",
       url: "/api/v1/settings/company",
-      setup: () =>
-        mockUseCase("GetCompanySettingsUseCase", { execute: companySettings }),
+      setup: () => {
+        ctx.repos.settings.getCompanySettings = async () => companySettings;
+      },
       assert: (data: typeof companySettings) => {
         expect(data.name).toBe(companySettings.name);
       },
@@ -43,7 +44,7 @@ describe("/api/v1/settings", () => {
       payload: companySettings,
       setup: () => {
         mockUseCase("SetCompanySettingsUseCase", { execute: null });
-        mockUseCase("GetCompanySettingsUseCase", { execute: companySettings });
+        ctx.repos.settings.getCompanySettings = async () => companySettings;
       },
       assert: (data: typeof companySettings) => {
         expect(data.currency).toBe(companySettings.currency);
@@ -53,10 +54,9 @@ describe("/api/v1/settings", () => {
       title: "GET /currency returns currency settings",
       method: "GET",
       url: "/api/v1/settings/currency",
-      setup: () =>
-        mockUseCase("GetCurrencySettingsUseCase", {
-          execute: currencySettings,
-        }),
+      setup: () => {
+        ctx.repos.settings.getCurrencySettings = async () => currencySettings;
+      },
       assert: (data: typeof currencySettings) => {
         expect(data.currencyCode).toBe(currencySettings.currencyCode);
       },
@@ -87,8 +87,9 @@ describe("/api/v1/settings", () => {
       title: "GET /:key returns one setting",
       method: "GET",
       url: "/api/v1/settings/theme",
-      setup: () =>
-        mockUseCase("GetSettingUseCase", { execute: { value: "light" } }),
+      setup: () => {
+        ctx.repos.settings.get = async () => ({ value: "light" });
+      },
       assert: (data: { value: string }) => {
         expect(data.value).toBe("light");
       },
@@ -100,7 +101,7 @@ describe("/api/v1/settings", () => {
       payload: {
         value: "dark",
       },
-      setup: () => mockUseCase("SetSettingUseCase", { execute: null }),
+      setup: () => { ctx.repos.settings.set = async () => undefined; },
       assert: (data: null) => {
         expect(data).toBeNull();
       },
@@ -175,11 +176,7 @@ describe("/api/v1/settings", () => {
   });
 
   test("returns 404 when a setting key does not exist", async () => {
-    mockUseCase("GetSettingUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.settings.get = async () => { throw new NotFoundError("missing"); };
 
     const response = await ctx.app.inject({
       method: "GET",

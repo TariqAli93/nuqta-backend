@@ -1,10 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { NotFoundError, PermissionDeniedError } from "@nuqta/core";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { customer } from "../../../helpers/fixtures.ts";
 import {
-  getUseCaseMock,
   mockUseCase,
   resetMockCore,
 } from "../../../helpers/mockCore.ts";
@@ -30,10 +29,9 @@ describe("/api/v1/customers", () => {
       title: "GET / returns the customer list",
       method: "GET",
       url: "/api/v1/customers?search=Layla&page=1&limit=10",
-      setup: () =>
-        mockUseCase("GetCustomersUseCase", {
-          execute: { items: [customer], total: 1 },
-        }),
+      setup: () => {
+        ctx.repos.customer.findAll = async () => ({ items: [customer], total: 1 });
+      },
       assert: (data: { items: (typeof customer)[]; total: number }) => {
         expect(data.items[0].name).toBe(customer.name);
       },
@@ -68,7 +66,7 @@ describe("/api/v1/customers", () => {
       title: "DELETE /:id removes a customer",
       method: "DELETE",
       url: "/api/v1/customers/3",
-      setup: () => mockUseCase("DeleteCustomerUseCase", { execute: null }),
+      setup: () => { ctx.repos.customer.delete = async () => null; },
       assert: (data: null) => {
         expect(data).toBeNull();
       },
@@ -140,11 +138,9 @@ describe("/api/v1/customers", () => {
   });
 
   test("returns 404 when deleting a missing customer", async () => {
-    mockUseCase("DeleteCustomerUseCase", {
-      execute: async () => {
-        throw new NotFoundError("missing");
-      },
-    });
+    ctx.repos.customer.delete = async () => {
+      throw new NotFoundError("missing");
+    };
 
     const response = await ctx.app.inject({
       method: "DELETE",
@@ -157,7 +153,7 @@ describe("/api/v1/customers", () => {
 
   // ── Covers L29-32: limit/page/nested-limit ternary fallback branches ──
   test("GET /customers without optional query params hits default fallbacks", async () => {
-    mockUseCase("GetCustomersUseCase", { execute: { items: [], total: 0 } });
+    ctx.repos.customer.findAll = async () => ({ items: [], total: 0 });
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -169,9 +165,8 @@ describe("/api/v1/customers", () => {
   });
 
   test("GET /customers with page but no limit uses the default page-size offset (covers src/routes/v1/customers/index.ts:32)", async () => {
-    mockUseCase("GetCustomersUseCase", {
-      execute: { items: [customer], total: 1 },
-    });
+    const spy = vi.fn().mockResolvedValue({ items: [customer], total: 1 });
+    ctx.repos.customer.findAll = spy;
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -187,9 +182,7 @@ describe("/api/v1/customers", () => {
       id: customer.id,
       name: customer.name,
     });
-    expect(
-      getUseCaseMock("GetCustomersUseCase", "execute"),
-    ).toHaveBeenCalledWith({
+    expect(spy).toHaveBeenCalledWith({
       search: undefined,
       limit: undefined,
       offset: 20,

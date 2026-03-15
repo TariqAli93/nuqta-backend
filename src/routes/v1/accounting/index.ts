@@ -1,11 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
 import {
-  GetAccountsUseCase,
-  GetJournalEntriesUseCase,
-  GetEntryByIdUseCase,
-  GetTrialBalanceUseCase,
-  GetProfitLossUseCase,
-  GetBalanceSheetUseCase,
   InitializeAccountingUseCase,
 } from "@nuqta/core";
 import {
@@ -224,8 +218,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate, requirePermission("accounting:read")],
     },
     async (request) => {
-      const uc = new GetAccountsUseCase(fastify.repos.accounting);
-      const data = await uc.execute();
+      const data = await fastify.repos.accounting.getAccounts();
       return { ok: true, data };
     },
   );
@@ -246,8 +239,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
-      const uc = new GetJournalEntriesUseCase(fastify.repos.accounting);
-      const data = await uc.execute({
+      const data = await fastify.repos.accounting.getJournalEntries({
         sourceType: query.sourceType,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
@@ -269,8 +261,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const id = parseInt(request.params.id, 10);
-      const uc = new GetEntryByIdUseCase(fastify.repos.accounting);
-      const data = await uc.execute(id);
+      const data = await fastify.repos.accounting.getEntryById(id);
       return { ok: true, data };
     },
   );
@@ -284,8 +275,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const query = request.query as { dateFrom?: string; dateTo?: string };
-      const uc = new GetTrialBalanceUseCase(fastify.repos.accounting);
-      const data = await uc.execute({
+      const data = await fastify.repos.accounting.getTrialBalance({
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
       });
@@ -302,8 +292,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const query = request.query as { dateFrom?: string; dateTo?: string };
-      const uc = new GetProfitLossUseCase(fastify.repos.accounting);
-      const data = await uc.execute({
+      const data = await fastify.repos.accounting.getProfitLoss({
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
       });
@@ -332,8 +321,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const query = request.query as { fromDate?: string; toDate?: string };
-      const uc = new GetBalanceSheetUseCase(fastify.repos.accounting);
-      const data = await uc.execute(query || {});
+      const data = await fastify.repos.accounting.getBalanceSheet(query || {});
       return { ok: true, data };
     },
   );

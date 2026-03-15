@@ -7,12 +7,9 @@ import {
   DeleteProductUseCase,
   AdjustProductStockUseCase,
   ReconcileStockUseCase,
-  GetProductUnitsUseCase,
   CreateProductUnitUseCase,
   UpdateProductUnitUseCase,
-  DeleteProductUnitUseCase,
   SetDefaultProductUnitUseCase,
-  GetProductBatchesUseCase,
   CreateProductBatchUseCase,
   GetProductPurchaseHistoryUseCase,
   GetProductSalesHistoryUseCase,
@@ -209,8 +206,7 @@ const products: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const productId = parseInt(request.params.id, 10);
-      const uc = new GetProductUnitsUseCase(fastify.repos.product);
-      const data = await uc.execute(productId);
+      const data = await fastify.repos.product.findUnitsByProductId(productId);
       return { ok: true, data };
     },
   );
@@ -256,8 +252,7 @@ const products: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const unitId = parseInt(request.params.id, 10);
-      const uc = new DeleteProductUnitUseCase(fastify.repos.product);
-      await uc.execute(unitId);
+      await fastify.repos.product.deleteUnit(unitId);
       return { ok: true, data: null };
     },
   );
@@ -289,8 +284,7 @@ const products: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const productId = parseInt(request.params.id, 10);
-      const uc = new GetProductBatchesUseCase(fastify.repos.product);
-      const data = await uc.execute(productId);
+      const data = await fastify.repos.product.findBatchesByProductId(productId);
       return { ok: true, data };
     },
   );
