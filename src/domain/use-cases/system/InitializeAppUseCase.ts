@@ -4,6 +4,7 @@ import { User } from "../../entities/User.js";
 import { CompanySettings } from "../../entities/Settings.js";
 import { ConflictError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { hashPassword } from "../../shared/utils/helpers.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface InitializeAppInput {
   admin: {
@@ -29,13 +30,15 @@ export interface InitializeAppOutput {
  * 3. Creates the first admin user
  * 4. Persists initialization flag (LAST — crash-safe)
  */
-export class InitializeAppUseCase {
+export class InitializeAppUseCase extends WriteUseCase<InitializeAppInput, InitializeAppOutput, InitializeAppOutput> {
   constructor(
     private userRepo: IUserRepository,
     private settingsRepo: ISettingsRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(input: InitializeAppInput): Promise<InitializeAppOutput> {
+  async executeCommitPhase(input: InitializeAppInput, _userId: string): Promise<InitializeAppOutput> {
     // 1. Validate input
     this.validateInput(input);
 
@@ -88,6 +91,14 @@ export class InitializeAppUseCase {
       success: true,
       admin: adminWithoutPassword,
     };
+  }
+
+  executeSideEffectsPhase(_result: InitializeAppOutput, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: InitializeAppOutput): InitializeAppOutput {
+    return result;
   }
 
   private validateInput(input: InitializeAppInput): void {

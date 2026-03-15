@@ -4,19 +4,22 @@ import type { UpdateSystemSettingsInput } from "../../entities/SystemSettings.js
 import type { UpdatePosSettingsInput } from "../../entities/PosSettings.js";
 import type { SetupWizardSettings } from "../../entities/ModuleSettings.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 /**
  * CompleteSetupWizardV2UseCase
  * Writes setup wizard results to the new structured settings tables
  * instead of the old KV store.
  */
-export class CompleteSetupWizardV2UseCase {
+export class CompleteSetupWizardV2UseCase extends WriteUseCase<SetupWizardSettings, void, void> {
   constructor(
     private systemSettingsRepo: ISystemSettingsRepository,
     private posSettingsRepo: IPosSettingsRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(input: SetupWizardSettings): Promise<void> {
+  async executeCommitPhase(input: SetupWizardSettings, _userId: string): Promise<void> {
     if (!input.modules || !input.notifications || !input.invoice) {
       throw new ValidationError("Wizard settings are incomplete");
     }
@@ -49,5 +52,13 @@ export class CompleteSetupWizardV2UseCase {
       showBarcode: input.invoice.showBarcode ?? false,
     };
     await this.posSettingsRepo.update(posUpdate);
+  }
+
+  executeSideEffectsPhase(_r: void, _u: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: void): void {
+    return result;
   }
 }

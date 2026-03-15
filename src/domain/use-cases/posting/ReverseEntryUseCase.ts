@@ -2,6 +2,7 @@ import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
 import { JournalEntry } from "../../entities/Accounting.js";
 import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 /**
  * ReverseEntryUseCase
@@ -12,15 +13,17 @@ import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js
  * - Posted entries: locked posting batches cannot be reversed; creates a counter-entry
  * - Unposted entries: voided in place (marked isReversed=true, no counter-entry)
  */
-export class ReverseEntryUseCase {
+export class ReverseEntryUseCase extends WriteUseCase<number, JournalEntry, JournalEntry> {
   constructor(
     private postingRepo: IPostingRepository,
     private accountingRepo: IAccountingRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(entryId: number, userId: number): Promise<JournalEntry> {
+  async executeCommitPhase(entryId: number, _userId: string): Promise<JournalEntry> {
     const original = await this.getValidatedOriginalEntry(entryId);
-    return await this.executeCommitPhase(original, userId);
+    return await this.performReversal(original, _userId);
   }
 
   async getValidatedOriginalEntry(entryId: number): Promise<JournalEntry> {
@@ -56,9 +59,9 @@ export class ReverseEntryUseCase {
     return original;
   }
 
-  async executeCommitPhase(
+  async performReversal(
     originalEntry: JournalEntry,
-    userId: number,
+    _userId: string,
   ): Promise<JournalEntry> {
     if (!originalEntry.id) {
       throw new InvalidStateError("Journal entry id is missing", {
@@ -88,6 +91,14 @@ export class ReverseEntryUseCase {
       }
     }
 
-    return await this.postingRepo.createReversalEntry(originalEntry.id, userId);
+    return await this.postingRepo.createReversalEntry(originalEntry.id, Number(_userId) || 0);
+  }
+
+  executeSideEffectsPhase(_result: JournalEntry, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: JournalEntry): JournalEntry {
+    return result;
   }
 }

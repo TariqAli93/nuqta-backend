@@ -1,8 +1,11 @@
 import { IInventoryRepository } from '../../interfaces/IInventoryRepository.js';
 import { InventoryMovement } from '../../entities/InventoryMovement.js';
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetInventoryMovementsUseCase {
-  constructor(private inventoryRepository: IInventoryRepository) {}
+export class GetInventoryMovementsUseCase extends ReadUseCase<{ productId?: number; movementType?: string; limit?: number; offset?: number } | undefined, { items: InventoryMovement[]; total: number }> {
+  constructor(private inventoryRepository: IInventoryRepository) {
+    super();
+  }
 
   async execute(params?: {
     productId?: number;

@@ -1,8 +1,11 @@
 import { ISaleRepository } from "../../interfaces/ISaleRepository.js";
 import { Sale } from "../../entities/Sale.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetSaleUseCase {
-  constructor(private saleRepo: ISaleRepository) {}
+export class GetSaleUseCase extends ReadUseCase<{ page?: number; limit?: number; startDate?: string; endDate?: string }, Sale | null> {
+  constructor(private saleRepo: ISaleRepository) {
+    super();
+  }
 
   async execute(params: {
     page?: number;

@@ -8,14 +8,17 @@ import {
   type NotificationSettings,
   type InvoiceSettings,
 } from "../../entities/ModuleSettings.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
 /**
  * GetModuleSettingsUseCase
  * Reads all module toggle, notification, and invoice settings from the KV store
  * and returns them as typed objects.
  */
-export class GetModuleSettingsUseCase {
-  constructor(private settingsRepo: ISettingsRepository) {}
+export class GetModuleSettingsUseCase extends ReadUseCase<void, { modules: ModuleSettings; notifications: NotificationSettings; invoice: InvoiceSettings; wizardCompleted: boolean }> {
+  constructor(private settingsRepo: ISettingsRepository) {
+    super();
+  }
 
   async execute(): Promise<{
     modules: ModuleSettings;

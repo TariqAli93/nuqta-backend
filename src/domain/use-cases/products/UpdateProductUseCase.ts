@@ -3,47 +3,57 @@ import { IAuditRepository } from '../../interfaces/IAuditRepository.js';
 import { AuditService } from '../../shared/services/AuditService.js';
 import { Product } from '../../entities/Product.js';
 import { ValidationError } from '../../shared/errors/DomainErrors.js';
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdateProductUseCase {
+type TInput = { id: number; productData: Partial<Product> };
+
+export class UpdateProductUseCase extends WriteUseCase<TInput, Product, Product> {
   private auditService: AuditService;
 
   constructor(
     private productRepo: IProductRepository,
     private auditRepo?: IAuditRepository
   ) {
+    super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
 
-  async execute(id: number, productData: Partial<Product>): Promise<Product> {
-    if (productData.name !== undefined && productData.name.trim().length === 0) {
+  async executeCommitPhase(input: TInput, _userId: string): Promise<Product> {
+    if (input.productData.name !== undefined && input.productData.name.trim().length === 0) {
       throw new ValidationError('Product name cannot be empty');
     }
 
-    if (productData.costPrice !== undefined && productData.costPrice < 0) {
+    if (input.productData.costPrice !== undefined && input.productData.costPrice < 0) {
       throw new ValidationError('Cost price must be non-negative');
     }
 
-    if (productData.sellingPrice !== undefined && productData.sellingPrice < 0) {
+    if (input.productData.sellingPrice !== undefined && input.productData.sellingPrice < 0) {
       throw new ValidationError('Selling price must be non-negative');
     }
 
-    if (productData.stock !== undefined && productData.stock < 0) {
+    if (input.productData.stock !== undefined && input.productData.stock < 0) {
       throw new ValidationError('Stock must be non-negative');
     }
 
-    const updated = await this.productRepo.update(id, productData);
+    return await this.productRepo.update(input.id, input.productData);
+  }
+
+  async executeSideEffectsPhase(updated: Product, _userId: string): Promise<void> {
     // Fire-and-forget audit
     this.auditService
       .logUpdate(
         0,
         'product',
-        id,
+        updated.id!,
         Object.fromEntries(
-          Object.entries(productData).map(([k, v]) => [k, { old: undefined, new: v }])
+          Object.entries(updated).map(([k, v]) => [k, { old: undefined, new: v }])
         ),
-        `Product #${id} updated`
+        `Product #${updated.id} updated`
       )
       .catch(() => {});
-    return updated;
+  }
+
+  toEntity(result: Product): Product {
+    return result;
   }
 }

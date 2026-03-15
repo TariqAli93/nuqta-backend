@@ -20,6 +20,7 @@ import type {
   ProductRepository,
   ProductWorkspaceRepository,
   PurchaseRepository,
+  RevokedTokenRepository,
   SaleRepository,
   SettingsRepository,
   SupplierLedgerRepository,
@@ -54,6 +55,7 @@ export interface Repositories {
   payroll: PayrollRepository;
   productWorkspace: ProductWorkspaceRepository;
   backup: BackupRepository;
+  revokedToken: RevokedTokenRepository;
 }
 
 export default fp<AppOptions>(async (fastify, opts) => {
@@ -89,6 +91,7 @@ export default fp<AppOptions>(async (fastify, opts) => {
       payroll: new data.PayrollRepository(connection),
       productWorkspace: new data.ProductWorkspaceRepository(connection),
       backup: new data.BackupRepository(),
+      revokedToken: new data.RevokedTokenRepository(connection),
     } as Repositories;
   }
 

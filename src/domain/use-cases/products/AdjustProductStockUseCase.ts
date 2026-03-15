@@ -9,6 +9,7 @@ import {
   ValidationError,
   InsufficientStockError,
 } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 const ACCT_INVENTORY = "1200";
 const ACCT_COGS = "5001";
@@ -30,7 +31,7 @@ export interface AdjustStockResult {
   batchId: number;
 }
 
-export class AdjustProductStockUseCase {
+export class AdjustProductStockUseCase extends WriteUseCase<AdjustStockInput, AdjustStockResult, AdjustStockResult> {
   private auditService: AuditService;
 
   constructor(
@@ -39,12 +40,13 @@ export class AdjustProductStockUseCase {
     private accountingRepo?: IAccountingRepository,
     auditRepo?: IAuditRepository,
   ) {
+    super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
 
   async executeCommitPhase(
     input: AdjustStockInput,
-    userId: number,
+    userId: string,
   ): Promise<AdjustStockResult> {
     if (!Number.isInteger(input.quantityChange)) {
       throw new ValidationError("Quantity change must be an integer");
@@ -182,7 +184,7 @@ export class AdjustProductStockUseCase {
       totalCost: Math.abs(input.quantityChange) * product.costPrice,
       sourceType: "adjustment",
       notes: input.notes,
-      createdBy: userId,
+      createdBy: Number(userId) || 0,
     });
 
     // ── Update product status ────────────────────────────────────
@@ -199,7 +201,7 @@ export class AdjustProductStockUseCase {
       product.costPrice,
       input.quantityChange,
       movement.id,
-      userId,
+      Number(userId) || 0,
     );
 
     return { movement, batchId };
@@ -283,30 +285,18 @@ export class AdjustProductStockUseCase {
     }
   }
 
-  async execute(
-    input: AdjustStockInput,
-    userId: number,
-  ): Promise<AdjustStockResult> {
-    const result = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(result, input, userId);
-    return result;
-  }
-
   async executeSideEffectsPhase(
     result: AdjustStockResult,
-    input: AdjustStockInput,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     try {
       await this.auditService.logAction(
-        userId,
+        Number(userId) || 0,
         "stock:adjust",
         "Product",
-        input.productId,
-        `Stock adjusted by ${input.quantityChange} for product ${input.productId}`,
+        result.movement.productId,
+        `Stock adjusted for product ${result.movement.productId}`,
         {
-          quantityChange: input.quantityChange,
-          reason: input.reason || "manual",
           batchId: result.batchId,
           movementId: result.movement.id,
         },
@@ -314,5 +304,9 @@ export class AdjustProductStockUseCase {
     } catch (error) {
       console.warn("Audit logging failed for stock adjustment:", error);
     }
+  }
+
+  toEntity(result: AdjustStockResult): AdjustStockResult {
+    return result;
   }
 }

@@ -4,9 +4,12 @@
  */
 import { IProductRepository } from "../../interfaces/IProductRepository.js";
 import { NotFoundError } from "../../shared/errors/DomainErrors.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetProductByIdUseCase {
-  constructor(private productRepo: IProductRepository) {}
+export class GetProductByIdUseCase extends ReadUseCase<number, Awaited<ReturnType<IProductRepository["findById"]>>> {
+  constructor(private productRepo: IProductRepository) {
+    super();
+  }
 
   async execute(id: number) {
     const product = await this.productRepo.findById(id);

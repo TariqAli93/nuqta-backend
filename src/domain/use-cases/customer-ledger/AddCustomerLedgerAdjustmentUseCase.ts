@@ -4,6 +4,7 @@ import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { CustomerLedgerEntry } from "../../entities/Ledger.js";
 import { AuditService } from "../../shared/services/AuditService.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface LedgerAdjustmentInput {
   customerId: number;
@@ -11,7 +12,7 @@ export interface LedgerAdjustmentInput {
   notes?: string;
 }
 
-export class AddCustomerLedgerAdjustmentUseCase {
+export class AddCustomerLedgerAdjustmentUseCase extends WriteUseCase<LedgerAdjustmentInput, CustomerLedgerEntry, CustomerLedgerEntry> {
   private auditService?: AuditService;
 
   constructor(
@@ -19,6 +20,7 @@ export class AddCustomerLedgerAdjustmentUseCase {
     private customerRepo: ICustomerRepository,
     auditRepo?: IAuditRepository,
   ) {
+    super();
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
     }
@@ -26,7 +28,7 @@ export class AddCustomerLedgerAdjustmentUseCase {
 
   async executeCommitPhase(
     data: LedgerAdjustmentInput,
-    userId = 1,
+    userId: string,
   ): Promise<CustomerLedgerEntry> {
     if (!Number.isInteger(data.amount)) {
       throw new ValidationError(
@@ -50,38 +52,28 @@ export class AddCustomerLedgerAdjustmentUseCase {
       amount: data.amount,
       balanceAfter: balanceAfter,
       notes: data.notes,
-      createdBy: userId,
+      createdBy: Number(userId) || 1,
     });
 
     return entry;
   }
 
-  async execute(
-    data: LedgerAdjustmentInput,
-    userId = 1,
-  ): Promise<CustomerLedgerEntry> {
-    const result = await this.executeCommitPhase(data, userId);
-    await this.executeSideEffectsPhase(result, data, userId);
-    return result;
-  }
-
   async executeSideEffectsPhase(
     entry: CustomerLedgerEntry,
-    data: LedgerAdjustmentInput,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     if (!this.auditService) return;
     try {
       await this.auditService.logAction(
-        userId,
+        Number(userId) || 1,
         "customerLedger:adjustment",
         "Customer",
-        data.customerId,
-        `Customer ledger adjusted for customer #${data.customerId}`,
+        entry.customerId,
+        `Customer ledger adjusted for customer #${entry.customerId}`,
         {
-          amount: data.amount,
+          amount: entry.amount,
           ledgerEntryId: entry.id,
-          notes: data.notes,
+          notes: entry.notes,
         },
       );
     } catch (error) {
@@ -90,5 +82,9 @@ export class AddCustomerLedgerAdjustmentUseCase {
         error,
       );
     }
+  }
+
+  toEntity(result: CustomerLedgerEntry): CustomerLedgerEntry {
+    return result;
   }
 }

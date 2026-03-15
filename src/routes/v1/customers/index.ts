@@ -206,7 +206,7 @@ const customers: FastifyPluginAsync = async (fastify) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<Customer>;
       const uc = new UpdateCustomerUseCase(fastify.repos.customer);
-      const data = await uc.execute(id, body);
+      const data = await uc.execute({ id, customer: body });
       return { ok: true, data };
     },
   );

@@ -1,5 +1,6 @@
 import { IUserRepository } from "../../interfaces/IUserRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
 export interface SetupStatus {
   isInitialized: boolean;
@@ -8,11 +9,13 @@ export interface SetupStatus {
   wizardCompleted: boolean;
 }
 
-export class CheckInitialSetupUseCase {
+export class CheckInitialSetupUseCase extends ReadUseCase<void, SetupStatus> {
   constructor(
     private userRepo: IUserRepository,
     private settingsRepo: ISettingsRepository,
-  ) {}
+  ) {
+    super();
+  }
 
   async execute(): Promise<SetupStatus> {
     // Primary flag — set atomically at the end of InitializeAppUseCase

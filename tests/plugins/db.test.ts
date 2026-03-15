@@ -91,6 +91,7 @@ describe("db plugin", () => {
       ProductRepository: MockRepo,
       ProductWorkspaceRepository: MockRepo,
       PurchaseRepository: MockRepo,
+      RevokedTokenRepository: MockRepo,
       SaleRepository: MockRepo,
       SettingsRepository: MockRepo,
       SupplierLedgerRepository: MockRepo,

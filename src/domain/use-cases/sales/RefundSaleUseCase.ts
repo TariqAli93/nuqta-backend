@@ -9,6 +9,7 @@ import {
   InvalidStateError,
   ValidationError,
 } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface RefundInput {
   saleId: number;
@@ -16,10 +17,14 @@ export interface RefundInput {
   reason?: string;
 }
 
-export class RefundSaleUseCase {
-  constructor(private saleRepo: ISaleRepository) {}
+type TEntity = { saleId: number; refundedAmount: number; newPaidAmount: number; newRemainingAmount: number };
 
-  async execute(input: RefundInput, userId: number) {
+export class RefundSaleUseCase extends WriteUseCase<RefundInput, TEntity, TEntity> {
+  constructor(private saleRepo: ISaleRepository) {
+    super();
+  }
+
+  async executeCommitPhase(input: RefundInput, _userId: string): Promise<TEntity> {
     const sale = await this.saleRepo.findById(input.saleId);
     if (!sale) {
       throw new NotFoundError("الفاتورة غير موجودة");
@@ -54,5 +59,13 @@ export class RefundSaleUseCase {
       newPaidAmount,
       newRemainingAmount,
     };
+  }
+
+  executeSideEffectsPhase(_result: TEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: TEntity): TEntity {
+    return result;
   }
 }

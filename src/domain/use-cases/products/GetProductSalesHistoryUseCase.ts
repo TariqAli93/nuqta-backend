@@ -5,9 +5,12 @@
 
 import { IProductWorkspaceRepository } from "../../interfaces/IProductWorkspaceRepository.js";
 import { SalesHistoryItem } from "../../entities/ProductHistory.js";
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetProductSalesHistoryUseCase {
-  constructor(private repo: IProductWorkspaceRepository) {}
+export class GetProductSalesHistoryUseCase extends ReadUseCase<{ productId: number; opts?: { limit?: number; offset?: number } }, { items: SalesHistoryItem[] }> {
+  constructor(private repo: IProductWorkspaceRepository) {
+    super();
+  }
 
   async execute(
     productId: number,

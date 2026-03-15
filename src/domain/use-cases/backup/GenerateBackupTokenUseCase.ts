@@ -2,16 +2,21 @@
  * GenerateBackupTokenUseCase — Generates a one-time download token for a backup
  */
 import { JwtService } from "../../shared/services/JwtService.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface BackupToken {
   token: string;
   expiresIn: number;
 }
 
-export class GenerateBackupTokenUseCase {
-  constructor(private jwtService: JwtService) {}
+type TInput = { backupName: string };
 
-  async execute(backupName: string, userId: number): Promise<BackupToken> {
+export class GenerateBackupTokenUseCase extends WriteUseCase<TInput, BackupToken, BackupToken> {
+  constructor(private jwtService: JwtService) {
+    super();
+  }
+
+  async executeCommitPhase(input: TInput, userId: string): Promise<BackupToken> {
     const expiresIn = 300; // 5 minutes
     const token = this.jwtService.signAccess({
       sub: String(userId),
@@ -21,5 +26,13 @@ export class GenerateBackupTokenUseCase {
       fullName: "",
     });
     return { token, expiresIn };
+  }
+
+  executeSideEffectsPhase(_result: BackupToken, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: BackupToken): BackupToken {
+    return result;
   }
 }

@@ -1,8 +1,20 @@
 import { IProductRepository } from '../../interfaces/IProductRepository.js';
 import { Product } from '../../entities/Product.js';
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetProductsUseCase {
-  constructor(private productRepo: IProductRepository) {}
+export class GetProductsUseCase extends ReadUseCase<{
+  search?: string;
+  page?: number;
+  limit?: number;
+  categoryId?: number;
+  supplierId?: number;
+  status?: string;
+  lowStockOnly?: boolean;
+  expiringSoonOnly?: boolean;
+}, Awaited<ReturnType<IProductRepository["findAll"]>>> {
+  constructor(private productRepo: IProductRepository) {
+    super();
+  }
 
   async execute(
     params: {

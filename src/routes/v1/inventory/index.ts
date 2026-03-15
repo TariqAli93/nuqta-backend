@@ -253,7 +253,7 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       if (query.repair === "true") {
         const corrected = await uc.repair();
 
-        fastify.eventBus.emit("inventory:reconciled", { corrected });
+        fastify.emitDomainEvent("inventory:reconciled", { corrected });
 
         return {
           ok: true,

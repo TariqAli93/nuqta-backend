@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import type { DomainEvent } from "../../../plugins/event-bus.js";
+import type { LegacyDomainEvent } from "../../../plugins/event-bus.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
@@ -42,8 +42,8 @@ const events: FastifyPluginAsync = async (fastify) => {
         }
       }, HEARTBEAT_INTERVAL_MS);
 
-      // Subscribe to domain events
-      const handler = (event: DomainEvent) => {
+      // Subscribe to domain events via the SSE fan-out bridge
+      const handler = (event: LegacyDomainEvent) => {
         if (!reply.raw.destroyed) {
           reply.raw.write(
             `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
@@ -51,7 +51,7 @@ const events: FastifyPluginAsync = async (fastify) => {
         }
       };
 
-      const unsubscribe = fastify.eventBus.subscribe(handler);
+      const unsubscribe = fastify.subscribeToSse(handler);
 
       // Cleanup on disconnect
       const cleanup = () => {

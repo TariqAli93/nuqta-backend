@@ -77,9 +77,13 @@ const batchArb = fc
   .record({
     id: fc.integer({ min: 1, max: 10_000 }),
     expiryDate: fc.option(
-      fc.date({ min: new Date("2024-01-01"), max: new Date("2030-12-31") }).map(
-        (d) => d.toISOString().slice(0, 10), // YYYY-MM-DD
-      ),
+      fc
+        .date({
+          min: new Date("2024-01-01"),
+          max: new Date("2030-12-31"),
+          noInvalidDate: true,
+        })
+        .map((d) => d.toISOString().slice(0, 10)), // YYYY-MM-DD
       { nil: null },
     ),
     quantityOnHand: fc.integer({ min: 0, max: 500 }),
