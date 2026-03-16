@@ -10,6 +10,7 @@ export * as schema from "./schema/schema.js";
 // ── Repositories ──
 export * from "./repositories/auth/RevokedTokenRepository.js";
 export * from "./repositories/accounting/AccountingRepository.js";
+export * from "./repositories/accounting/ReconciliationRepository.js";
 export * from "./repositories/backup/BackupRepository.js";
 export * from "./repositories/audit/AuditRepository.js";
 export * from "./repositories/barcode/BarcodeRepository.js";

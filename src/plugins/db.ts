@@ -20,6 +20,7 @@ import type {
   ProductRepository,
   ProductWorkspaceRepository,
   PurchaseRepository,
+  ReconciliationRepository,
   RevokedTokenRepository,
   SaleRepository,
   SettingsRepository,
@@ -49,6 +50,7 @@ export interface Repositories {
   audit: AuditRepository;
   barcode: BarcodeRepository;
   accounting: AccountingRepository;
+  reconciliation: ReconciliationRepository;
   customerLedger: CustomerLedgerRepository;
   supplierLedger: SupplierLedgerRepository;
   posting: PostingRepository;
@@ -85,6 +87,7 @@ export default fp<AppOptions>(async (fastify, opts) => {
       audit: new data.AuditRepository(connection),
       barcode: new data.BarcodeRepository(connection),
       accounting: new data.AccountingRepository(connection),
+      reconciliation: new data.ReconciliationRepository(connection),
       customerLedger: new data.CustomerLedgerRepository(connection),
       supplierLedger: new data.SupplierLedgerRepository(connection),
       posting: new data.PostingRepository(connection),

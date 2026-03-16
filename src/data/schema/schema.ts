@@ -536,14 +536,67 @@ export const journalLines = pgTable(
     id: serial("id").primaryKey(),
     journalEntryId: integer("journal_entry_id").notNull(),
     accountId: integer("account_id").notNull(),
+    /** Customer or supplier ID — populated on AR/AP lines for reconciliation matching. */
+    partnerId: integer("partner_id"),
     debit: integer("debit").default(0),
     credit: integer("credit").default(0),
+    /** Net balance of this line: debit - credit. Positive = debit side, negative = credit side. */
+    balance: integer("balance").notNull().default(0),
     description: text("description"),
+    /** True once this line has been fully reconciled. */
+    reconciled: boolean("reconciled").notNull().default(false),
+    /** FK to reconciliations.id when partially or fully reconciled. */
+    reconciliationId: integer("reconciliation_id"),
     createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
   },
   (table) => [
     index("idx_journal_lines_entry").on(table.journalEntryId),
     index("idx_journal_lines_account").on(table.accountId),
+    index("idx_journal_lines_partner").on(table.partnerId),
+    index("idx_journal_lines_reconciled").on(table.reconciled),
+    index("idx_journal_lines_reconciliation").on(table.reconciliationId),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════════════
+// RECONCILIATIONS (Matching Header)
+// ═══════════════════════════════════════════════════════════════
+
+export const reconciliations = pgTable(
+  "reconciliations",
+  {
+    id: serial("id").primaryKey(),
+    /** customer | supplier | account */
+    type: text("type").notNull(),
+    /** open | partially_paid | paid */
+    status: text("status").notNull().default("open"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    createdBy: integer("created_by"),
+  },
+  (table) => [
+    index("idx_reconciliations_type").on(table.type),
+    index("idx_reconciliations_status").on(table.status),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════════════
+// RECONCILIATION LINES (Matched Journal Line Detail)
+// ═══════════════════════════════════════════════════════════════
+
+export const reconciliationLines = pgTable(
+  "reconciliation_lines",
+  {
+    id: serial("id").primaryKey(),
+    reconciliationId: integer("reconciliation_id").notNull(),
+    journalEntryLineId: integer("journal_entry_line_id").notNull(),
+    /** The amount from this line applied to the reconciliation (supports partial matching). */
+    amount: integer("amount").notNull(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    index("idx_recon_lines_reconciliation").on(table.reconciliationId),
+    index("idx_recon_lines_journal_line").on(table.journalEntryLineId),
   ],
 );
 

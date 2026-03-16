@@ -754,8 +754,12 @@ export class CreateSaleUseCase extends WriteUseCase<
     if (remainingAmount > 0 && arAcct?.id) {
       lines.push({
         accountId: arAcct.id,
+        // partner_id must be set on AR lines so the reconciliation engine can
+        // match this invoice line against the corresponding payment line.
+        partnerId: sale.customerId ?? null,
         debit: remainingAmount,
         credit: 0,
+        balance: remainingAmount,
         description: "ذمم العملاء",
       });
     }

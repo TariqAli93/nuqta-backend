@@ -1,6 +1,13 @@
 import { FastifyPluginAsync } from "fastify";
 import { InitializeAccountingUseCase } from "../../../domain/index.js";
 import {
+  ReconcileJournalLinesUseCase,
+  UnreconcileUseCase,
+  GetReconciliationsUseCase,
+  GetPartnerLedgerUseCase,
+  GetUnreconciledLinesUseCase,
+} from "../../../domain/use-cases/accounting/index.js";
+import {
   ErrorResponses,
   successEnvelope,
   successArrayEnvelope,
@@ -358,6 +365,265 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
       );
       const data = await uc.getStatus();
+      return { ok: true, data };
+    },
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // RECONCILIATION ENDPOINTS
+  // ══════════════════════════════════════════════════════════════════════
+
+  // POST /accounting/reconcile
+  fastify.post(
+    "/reconcile",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Reconcile journal lines (AR/AP matching)",
+        description:
+          "Match debit lines (invoices) with credit lines (payments) on the same AR or AP account for the same partner. " +
+          "Supports full, partial, and overpayment scenarios.",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object" as const,
+          required: ["journalLineIds"],
+          properties: {
+            journalLineIds: {
+              type: "array",
+              items: { type: "integer" },
+              minItems: 2,
+              description: "IDs of journal lines to reconcile",
+            },
+            amounts: {
+              type: "array",
+              items: { type: "integer", minimum: 1 },
+              description:
+                "Optional partial amounts per line (index-matched to journalLineIds). Omit for full-balance matching.",
+            },
+            notes: { type: "string" },
+          },
+          additionalProperties: false,
+        },
+        response: {
+          200: successEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Reconciliation created",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
+    },
+    async (request) => {
+      const body = request.body as {
+        journalLineIds: number[];
+        amounts?: number[];
+        notes?: string;
+      };
+      const uc = new ReconcileJournalLinesUseCase(
+        fastify.repos.reconciliation,
+        fastify.repos.audit,
+      );
+      const data = await uc.execute(body, String(request.user?.sub ?? "0"));
+      return { ok: true, data };
+    },
+  );
+
+  // POST /accounting/unreconcile
+  fastify.post(
+    "/unreconcile",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Reverse (unreconcile) a reconciliation",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object" as const,
+          required: ["reconciliationId"],
+          properties: {
+            reconciliationId: { type: "integer" },
+          },
+          additionalProperties: false,
+        },
+        response: {
+          200: successEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Reconciliation reversed",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
+    },
+    async (request) => {
+      const { reconciliationId } = request.body as { reconciliationId: number };
+      const uc = new UnreconcileUseCase(
+        fastify.repos.reconciliation,
+        fastify.repos.audit,
+      );
+      const data = await uc.execute(
+        { reconciliationId },
+        String(request.user?.sub ?? "0"),
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // GET /accounting/reconciliations
+  fastify.get(
+    "/reconciliations",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "List reconciliations",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object" as const,
+          properties: {
+            type: {
+              type: "string",
+              enum: ["customer", "supplier", "account"],
+            },
+            status: {
+              type: "string",
+              enum: ["open", "partially_paid", "paid"],
+            },
+            limit: { type: "string", pattern: "^\\d+$" },
+            offset: { type: "string", pattern: "^\\d+$" },
+          },
+        },
+        response: {
+          200: successPaginatedEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Reconciliations",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
+    async (request) => {
+      const q = request.query as {
+        type?: string;
+        status?: string;
+        limit?: string;
+        offset?: string;
+      };
+      const uc = new GetReconciliationsUseCase(fastify.repos.reconciliation);
+      const data = await uc.execute({
+        type: q.type,
+        status: q.status,
+        limit: q.limit ? parseInt(q.limit, 10) : undefined,
+        offset: q.offset ? parseInt(q.offset, 10) : undefined,
+      });
+      return { ok: true, data };
+    },
+  );
+
+  // GET /accounting/unreconciled-lines
+  fastify.get(
+    "/unreconciled-lines",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Get unreconciled AR/AP journal lines",
+        description:
+          "Returns candidate journal lines for reconciliation. " +
+          "Filter by accountCode (required) and optionally partnerId.",
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: "object" as const,
+          properties: {
+            accountCode: { type: "string", description: "e.g. 1100 (AR) or 2100 (AP)" },
+            partnerId: { type: "string", pattern: "^\\d+$" },
+          },
+        },
+        response: {
+          200: successArrayEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Unreconciled journal lines",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
+    async (request) => {
+      const q = request.query as {
+        accountCode?: string;
+        partnerId?: string;
+      };
+      const uc = new GetUnreconciledLinesUseCase(fastify.repos.reconciliation);
+      const data = await uc.execute({
+        accountCode: q.accountCode,
+        partnerId: q.partnerId ? parseInt(q.partnerId, 10) : undefined,
+      });
+      return { ok: true, data };
+    },
+  );
+
+  // GET /accounting/customers/:id/ledger
+  fastify.get<{ Params: { id: string } }>(
+    "/customers/:id/ledger",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Customer AR ledger (journal-line based)",
+        description:
+          "Returns the full AR ledger for a customer, read directly from journal lines. " +
+          "Includes reconciliation status per line and running balance.",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: {
+          200: successEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Customer AR ledger",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
+    async (request) => {
+      const customerId = parseInt(request.params.id, 10);
+      const uc = new GetPartnerLedgerUseCase(fastify.repos.reconciliation);
+      const data = await uc.execute({
+        partnerId: customerId,
+        partnerType: "customer",
+      });
+      return { ok: true, data };
+    },
+  );
+
+  // GET /accounting/suppliers/:id/ledger
+  fastify.get<{ Params: { id: string } }>(
+    "/suppliers/:id/ledger",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Supplier AP ledger (journal-line based)",
+        description:
+          "Returns the full AP ledger for a supplier, read directly from journal lines. " +
+          "Includes reconciliation status per line and running balance.",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: {
+          200: successEnvelope(
+            { type: "object" as const, additionalProperties: true },
+            "Supplier AP ledger",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:read")],
+    },
+    async (request) => {
+      const supplierId = parseInt(request.params.id, 10);
+      const uc = new GetPartnerLedgerUseCase(fastify.repos.reconciliation);
+      const data = await uc.execute({
+        partnerId: supplierId,
+        partnerType: "supplier",
+      });
       return { ok: true, data };
     },
   );

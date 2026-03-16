@@ -17,9 +17,21 @@ export const JournalLineSchema = z.object({
   id: z.number().optional(),
   journalEntryId: z.number().optional(),
   accountId: z.number().min(1),
+  /**
+   * Customer or supplier ID — must be set on AR/AP lines so the reconciliation
+   * engine can match debit lines (invoices) with credit lines (payments) for the
+   * same partner.
+   */
+  partnerId: z.number().nullable().optional(),
   debit: z.number().int().default(0),
   credit: z.number().int().default(0),
+  /** Net balance of this line (debit - credit). Positive = debit side. */
+  balance: z.number().int().default(0),
   description: z.string().nullable().optional(),
+  /** True once this line has been fully applied in a reconciliation. */
+  reconciled: z.boolean().default(false),
+  /** FK to reconciliations.id. Set when line is reconciled. */
+  reconciliationId: z.number().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),
 });
 
