@@ -103,53 +103,6 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@24.10.14)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/core:
-    dependencies:
-      bcryptjs:
-        specifier: ^3.0.3
-        version: 3.0.3
-      jsonwebtoken:
-        specifier: ^9.0.3
-        version: 9.0.3
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@types/jsonwebtoken':
-        specifier: ^9.0.10
-        version: 9.0.10
-      typescript:
-        specifier: ~5.9.2
-        version: 5.9.3
-
-  packages/data:
-    dependencies:
-      '@nuqta/core':
-        specifier: workspace:*
-        version: link:../core
-      commander:
-        specifier: ^14.0.3
-        version: 14.0.3
-      dotenv:
-        specifier: ^17.3.1
-        version: 17.3.1
-      drizzle-orm:
-        specifier: ^0.45.1
-        version: 0.45.1(@types/better-sqlite3@7.6.13)(@types/pg@8.16.0)(better-sqlite3@11.10.0)(pg@8.19.0)(postgres@3.4.8)
-      pg:
-        specifier: ^8.19.0
-        version: 8.19.0
-    devDependencies:
-      '@types/pg':
-        specifier: ^8.16.0
-        version: 8.16.0
-      drizzle-kit:
-        specifier: ^0.31.9
-        version: 0.31.9
-      typescript:
-        specifier: ~5.9.2
-        version: 5.9.3
-
 packages:
 
   '@babel/helper-string-parser@7.27.1':

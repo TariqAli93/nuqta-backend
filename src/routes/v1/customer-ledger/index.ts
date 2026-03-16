@@ -193,7 +193,7 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
         notes?: string;
         idempotencyKey?: string;
       };
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new RecordCustomerPaymentUseCase(
         fastify.repos.customerLedger,
         fastify.repos.customer,
@@ -218,7 +218,7 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const customerId = parseInt(request.params.customerId, 10);
       const body = request.body as { amount: number; notes?: string };
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new AddCustomerLedgerAdjustmentUseCase(
         fastify.repos.customerLedger,
         fastify.repos.customer,
@@ -246,7 +246,10 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
         const corrected = await uc.repair();
         return { ok: true, data: { corrected } };
       }
-      const data = await uc.execute();
+      const data = await uc.execute(
+        undefined as void,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

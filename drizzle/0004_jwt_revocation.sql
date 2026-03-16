@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS "revoked_tokens" (
   "revoked_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "expires_at" TIMESTAMPTZ NOT NULL
 );
-
+--> statement-breakpoint
 -- Index for fast expiry-based cleanup
 CREATE INDEX IF NOT EXISTS "idx_revoked_tokens_expires_at"
   ON "revoked_tokens" ("expires_at");

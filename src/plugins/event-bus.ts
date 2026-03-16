@@ -82,7 +82,6 @@ export default fp(async (fastify) => {
   // won't match concrete event types.  Instead we monkey-patch publish to
   // always forward to SSE after running domain handlers.
   const originalPublish = bus.publish.bind(bus);
-  // @ts-expect-error — we are augmenting the concrete instance, not the interface
   bus.publish = async (event: DomainEvent) => {
     await originalPublish(event);
     sse.forward(event);
@@ -90,15 +89,19 @@ export default fp(async (fastify) => {
 
   fastify.decorate("eventBus", bus);
 
-  fastify.decorate(
-    "subscribeToSse",
-    (handler: LegacyDomainEventHandler) => sse.subscribe(handler),
+  fastify.decorate("subscribeToSse", (handler: LegacyDomainEventHandler) =>
+    sse.subscribe(handler),
   );
 
   fastify.decorate(
     "emitDomainEvent",
     (type: string, payload: Record<string, unknown> = {}) => {
-      sse.forward({ eventType: type, payload, occurredAt: new Date(), userId: "system" });
+      sse.forward({
+        eventType: type,
+        payload,
+        occurredAt: new Date(),
+        userId: "system",
+      });
     },
   );
 });

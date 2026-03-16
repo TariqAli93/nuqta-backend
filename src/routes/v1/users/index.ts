@@ -135,7 +135,10 @@ const users: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as User;
       const uc = new CreateUserUseCase(fastify.repos.user);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -148,7 +151,10 @@ const users: FastifyPluginAsync = async (fastify) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<User>;
       const uc = new UpdateUserUseCase(fastify.repos.user);
-      const data = await uc.execute({ id, user: body });
+      const data = await uc.execute(
+        { id, user: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

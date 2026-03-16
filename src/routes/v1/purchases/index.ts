@@ -238,7 +238,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const body = request.body as CreatePurchaseInput;
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new CreatePurchaseUseCase(
         fastify.repos.purchase,
         fastify.repos.supplier,
@@ -264,7 +264,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const purchaseId = parseInt(request.params.id, 10);
       const body = request.body as Omit<AddPurchasePaymentInput, "purchaseId">;
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new AddPurchasePaymentUseCase(
         fastify.repos.purchase,
         fastify.repos.payment,

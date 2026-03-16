@@ -440,7 +440,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as CompanySettings;
       const setUc = new SetCompanySettingsUseCase(fastify.repos.settings);
-      await setUc.execute(body);
+      await setUc.execute(body, String(request.user?.sub ?? "system"));
       const data = await fastify.settings.getCompany();
       return { ok: true, data };
     },
@@ -474,7 +474,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as any;
       const uc = new CompleteSetupWizardUseCase(fastify.repos.settings);
-      await uc.execute(body);
+      await uc.execute(body, String(request.user?.sub ?? "system"));
       return { ok: true, data: { completed: true } };
     },
   );
@@ -532,7 +532,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as UpdateSystemSettingsInput;
       const uc = new UpdateSystemSettingsUseCase(fastify.repos.systemSettings);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -559,7 +562,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
       const uc = new UpdateAccountingSettingsUseCase(
         fastify.repos.accountingSettings,
       );
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -580,7 +586,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as UpdatePosSettingsInput;
       const uc = new UpdatePosSettingsUseCase(fastify.repos.posSettings);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -607,7 +616,10 @@ const settings: FastifyPluginAsync = async (fastify) => {
       const uc = new UpdateBarcodeSettingsUseCase(
         fastify.repos.barcodeSettings,
       );
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -622,7 +634,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
         fastify.repos.systemSettings,
         fastify.repos.posSettings,
       );
-      await uc.execute(body);
+      await uc.execute(body, String(request.user?.sub ?? "system"));
       return { ok: true, data: { completed: true } };
     },
   );

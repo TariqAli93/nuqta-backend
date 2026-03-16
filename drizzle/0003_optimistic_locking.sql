@@ -4,6 +4,6 @@
 
 ALTER TABLE "products"
   ADD COLUMN IF NOT EXISTS "version" integer NOT NULL DEFAULT 1;
-
+--> statement-breakpoint
 ALTER TABLE "product_batches"
   ADD COLUMN IF NOT EXISTS "version" integer NOT NULL DEFAULT 1;

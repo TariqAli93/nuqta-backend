@@ -83,7 +83,11 @@ type CreateSaleDiagnostics = {
 
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleCommitResult, Sale> {
+export class CreateSaleUseCase extends WriteUseCase<
+  CreateSaleInput,
+  CreateSaleCommitResult,
+  Sale
+> {
   private auditService: AuditService;
 
   constructor(
@@ -802,7 +806,7 @@ export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleC
       isReversed: false,
       totalAmount: sale.total,
       currency,
-      createdBy: numUserId,
+      createdBy: userId,
       lines,
     });
     return { created: true, reason: "created" };
@@ -898,6 +902,7 @@ export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleC
       lastError ??
       new OptimisticLockError(
         "Sale creation failed after retries due to concurrent batch updates",
+        "sale",
       )
     );
   }

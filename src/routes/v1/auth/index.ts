@@ -216,34 +216,44 @@ const auth: FastifyPluginAsync = async (fastify) => {
   }
 
   // ── POST /auth/login ──────────────────────────────────────────────
-  fastify.post("/login", { schema: loginSchema, config: { rateLimit: { max: 10, timeWindow: 60_000 } } }, async (request, reply) => {
-    const { username, password } = request.body as {
-      username: string;
-      password: string;
-    };
-    const uc = new LoginUseCase(fastify.repos.user);
-    const result = await uc.execute({ username, password });
+  fastify.post(
+    "/login",
+    {
+      schema: loginSchema,
+      config: { rateLimit: { max: 10, timeWindow: 60_000 } },
+    },
+    async (request, reply) => {
+      const { username, password } = request.body as {
+        username: string;
+        password: string;
+      };
+      const uc = new LoginUseCase(fastify.repos.user);
+      const result = await uc.execute({ username, password }, "anonymous");
 
-    const payload = buildTokenPayload(result.user, result.permissions);
-    const accessToken = fastify.jwt.signAccess(payload);
-    const refreshToken = fastify.jwt.signRefresh(payload);
+      const payload = buildTokenPayload(result.user, result.permissions);
+      const accessToken = fastify.jwt.signAccess(payload);
+      const refreshToken = fastify.jwt.signRefresh(payload);
 
-    return {
-      ok: true,
-      data: {
-        accessToken,
-        refreshToken,
-        token: accessToken,
-        user: result.user,
-        permissions: result.permissions,
-      },
-    };
-  });
+      return {
+        ok: true,
+        data: {
+          accessToken,
+          refreshToken,
+          token: accessToken,
+          user: result.user,
+          permissions: result.permissions,
+        },
+      };
+    },
+  );
 
   // ── POST /auth/register (first user only) ─────────────────────────
   fastify.post(
     "/register",
-    { schema: registerSchema, config: { rateLimit: { max: 5, timeWindow: 60_000 } } },
+    {
+      schema: registerSchema,
+      config: { rateLimit: { max: 5, timeWindow: 60_000 } },
+    },
     async (request, reply) => {
       const body = request.body as {
         username: string;
@@ -252,13 +262,16 @@ const auth: FastifyPluginAsync = async (fastify) => {
         phone?: string;
       };
       const uc = new RegisterFirstUserUseCase(fastify.repos.user);
-      const user = await uc.execute({
-        username: body.username,
-        password: body.password,
-        fullName: body.fullName,
-        phone: body.phone,
-        role: "admin",
-      });
+      const user = await uc.execute(
+        {
+          username: body.username,
+          password: body.password,
+          fullName: body.fullName,
+          phone: body.phone,
+          role: "admin",
+        },
+        "anonymous",
+      );
       return { ok: true, data: user };
     },
   );
@@ -306,7 +319,10 @@ const auth: FastifyPluginAsync = async (fastify) => {
   // Does NOT require the `authenticate` preHandler (the refresh token is self-contained).
   fastify.post(
     "/refresh",
-    { schema: refreshSchema, config: { rateLimit: { max: 20, timeWindow: 60_000 } } },
+    {
+      schema: refreshSchema,
+      config: { rateLimit: { max: 20, timeWindow: 60_000 } },
+    },
     async (request, reply) => {
       const { refreshToken } = request.body as { refreshToken?: string };
 
@@ -367,7 +383,10 @@ const auth: FastifyPluginAsync = async (fastify) => {
       };
       const userId = request.user?.sub as number;
       const uc = new ChangePasswordUseCase(fastify.repos.user);
-      await uc.execute({ userId, currentPassword, newPassword });
+      await uc.execute(
+        { userId, currentPassword, newPassword },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data: null };
     },
   );

@@ -265,12 +265,15 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       const rawLimit = query.limit ? parseInt(query.limit, 10) : 50;
       const limit = Math.min(Math.max(rawLimit, 1), 200);
 
-      const data = await uc.execute({
-        driftOnly: query.driftOnly !== "false",
-        search: query.search,
-        limit,
-        offset: query.offset ? parseInt(query.offset, 10) : undefined,
-      });
+      const data = await uc.execute(
+        {
+          driftOnly: query.driftOnly !== "false",
+          search: query.search,
+          limit,
+          offset: query.offset ? parseInt(query.offset, 10) : undefined,
+        },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

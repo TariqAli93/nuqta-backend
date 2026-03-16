@@ -115,7 +115,10 @@ const categories: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as Category;
       const uc = new CreateCategoryUseCase(fastify.repos.category);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -131,7 +134,10 @@ const categories: FastifyPluginAsync = async (fastify) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<Category>;
       const uc = new UpdateCategoryUseCase(fastify.repos.category);
-      const data = await uc.execute({ id, category: body });
+      const data = await uc.execute(
+        { id, category: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

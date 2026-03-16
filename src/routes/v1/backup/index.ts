@@ -175,7 +175,8 @@ const backup: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute(
-        request.user ? (request.user?.sub as number) : 1,
+        undefined as void,
+        String(request.user?.sub ?? "system"),
       );
       return { ok: true, data };
     },
@@ -220,8 +221,8 @@ const backup: FastifyPluginAsync = async (fastify) => {
       const { backupName } = request.body as { backupName: string };
       const uc = new GenerateBackupTokenUseCase(fastify.jwt);
       const data = await uc.execute(
-        backupName,
-        request.user ? (request.user?.sub as number) : 1,
+        { backupName },
+        String(request.user?.sub ?? "system"),
       );
       return { ok: true, data };
     },
@@ -244,10 +245,7 @@ const backup: FastifyPluginAsync = async (fastify) => {
         fastify.repos.backup,
         fastify.repos.audit,
       );
-      await uc.execute(
-        backupName,
-        request.user ? (request.user?.sub as number) : 1,
-      );
+      await uc.execute({ backupName }, String(request.user?.sub ?? "system"));
       return { ok: true, data: null };
     },
   );
@@ -265,8 +263,8 @@ const backup: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       await uc.execute(
-        request.params.backupName,
-        request.user ? (request.user?.sub as number) : 1,
+        { backupName: request.params.backupName },
+        String(request.user?.sub ?? "system"),
       );
       return { ok: true, data: null };
     },

@@ -341,7 +341,10 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as Employee;
       const uc = new CreateEmployeeUseCase(fastify.repos.employee);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -355,7 +358,10 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as Partial<Employee>;
       const uc = new UpdateEmployeeUseCase(fastify.repos.employee);
-      const data = await uc.execute({ id: parseInt(request.params.id, 10), employee: body });
+      const data = await uc.execute(
+        { id: parseInt(request.params.id, 10), employee: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -410,7 +416,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const body = request.body as CreatePayrollRunInput;
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new CreatePayrollRunUseCase(
         fastify.repos.employee,
         fastify.repos.payroll,
@@ -428,7 +434,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("payroll:approve"),
     },
     async (request) => {
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new ApprovePayrollRunUseCase(
         fastify.repos.payroll,
         fastify.repos.accounting,
@@ -446,7 +452,10 @@ const hr: FastifyPluginAsync = async (fastify) => {
         summary: "Submit payroll run for approval",
         security: [{ bearerAuth: [] }],
         params: { $ref: "IdParams#" },
-        response: { 200: successEnvelope(PayrollRunSchema, "Submitted payroll run"), ...ErrorResponses },
+        response: {
+          200: successEnvelope(PayrollRunSchema, "Submitted payroll run"),
+          ...ErrorResponses,
+        },
       },
       preHandler: requirePermission("payroll:update"),
     },
@@ -469,7 +478,10 @@ const hr: FastifyPluginAsync = async (fastify) => {
         summary: "Mark payroll run as disbursed",
         security: [{ bearerAuth: [] }],
         params: { $ref: "IdParams#" },
-        response: { 200: successEnvelope(PayrollRunSchema, "Disbursed payroll run"), ...ErrorResponses },
+        response: {
+          200: successEnvelope(PayrollRunSchema, "Disbursed payroll run"),
+          ...ErrorResponses,
+        },
       },
       preHandler: requirePermission("payroll:approve"),
     },
@@ -492,7 +504,10 @@ const hr: FastifyPluginAsync = async (fastify) => {
         summary: "Cancel a payroll run",
         security: [{ bearerAuth: [] }],
         params: { $ref: "IdParams#" },
-        response: { 200: successEnvelope(PayrollRunSchema, "Cancelled payroll run"), ...ErrorResponses },
+        response: {
+          200: successEnvelope(PayrollRunSchema, "Cancelled payroll run"),
+          ...ErrorResponses,
+        },
       },
       preHandler: requirePermission("payroll:approve"),
     },

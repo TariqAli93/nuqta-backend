@@ -1,7 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
-import {
-  InitializeAccountingUseCase,
-} from "../../../domain/index.js";
+import { InitializeAccountingUseCase } from "../../../domain/index.js";
 import {
   ErrorResponses,
   successEnvelope,
@@ -339,7 +337,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         fastify.repos.settings,
         fastify.repos.accounting,
       );
-      const data = await uc.execute(body || {});
+      const data = await uc.execute(
+        body || {},
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

@@ -193,7 +193,10 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const body = request.body as Supplier;
       const uc = new CreateSupplierUseCase(fastify.repos.supplier);
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -209,7 +212,10 @@ const suppliers: FastifyPluginAsync = async (fastify) => {
       const id = parseInt(request.params.id, 10);
       const body = request.body as Partial<Supplier>;
       const uc = new UpdateSupplierUseCase(fastify.repos.supplier);
-      const data = await uc.execute({ id, data: body });
+      const data = await uc.execute(
+        { id, data: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );

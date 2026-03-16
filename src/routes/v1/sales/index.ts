@@ -306,7 +306,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
     { schema: createSaleSchema, preHandler: requirePermission("sales:create") },
     async (request) => {
       const body = request.body as CreateSaleInput;
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const fifoService = new FifoService(fastify.db);
       const uc = new CreateSaleUseCase(
         fastify.repos.sale,
@@ -344,7 +344,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const saleId = parseInt(request.params.id, 10);
       const body = request.body as Omit<AddPaymentInput, "saleId">;
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new AddPaymentUseCase(
         fastify.repos.sale,
         fastify.repos.payment,
@@ -366,7 +366,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
     { schema: cancelSaleSchema, preHandler: requirePermission("sales:cancel") },
     async (request) => {
       const saleId = parseInt(request.params.id, 10);
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new CancelSaleUseCase(fastify.repos.sale);
       await uc.execute({ saleId }, userId);
 
@@ -383,7 +383,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const saleId = parseInt(request.params.id, 10);
       const body = request.body as { amount: number; reason?: string };
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new RefundSaleUseCase(fastify.repos.sale);
       const data = await uc.execute(
         { saleId, amount: body.amount, reason: body.reason },

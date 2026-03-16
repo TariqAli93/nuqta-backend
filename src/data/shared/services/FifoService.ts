@@ -105,7 +105,7 @@ export class FifoService implements IFifoDepletionService {
       if (!lockAcquired) {
         throw new OptimisticLockError(
           `Concurrent update detected on batch ${currentBatch.id} — retry the operation`,
-          { batchId: currentBatch.id, productId },
+          "product_batch",
         );
       }
     }

@@ -86,7 +86,10 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.product,
         fastify.repos.audit,
       );
-      const data = await uc.execute(body);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
 
       fastify.emitDomainEvent("product:created", {
         id: data.id,
@@ -111,7 +114,10 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.product,
         fastify.repos.audit,
       );
-      const data = await uc.execute({ id, productData: body });
+      const data = await uc.execute(
+        { id, productData: body },
+        String(request.user?.sub ?? "system"),
+      );
 
       fastify.emitDomainEvent("product:updated", {
         id: data.id,
@@ -135,7 +141,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.product,
         fastify.repos.audit,
       );
-      await uc.execute(id);
+      await uc.execute(id, String(request.user?.sub ?? "system"));
 
       fastify.emitDomainEvent("product:deleted", { id });
 
@@ -160,7 +166,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         unitName?: string;
         unitFactor?: number;
       };
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new AdjustProductStockUseCase(
         fastify.repos.product,
         fastify.repos.inventory,
@@ -190,7 +196,10 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.product,
         fastify.repos.inventory,
       );
-      const data = await uc.execute();
+      const data = await uc.execute(
+        undefined,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -222,7 +231,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new CreateProductUnitUseCase(fastify.repos.product);
-      const data = await uc.execute({ productId, data: body });
+      const data = await uc.execute(
+        { productId, data: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -238,7 +250,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const unitId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new UpdateProductUnitUseCase(fastify.repos.product);
-      const data = await uc.execute({ unitId, data: body });
+      const data = await uc.execute(
+        { unitId, data: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -268,7 +283,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const unitId = parseInt(request.params.uid, 10);
       const uc = new SetDefaultProductUnitUseCase(fastify.repos.product);
-      await uc.execute({ productId, unitId });
+      await uc.execute(
+        { productId, unitId },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data: null };
     },
   );
@@ -284,7 +302,8 @@ const products: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const productId = parseInt(request.params.id, 10);
-      const data = await fastify.repos.product.findBatchesByProductId(productId);
+      const data =
+        await fastify.repos.product.findBatchesByProductId(productId);
       return { ok: true, data };
     },
   );
@@ -300,7 +319,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new CreateProductBatchUseCase(fastify.repos.product);
-      const data = await uc.execute({ productId, data: body });
+      const data = await uc.execute(
+        { productId, data: body },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
@@ -322,7 +344,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const uc = new GetProductSalesHistoryUseCase(
         fastify.repos.productWorkspace,
       );
-      const result = await uc.execute(productId, { limit, offset });
+      const result = await uc.execute(
+        { productId, opts: { limit, offset } },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data: { data: result.items } };
     },
   );
@@ -344,7 +369,10 @@ const products: FastifyPluginAsync = async (fastify) => {
       const uc = new GetProductPurchaseHistoryUseCase(
         fastify.repos.productWorkspace,
       );
-      const result = await uc.execute(productId, { limit, offset });
+      const result = await uc.execute(
+        { productId, opts: { limit, offset } },
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data: { data: result.items } };
     },
   );

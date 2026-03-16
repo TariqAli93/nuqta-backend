@@ -164,7 +164,7 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
         notes?: string;
         idempotencyKey?: string;
       };
-      const userId = request.user?.sub || 1;
+      const userId = String(request.user?.sub ?? "system");
       const uc = new RecordSupplierPaymentUseCase(
         fastify.repos.supplierLedger,
         fastify.repos.supplier,
@@ -196,7 +196,10 @@ const supplierLedger: FastifyPluginAsync = async (fastify) => {
         const corrected = await uc.repair();
         return { ok: true, data: { corrected } };
       }
-      const data = await uc.execute();
+      const data = await uc.execute(
+        undefined as void,
+        String(request.user?.sub ?? "system"),
+      );
       return { ok: true, data };
     },
   );
