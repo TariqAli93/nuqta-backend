@@ -62,6 +62,22 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
       );
     }
 
+    // Reject duplicate IDs up-front to avoid confusing not-found behavior
+    const uniqueIds = new Set(input.journalLineIds);
+    if (uniqueIds.size !== input.journalLineIds.length) {
+      const duplicateIds = [
+        ...new Set(
+          input.journalLineIds.filter(
+            (id, index, arr) => arr.indexOf(id) !== index,
+          ),
+        ),
+      ];
+      throw new ValidationError(
+        `Duplicate journal line IDs are not allowed: ${duplicateIds.join(", ")}`,
+        { duplicateIds },
+      );
+    }
+
     const lines = await this.reconRepo.findJournalLinesByIds(
       input.journalLineIds,
     );
