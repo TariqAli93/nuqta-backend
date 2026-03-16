@@ -44,8 +44,31 @@ export class UnreconcileUseCase extends WriteUseCase<
     input: UnreconcileInput,
     _userId: string,
   ): Promise<UnreconcileCommitResult> {
+    // Prefer to run the unreconcile logic inside a single DB transaction
+    // if the repository implementation provides a transactional helper.
+    const repoAny = this.reconRepo as any;
+    if (typeof repoAny.withTransaction === "function") {
+      return await repoAny.withTransaction(
+        async (txRepo: IReconciliationRepository) =>
+          this.unreconcileInternal(txRepo, input),
+      );
+    }
+
+    // Fallback to non-transactional behavior (existing behavior) when
+    // the repository does not expose a transaction helper.
+    return await this.unreconcileInternal(this.reconRepo, input);
+  }
+
+  /**
+   * Core unreconcile logic. This method assumes that the provided repository
+   * is already scoped to an appropriate transaction when needed.
+   */
+  private async unreconcileInternal(
+    repo: IReconciliationRepository,
+    input: UnreconcileInput,
+  ): Promise<UnreconcileCommitResult> {
     // ── 1. Load the reconciliation ────────────────────────────────────────
-    const reconciliation = await this.reconRepo.findReconciliationById(
+    const reconciliation = await repo.findReconciliationById(
       input.reconciliationId,
     );
     if (!reconciliation) {
@@ -66,11 +89,11 @@ export class UnreconcileUseCase extends WriteUseCase<
     const journalLineIds = lines.map((l) => l.journalEntryLineId);
 
     // ── 3. Release the journal lines ──────────────────────────────────────
-    await this.reconRepo.markLinesUnreconciled(journalLineIds);
+    await repo.markLinesUnreconciled(journalLineIds);
 
     // ── 4. Delete reconciliation detail + header ──────────────────────────
-    await this.reconRepo.deleteReconciliationLines(input.reconciliationId);
-    await this.reconRepo.deleteReconciliation(input.reconciliationId);
+    await repo.deleteReconciliationLines(input.reconciliationId);
+    await repo.deleteReconciliation(input.reconciliationId);
 
     return {
       reconciliationId: input.reconciliationId,
