@@ -396,7 +396,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
             },
             amounts: {
               type: "array",
-              items: { type: "integer" },
+              items: { type: "integer", minimum: 1 },
               description:
                 "Optional partial amounts per line (index-matched to journalLineIds). Omit for full-balance matching.",
             },
