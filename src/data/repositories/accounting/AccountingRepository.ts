@@ -20,10 +20,20 @@ export class AccountingRepository implements IAccountingRepository {
       .returning();
 
     if (lines && lines.length > 0) {
-      const lineValues = lines.map((line) => ({
-        ...line,
-        journalEntryId: created.id,
-      }));
+      const lineValues = lines.map((line) => {
+        const balance = (line.debit || 0) - (line.credit || 0);
+        return {
+          journalEntryId: created.id,
+          accountId: line.accountId,
+          partnerId: (line as any).partnerId ?? null,
+          debit: line.debit ?? 0,
+          credit: line.credit ?? 0,
+          balance,
+          description: line.description ?? null,
+          reconciled: false,
+          reconciliationId: null,
+        };
+      });
       await this.db.insert(journalLines).values(lineValues as any);
 
       // Update account balances

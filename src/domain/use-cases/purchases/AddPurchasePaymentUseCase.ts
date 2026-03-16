@@ -211,6 +211,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentIn
         currency,
         numUserId,
         input.purchaseId,
+        supplierId,
       );
     }
 
@@ -230,6 +231,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentIn
     currency: string,
     userId: number,
     purchaseId: number,
+    supplierId?: number,
   ): Promise<void> {
     const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
     const apAcct = await this.accountingRepo.findAccountByCode(ACCT_AP);
@@ -245,14 +247,17 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentIn
     const lines: JournalLine[] = [
       {
         accountId: apAcct.id,
+        partnerId: supplierId ?? null,
         debit: amount,
         credit: 0,
+        balance: amount,
         description: "Accounts payable settlement",
       },
       {
         accountId: cashAcct.id,
         debit: 0,
         credit: amount,
+        balance: -amount,
         description: "Cash paid to supplier",
       },
     ];

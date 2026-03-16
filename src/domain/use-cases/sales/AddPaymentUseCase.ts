@@ -203,6 +203,7 @@ export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentC
         actualPaymentAmount,
         currency,
         numUserId,
+        effectiveCustomerId,
       );
     }
 
@@ -221,6 +222,7 @@ export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentC
     amount: number,
     currency: string,
     userId: number,
+    customerId?: number,
   ): Promise<void> {
     const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
     const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR);
@@ -239,12 +241,15 @@ export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentC
         accountId: cashAcct.id,
         debit: amount,
         credit: 0,
+        balance: amount,
         description: "Cash received",
       },
       {
         accountId: arAcct.id,
+        partnerId: customerId ?? null,
         debit: 0,
         credit: amount,
+        balance: -amount,
         description: "Accounts receivable settlement",
       },
     ];

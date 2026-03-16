@@ -12,6 +12,7 @@ export * from "./shared/utils/helpers.js";
 
 // ── Entities ──
 export * from "./entities/Accounting.js";
+export * from "./entities/Reconciliation.js";
 export * from "./entities/AuditEvent.js";
 export * from "./entities/Barcode.js";
 export * from "./entities/Category.js";
@@ -40,6 +41,7 @@ export * from "./entities/User.js";
 
 // ── Interfaces ──
 export * from "./interfaces/IAccountingRepository.js";
+export * from "./interfaces/IReconciliationRepository.js";
 export * from "./interfaces/IAuditRepository.js";
 export * from "./interfaces/IBackupRepository.js";
 export * from "./interfaces/IBarcodeRepository.js";
@@ -66,6 +68,11 @@ export * from "./interfaces/IUserRepository.js";
 
 // ── Use Cases: Accounting ──
 export * from "./use-cases/accounting/InitializeAccountingUseCase.js";
+export * from "./use-cases/accounting/ReconcileJournalLinesUseCase.js";
+export * from "./use-cases/accounting/UnreconcileUseCase.js";
+export * from "./use-cases/accounting/GetReconciliationsUseCase.js";
+export * from "./use-cases/accounting/GetPartnerLedgerUseCase.js";
+export * from "./use-cases/accounting/GetUnreconciledLinesUseCase.js";
 
 // ── Use Cases: Auth ──
 export * from "./use-cases/auth/ChangePasswordUseCase.js";
