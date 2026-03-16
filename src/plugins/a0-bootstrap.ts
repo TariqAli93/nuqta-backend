@@ -1,0 +1,12 @@
+import fp from "fastify-plugin";
+import { prepareDatabase } from "../data/db/bootstrap.js";
+
+export default fp(async (fastify) => {
+  fastify.addHook("onReady", async () => {
+    fastify.log.info("Preparing database bootstrap sequence");
+
+    await prepareDatabase();
+
+    fastify.log.info("Database bootstrap sequence completed");
+  });
+});
