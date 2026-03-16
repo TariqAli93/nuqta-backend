@@ -122,7 +122,14 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
         }
         return overrideAmt;
       }
-      return Math.abs(line.balance);
+      const defaultAmt = Math.abs(line.balance);
+      if (defaultAmt === 0) {
+        throw new ValidationError(
+          `Journal line ${line.id} has zero open balance and cannot be reconciled without an explicit amount.`,
+          { lineId: line.id },
+        );
+      }
+      return defaultAmt;
     });
 
     // ── 5. Separate debits from credits ───────────────────────────────────
