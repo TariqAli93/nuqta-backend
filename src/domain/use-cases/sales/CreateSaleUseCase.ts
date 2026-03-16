@@ -20,6 +20,7 @@ import {
   NotFoundError,
   InsufficientStockError,
   ConflictError,
+  OptimisticLockError,
 } from "../../shared/errors/DomainErrors.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
@@ -80,7 +81,9 @@ type CreateSaleDiagnostics = {
   customerLedgerCreated: { created: boolean; reason: string };
 };
 
-export class CreateSaleUseCase {
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
+
+export class CreateSaleUseCase extends WriteUseCase<CreateSaleInput, CreateSaleCommitResult, Sale> {
   private auditService: AuditService;
 
   constructor(
@@ -96,13 +99,15 @@ export class CreateSaleUseCase {
     private fifoService?: IFifoDepletionService,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
 
   async executeCommitPhase(
     input: CreateSaleInput,
-    userId: number,
+    userId: string,
   ): Promise<CreateSaleCommitResult> {
+    const numUserId = Number(userId) || 0;
     const diagnostics: CreateSaleDiagnostics = {
       inventoryMovementsCreated: 0,
       fifoUsed: !!this.fifoService,
@@ -137,7 +142,7 @@ export class CreateSaleUseCase {
         });
         return {
           createdSale: existing,
-          userId,
+          userId: numUserId,
           currency: input.currency || currencySettings.defaultCurrency,
         };
       }
@@ -418,7 +423,7 @@ export class CreateSaleUseCase {
       interestRate: interestRateBps,
       interestAmount: roundByCurrency(interestAmount, currency),
       idempotencyKey: input.idempotencyKey,
-      createdBy: userId,
+      createdBy: numUserId,
       items: saleItems.map((si) => ({
         productId: si.productId,
         productName: si.productName,
@@ -501,7 +506,7 @@ export class CreateSaleUseCase {
             sourceType: "sale",
             sourceId: createdSale.id,
             notes: `Sale #${createdSale.invoiceNumber} (batch ${depletion.batchId})`,
-            createdBy: userId,
+            createdBy: numUserId,
           });
           diagnostics.inventoryMovementsCreated += 1;
           runningStock = newStock;
@@ -529,7 +534,7 @@ export class CreateSaleUseCase {
           sourceType: "sale",
           sourceId: createdSale.id,
           notes: `Sale #${createdSale.invoiceNumber}`,
-          createdBy: userId,
+          createdBy: numUserId,
         });
         diagnostics.inventoryMovementsCreated += 1;
 
@@ -568,7 +573,7 @@ export class CreateSaleUseCase {
         idempotencyKey: input.idempotencyKey
           ? `${input.idempotencyKey}:payment:initial`
           : undefined,
-        createdBy: userId,
+        createdBy: numUserId,
       });
       diagnostics.paymentCreated = { created: true, reason: "paidAmount>0" };
     } else {
@@ -585,7 +590,7 @@ export class CreateSaleUseCase {
           paidAmount,
           remainingAmount,
           currency,
-          userId,
+          numUserId,
         )
       : { created: false, reason: "accounting-disabled" };
 
@@ -608,7 +613,7 @@ export class CreateSaleUseCase {
         balanceAfter: newBalance,
         saleId: createdSale.id,
         notes: `Sale #${createdSale.invoiceNumber}`,
-        createdBy: userId,
+        createdBy: numUserId,
       });
       diagnostics.customerLedgerCreated = {
         created: true,
@@ -643,7 +648,7 @@ export class CreateSaleUseCase {
 
     return {
       createdSale,
-      userId,
+      userId: numUserId,
       currency,
     };
   }
@@ -797,7 +802,7 @@ export class CreateSaleUseCase {
       isReversed: false,
       totalAmount: sale.total,
       currency,
-      createdBy: userId,
+      createdBy: numUserId,
       lines,
     });
     return { created: true, reason: "created" };
@@ -822,6 +827,7 @@ export class CreateSaleUseCase {
 
   async executeSideEffectsPhase(
     commitResult: CreateSaleCommitResult,
+    _userId: string,
   ): Promise<void> {
     const { createdSale, userId, currency } = commitResult;
 
@@ -844,9 +850,55 @@ export class CreateSaleUseCase {
     }
   }
 
-  async execute(input: CreateSaleInput, userId: number): Promise<Sale> {
-    const commitResult = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(commitResult);
+  toEntity(commitResult: CreateSaleCommitResult): Sale {
     return commitResult.createdSale;
+  }
+
+  /**
+   * Override execute() to add retry logic for optimistic lock conflicts.
+   *
+   * Up to 3 attempts are made when `OptimisticLockError` is thrown by the
+   * FIFO depletion service (e.g. two concurrent sales competing for the same
+   * batch).  The idempotency key ensures that if the sale record was already
+   * persisted on a previous attempt the commit phase is a no-op and the
+   * existing sale is returned without double-depleting stock.
+   */
+  override async execute(
+    input: CreateSaleInput,
+    userId: string,
+  ): Promise<Sale> {
+    const MAX_RETRIES = 3;
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const result = await this.executeCommitPhase(input, userId);
+        try {
+          await this.executeSideEffectsPhase(result, userId);
+        } catch (sideEffectErr) {
+          console.error(
+            `[SideEffect Error] CreateSaleUseCase (attempt ${attempt}):`,
+            sideEffectErr,
+          );
+        }
+        return this.toEntity(result);
+      } catch (err) {
+        if (err instanceof OptimisticLockError && attempt < MAX_RETRIES) {
+          console.warn(
+            `[CreateSaleUseCase] OptimisticLockError on attempt ${attempt}/${MAX_RETRIES}, retrying...`,
+          );
+          lastError = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    throw (
+      lastError ??
+      new OptimisticLockError(
+        "Sale creation failed after retries due to concurrent batch updates",
+      )
+    );
   }
 }

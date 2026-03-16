@@ -3,18 +3,20 @@ import { IAuditRepository } from '../../interfaces/IAuditRepository.js';
 import { AuditService } from '../../shared/services/AuditService.js';
 import { Product, ProductInput, ProductSchema } from '../../entities/Product.js';
 import { ValidationError } from '../../shared/errors/DomainErrors.js';
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class CreateProductUseCase {
+export class CreateProductUseCase extends WriteUseCase<ProductInput, Product, Product> {
   private auditService: AuditService;
 
   constructor(
     private productRepo: IProductRepository,
     private auditRepo?: IAuditRepository
   ) {
+    super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
   }
 
-  async execute(productData: ProductInput): Promise<Product> {
+  async executeCommitPhase(productData: ProductInput, _userId: string): Promise<Product> {
     let product: Product;
     try {
       product = ProductSchema.parse(productData);
@@ -38,7 +40,10 @@ export class CreateProductUseCase {
       throw new ValidationError('Stock must be non-negative');
     }
 
-    const created = await this.productRepo.create(product);
+    return await this.productRepo.create(product);
+  }
+
+  async executeSideEffectsPhase(created: Product, _userId: string): Promise<void> {
     // Fire-and-forget audit
     this.auditService
       .logCreate(
@@ -54,6 +59,9 @@ export class CreateProductUseCase {
         `Product "${created.name}" created`
       )
       .catch(() => {});
-    return created;
+  }
+
+  toEntity(result: Product): Product {
+    return result;
   }
 }

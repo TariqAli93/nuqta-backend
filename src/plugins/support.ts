@@ -41,6 +41,22 @@ export default fp<SupportPluginOptions & Pick<AppOptions, "testOverrides">>(
           });
         }
 
+        // Check token revocation (jti blacklist) when repo is available
+        if (payload.jti && fastify.repos?.revokedToken) {
+          const isRevoked = await fastify.repos.revokedToken.isRevoked(
+            payload.jti,
+          );
+          if (isRevoked) {
+            return reply.status(401).send({
+              ok: false,
+              error: {
+                code: "UNAUTHORIZED",
+                message: "Token has been revoked",
+              },
+            });
+          }
+        }
+
         // Attach user info to request
         request.user = {
           sub: payload.sub as unknown as number | undefined,

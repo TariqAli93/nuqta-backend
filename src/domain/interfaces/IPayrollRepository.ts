@@ -1,4 +1,5 @@
 import { PayrollRun, PayrollRunItem } from "../entities/Payroll.js";
+import type { PayrollStatus } from "../shared/PayrollStateMachine.js";
 
 export interface CreatePayrollRunRecord
   extends Omit<PayrollRun, "id" | "createdAt" | "approvedAt" | "approvedBy" | "items"> {
@@ -7,7 +8,7 @@ export interface CreatePayrollRunRecord
 
 export interface IPayrollRepository {
   findAll(params?: {
-    status?: "draft" | "approved";
+    status?: PayrollStatus;
     periodYear?: number;
     periodMonth?: number;
     limit?: number;
@@ -16,6 +17,7 @@ export interface IPayrollRepository {
   findById(id: number): Promise<PayrollRun | null>;
   existsForPeriod(periodYear: number, periodMonth: number): Promise<boolean>;
   create(run: CreatePayrollRunRecord): Promise<PayrollRun>;
+  updateStatus(id: number, status: PayrollStatus): Promise<PayrollRun>;
   approve(
     id: number,
     input: {

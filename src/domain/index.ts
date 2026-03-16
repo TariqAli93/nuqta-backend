@@ -71,6 +71,7 @@ export * from "./use-cases/accounting/InitializeAccountingUseCase.js";
 export * from "./use-cases/auth/ChangePasswordUseCase.js";
 export * from "./use-cases/auth/CheckInitialSetupUseCase.js";
 export * from "./use-cases/auth/LoginUseCase.js";
+export * from "./use-cases/auth/LogoutUseCase.js";
 export * from "./use-cases/auth/RegisterFirstUserUseCase.js";
 
 // ── Use Cases: Backup ──
@@ -100,10 +101,13 @@ export * from "./use-cases/dashboard/GetDashboardStatsUseCase.js";
 
 // ── Use Cases: HR ──
 export * from "./use-cases/hr/ApprovePayrollRunUseCase.js";
+export * from "./use-cases/hr/CancelPayrollUseCase.js";
 export * from "./use-cases/hr/CreateEmployeeUseCase.js";
 export * from "./use-cases/hr/CreatePayrollRunUseCase.js";
+export * from "./use-cases/hr/DisbursePayrollUseCase.js";
 export * from "./use-cases/hr/GetEmployeeByIdUseCase.js";
 export * from "./use-cases/hr/GetPayrollRunByIdUseCase.js";
+export * from "./use-cases/hr/SubmitPayrollUseCase.js";
 export * from "./use-cases/hr/UpdateEmployeeUseCase.js";
 
 // ── Use Cases: Inventory ──

@@ -6,6 +6,7 @@ import type {
   FifoDepletionResult,
   BatchDepletion,
 } from "../../../domain/index.js";
+import { OptimisticLockError } from "../../../domain/index.js";
 
 /**
  * FIFO Depletion Service for PostgreSQL.
@@ -40,31 +41,73 @@ export class FifoService implements IFifoDepletionService {
 
     const depletions: BatchDepletion[] = [];
     let remaining = quantityNeeded;
+    const MAX_LOCK_RETRIES = 3;
 
     for (const batch of batches) {
       if (remaining <= 0) break;
 
-      const depleted = Math.min(remaining, batch.quantityOnHand);
-      const newQty = batch.quantityOnHand - depleted;
+      // Optimistic locking: retry up to MAX_LOCK_RETRIES times if a concurrent
+      // write changes the batch version between our SELECT and UPDATE.
+      let currentBatch = batch;
+      let lockAcquired = false;
 
-      // Update batch stock
-      await this.db
-        .update(productBatches)
-        .set({
-          quantityOnHand: newQty,
-          status: newQty <= 0 ? "depleted" : "active",
-        } as any)
-        .where(eq(productBatches.id, batch.id));
+      for (let attempt = 0; attempt < MAX_LOCK_RETRIES; attempt++) {
+        const depleted = Math.min(remaining, currentBatch.quantityOnHand);
+        const newQty = currentBatch.quantityOnHand - depleted;
 
-      depletions.push({
-        batchId: batch.id,
-        batchNumber: batch.batchNumber,
-        quantity: depleted,
-        costPerUnit: batch.costPerUnit ?? 0,
-        totalCost: depleted * (batch.costPerUnit ?? 0),
-      });
+        const result = await this.db
+          .update(productBatches)
+          .set({
+            quantityOnHand: newQty,
+            status: newQty <= 0 ? "depleted" : "active",
+            version: sql`${productBatches.version} + 1`,
+          } as any)
+          .where(
+            and(
+              eq(productBatches.id, currentBatch.id),
+              eq(productBatches.version, (currentBatch as any).version ?? 1),
+            ),
+          );
 
-      remaining -= depleted;
+        const rowsAffected =
+          (result as unknown as { rowCount?: number }).rowCount ?? 1;
+
+        if (rowsAffected > 0) {
+          depletions.push({
+            batchId: currentBatch.id,
+            batchNumber: currentBatch.batchNumber,
+            quantity: depleted,
+            costPerUnit: currentBatch.costPerUnit ?? 0,
+            totalCost: depleted * (currentBatch.costPerUnit ?? 0),
+          });
+          remaining -= depleted;
+          lockAcquired = true;
+          break;
+        }
+
+        // Version mismatch: re-fetch the batch and retry
+        if (attempt < MAX_LOCK_RETRIES - 1) {
+          const [fresh] = await this.db
+            .select()
+            .from(productBatches)
+            .where(
+              and(
+                eq(productBatches.id, currentBatch.id),
+                gt(productBatches.quantityOnHand, 0),
+                eq(productBatches.status, "active"),
+              ),
+            );
+          if (!fresh) break; // batch fully depleted by another process
+          currentBatch = fresh;
+        }
+      }
+
+      if (!lockAcquired) {
+        throw new OptimisticLockError(
+          `Concurrent update detected on batch ${currentBatch.id} — retry the operation`,
+          { batchId: currentBatch.id, productId },
+        );
+      }
     }
 
     const totalCost = depletions.reduce((s, d) => s + d.totalCost, 0);

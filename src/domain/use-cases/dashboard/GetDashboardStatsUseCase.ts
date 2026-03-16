@@ -1,11 +1,14 @@
 import { ISaleRepository } from '../../interfaces/ISaleRepository.js';
 import { IProductRepository } from '../../interfaces/IProductRepository.js';
+import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetDashboardStatsUseCase {
+export class GetDashboardStatsUseCase extends ReadUseCase<void, any> {
   constructor(
     private saleRepo: ISaleRepository,
     private productRepo: IProductRepository
-  ) {}
+  ) {
+    super();
+  }
 
   async execute() {
     const today = new Date();

@@ -4,11 +4,14 @@ import type {
   UpdatePosSettingsInput,
 } from "../../entities/PosSettings.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class UpdatePosSettingsUseCase {
-  constructor(private repo: IPosSettingsRepository) {}
+export class UpdatePosSettingsUseCase extends WriteUseCase<UpdatePosSettingsInput, PosSettingsEntity, PosSettingsEntity> {
+  constructor(private repo: IPosSettingsRepository) {
+    super();
+  }
 
-  async execute(input: UpdatePosSettingsInput): Promise<PosSettingsEntity> {
+  async executeCommitPhase(input: UpdatePosSettingsInput, _userId: string): Promise<PosSettingsEntity> {
     if (
       input.invoicePrefix !== undefined &&
       input.invoicePrefix.trim().length === 0
@@ -31,5 +34,13 @@ export class UpdatePosSettingsUseCase {
     }
 
     return this.repo.update(input);
+  }
+
+  executeSideEffectsPhase(_result: PosSettingsEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: PosSettingsEntity): PosSettingsEntity {
+    return result;
   }
 }

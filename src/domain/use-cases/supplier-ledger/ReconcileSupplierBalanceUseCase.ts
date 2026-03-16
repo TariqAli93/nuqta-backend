@@ -1,5 +1,6 @@
 import { ISupplierRepository } from "../../interfaces/ISupplierRepository.js";
 import { ISupplierLedgerRepository } from "../../interfaces/ISupplierLedgerRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface SupplierBalanceDriftItem {
   supplierId: number;
@@ -15,13 +16,15 @@ export interface ReconcileSupplierBalanceResult {
   totalDrift: number;
 }
 
-export class ReconcileSupplierBalanceUseCase {
+export class ReconcileSupplierBalanceUseCase extends WriteUseCase<void, ReconcileSupplierBalanceResult, ReconcileSupplierBalanceResult> {
   constructor(
     private supplierRepo: ISupplierRepository,
     private supplierLedgerRepo: ISupplierLedgerRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(): Promise<ReconcileSupplierBalanceResult> {
+  async executeCommitPhase(_input: void, _userId: string): Promise<ReconcileSupplierBalanceResult> {
     const { items: suppliers } = await this.supplierRepo.findAll({
       limit: 100000,
       offset: 0,
@@ -55,13 +58,21 @@ export class ReconcileSupplierBalanceUseCase {
     };
   }
 
+  executeSideEffectsPhase(_result: ReconcileSupplierBalanceResult, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: ReconcileSupplierBalanceResult): ReconcileSupplierBalanceResult {
+    return result;
+  }
+
   async repair(): Promise<number> {
-    const { driftItems } = await this.execute();
-    for (const item of driftItems) {
+    const result = await this.executeCommitPhase(undefined as void, "0");
+    for (const item of result.driftItems) {
       await this.supplierRepo.update(item.supplierId, {
         currentBalance: item.ledgerBalance,
       });
     }
-    return driftItems.length;
+    return result.driftItems.length;
   }
 }

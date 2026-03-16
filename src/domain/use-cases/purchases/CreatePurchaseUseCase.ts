@@ -12,6 +12,7 @@ import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface CreatePurchaseInput {
   invoiceNumber: string;
@@ -44,7 +45,7 @@ export interface CreatePurchaseCommitResult {
   createdPurchase: Purchase;
 }
 
-export class CreatePurchaseUseCase {
+export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, CreatePurchaseCommitResult, Purchase> {
   private auditService?: AuditService;
 
   constructor(
@@ -57,6 +58,7 @@ export class CreatePurchaseUseCase {
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo as IAuditRepository);
     }
@@ -64,8 +66,9 @@ export class CreatePurchaseUseCase {
 
   async executeCommitPhase(
     input: CreatePurchaseInput,
-    userId: number,
+    userId: string,
   ): Promise<CreatePurchaseCommitResult> {
+    const numUserId = Number(userId) || 0;
     if (!input.items || input.items.length === 0) {
       throw new ValidationError("Purchase must include at least one item");
     }
@@ -168,7 +171,7 @@ export class CreatePurchaseUseCase {
       idempotencyKey: input.idempotencyKey,
       createdAt: now,
       updatedAt: now,
-      createdBy: userId,
+      createdBy: numUserId,
       items: input.items.map((item) => {
         const quantityBase =
           item.quantityBase || item.quantity * (item.unitFactor || 1);
@@ -214,7 +217,7 @@ export class CreatePurchaseUseCase {
         status: "completed",
         paymentDate: now,
         createdAt: now,
-        createdBy: userId,
+        createdBy: numUserId,
         // Keep payment idempotency deterministic and unique per purchase write.
         idempotencyKey: input.idempotencyKey
           ? `${input.idempotencyKey}:payment:initial`
@@ -234,7 +237,7 @@ export class CreatePurchaseUseCase {
         balanceAfter: balanceBefore + remainingAmount,
         purchaseId: createdPurchase.id,
         notes: `Purchase #${createdPurchase.invoiceNumber}`,
-        createdBy: userId,
+        createdBy: numUserId,
       });
     }
 
@@ -243,7 +246,7 @@ export class CreatePurchaseUseCase {
         createdPurchase,
         paidAmount,
         remainingAmount,
-        userId,
+        numUserId,
       );
     }
 
@@ -367,20 +370,15 @@ export class CreatePurchaseUseCase {
     });
   }
 
-  async execute(input: CreatePurchaseInput, userId = 1): Promise<Purchase> {
-    const result = await this.executeCommitPhase(input, userId);
-    await this.executeSideEffectsPhase(result, userId);
-    return result.createdPurchase;
-  }
-
   async executeSideEffectsPhase(
     result: CreatePurchaseCommitResult,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     if (!this.auditService) return;
+    const numUserId = Number(userId) || 0;
     try {
       await this.auditService.logCreate(
-        userId,
+        numUserId,
         "Purchase",
         result.createdPurchase.id!,
         {
@@ -395,6 +393,10 @@ export class CreatePurchaseUseCase {
       // Audit must not break committed business writes.
       console.warn("Audit logging failed for purchase creation:", error);
     }
+  }
+
+  toEntity(result: CreatePurchaseCommitResult): Purchase {
+    return result.createdPurchase;
   }
 
   private async isAccountingEnabled(): Promise<boolean> {

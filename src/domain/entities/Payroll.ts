@@ -20,7 +20,9 @@ export const PayrollRunSchema = z.object({
   periodYear: z.number().int().min(2000).max(9999),
   periodMonth: z.number().int().min(1).max(12),
   paymentDate: z.union([z.string(), z.date()]).nullable().optional(),
-  status: z.enum(["draft", "approved"]).default("draft"),
+  status: z
+    .enum(["draft", "submitted", "approved", "disbursed", "cancelled"])
+    .default("draft"),
   totalGrossPay: z.number().int().min(0),
   totalDeductions: z.number().int().min(0).default(0),
   totalBonuses: z.number().int().min(0).default(0),

@@ -88,7 +88,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       );
       const data = await uc.execute(body);
 
-      fastify.eventBus.emit("product:created", {
+      fastify.emitDomainEvent("product:created", {
         id: data.id,
         name: data.name,
       });
@@ -111,9 +111,9 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.product,
         fastify.repos.audit,
       );
-      const data = await uc.execute(id, body);
+      const data = await uc.execute({ id, productData: body });
 
-      fastify.eventBus.emit("product:updated", {
+      fastify.emitDomainEvent("product:updated", {
         id: data.id,
         name: data.name,
       });
@@ -137,7 +137,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       );
       await uc.execute(id);
 
-      fastify.eventBus.emit("product:deleted", { id });
+      fastify.emitDomainEvent("product:deleted", { id });
 
       return { ok: true, data: null };
     },
@@ -169,7 +169,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       );
       const data = await uc.execute({ productId: id, ...body }, userId);
 
-      fastify.eventBus.emit("inventory:adjusted", {
+      fastify.emitDomainEvent("inventory:adjusted", {
         productId: id,
         quantityChange: body.quantityChange,
       });
@@ -222,7 +222,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new CreateProductUnitUseCase(fastify.repos.product);
-      const data = await uc.execute(productId, body);
+      const data = await uc.execute({ productId, data: body });
       return { ok: true, data };
     },
   );
@@ -238,7 +238,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       const unitId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new UpdateProductUnitUseCase(fastify.repos.product);
-      const data = await uc.execute(unitId, body);
+      const data = await uc.execute({ unitId, data: body });
       return { ok: true, data };
     },
   );
@@ -268,7 +268,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const unitId = parseInt(request.params.uid, 10);
       const uc = new SetDefaultProductUnitUseCase(fastify.repos.product);
-      await uc.execute(productId, unitId);
+      await uc.execute({ productId, unitId });
       return { ok: true, data: null };
     },
   );
@@ -300,7 +300,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       const productId = parseInt(request.params.id, 10);
       const body = request.body as any;
       const uc = new CreateProductBatchUseCase(fastify.repos.product);
-      const data = await uc.execute(productId, body);
+      const data = await uc.execute({ productId, data: body });
       return { ok: true, data };
     },
   );

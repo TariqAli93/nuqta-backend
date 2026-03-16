@@ -3,14 +3,20 @@ import { User } from "../../entities/User.js";
 import { UnauthorizedError, ValidationError } from "../../shared/errors/DomainErrors.js";
 import { getPermissionsForRole, UserRole } from "../../shared/services/PermissionService.js";
 import { comparePassword } from "../../shared/utils/helpers.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
-export class LoginUseCase {
-  constructor(private userRepo: IUserRepository) {}
+type TInput = { username: string; password: string };
+type TEntity = { user: Omit<User, "password">; permissions: string[] };
 
-  async execute(credentials: {
-    username: string;
-    password: string;
-  }): Promise<{ user: Omit<User, "password">; permissions: string[] }> {
+export class LoginUseCase extends WriteUseCase<TInput, TEntity, TEntity> {
+  constructor(private userRepo: IUserRepository) {
+    super();
+  }
+
+  async executeCommitPhase(
+    credentials: TInput,
+    _userId: string,
+  ): Promise<TEntity> {
     const user = await this.userRepo.findByUsername(credentials.username);
 
     if (!user) {
@@ -47,5 +53,13 @@ export class LoginUseCase {
       },
       permissions,
     };
+  }
+
+  executeSideEffectsPhase(_result: TEntity, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: TEntity): TEntity {
+    return result;
   }
 }

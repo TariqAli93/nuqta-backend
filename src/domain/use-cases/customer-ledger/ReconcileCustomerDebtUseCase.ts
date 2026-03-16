@@ -1,5 +1,6 @@
 import { ICustomerRepository } from "../../interfaces/ICustomerRepository.js";
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface CustomerDebtDriftItem {
   customerId: number;
@@ -15,13 +16,15 @@ export interface ReconcileCustomerDebtResult {
   totalDrift: number;
 }
 
-export class ReconcileCustomerDebtUseCase {
+export class ReconcileCustomerDebtUseCase extends WriteUseCase<void, ReconcileCustomerDebtResult, ReconcileCustomerDebtResult> {
   constructor(
     private customerRepo: ICustomerRepository,
     private customerLedgerRepo: ICustomerLedgerRepository,
-  ) {}
+  ) {
+    super();
+  }
 
-  async execute(): Promise<ReconcileCustomerDebtResult> {
+  async executeCommitPhase(_input: void, _userId: string): Promise<ReconcileCustomerDebtResult> {
     const { items: customers } = await this.customerRepo.findAll({
       limit: 100000,
       offset: 0,
@@ -55,13 +58,21 @@ export class ReconcileCustomerDebtUseCase {
     };
   }
 
+  executeSideEffectsPhase(_result: ReconcileCustomerDebtResult, _userId: string): Promise<void> {
+    return Promise.resolve();
+  }
+
+  toEntity(result: ReconcileCustomerDebtResult): ReconcileCustomerDebtResult {
+    return result;
+  }
+
   async repair(): Promise<number> {
-    const { driftItems } = await this.execute();
-    for (const item of driftItems) {
+    const result = await this.executeCommitPhase(undefined as void, "0");
+    for (const item of result.driftItems) {
       await this.customerRepo.update(item.customerId, {
         totalDebt: item.ledgerDebt,
       });
     }
-    return driftItems.length;
+    return result.driftItems.length;
   }
 }

@@ -9,6 +9,7 @@ import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors
 import { SupplierLedgerEntry } from "../../entities/Ledger.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
+import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 export interface RecordSupplierPaymentInput {
   supplierId: number;
@@ -18,7 +19,7 @@ export interface RecordSupplierPaymentInput {
   idempotencyKey?: string;
 }
 
-export class RecordSupplierPaymentUseCase {
+export class RecordSupplierPaymentUseCase extends WriteUseCase<RecordSupplierPaymentInput, SupplierLedgerEntry, SupplierLedgerEntry> {
   private auditService?: AuditService;
 
   constructor(
@@ -30,6 +31,7 @@ export class RecordSupplierPaymentUseCase {
     private settingsRepo?: ISettingsRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
+    super();
     if (auditRepo) {
       this.auditService = new AuditService(auditRepo);
     }
@@ -37,7 +39,7 @@ export class RecordSupplierPaymentUseCase {
 
   async executeCommitPhase(
     data: RecordSupplierPaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<SupplierLedgerEntry> {
     if (data.amount <= 0) {
       throw new ValidationError("Payment amount must be greater than zero");
@@ -63,6 +65,8 @@ export class RecordSupplierPaymentUseCase {
       }
     }
 
+    const numUserId = Number(userId) || 1;
+
     const payment = await this.paymentRepo.createSync({
       supplierId: data.supplierId,
       amount: data.amount,
@@ -74,7 +78,7 @@ export class RecordSupplierPaymentUseCase {
       notes: data.notes,
       paymentDate: new Date(),
       createdAt: new Date(),
-      createdBy: userId,
+      createdBy: numUserId,
     } as any);
 
     const balanceBefore = await this.ledgerRepo.getLastBalanceSync(
@@ -89,7 +93,7 @@ export class RecordSupplierPaymentUseCase {
       balanceAfter,
       paymentId: payment.id,
       notes: data.notes,
-      createdBy: userId,
+      createdBy: numUserId,
     });
 
     // Update cached currentBalance on supplier record
@@ -97,7 +101,7 @@ export class RecordSupplierPaymentUseCase {
 
     // Create journal entry only if accounting is enabled
     if (await this.isAccountingEnabled()) {
-      await this.createJournalEntry(payment.id!, data.amount, userId);
+      await this.createJournalEntry(payment.id!, data.amount, numUserId);
     }
 
     return entry;
@@ -168,31 +172,20 @@ export class RecordSupplierPaymentUseCase {
     });
   }
 
-  async execute(
-    data: RecordSupplierPaymentInput,
-    userId = 1,
-  ): Promise<SupplierLedgerEntry> {
-    const result = await this.executeCommitPhase(data, userId);
-    await this.executeSideEffectsPhase(result, data, userId);
-    return result;
-  }
-
   async executeSideEffectsPhase(
     entry: SupplierLedgerEntry,
-    data: RecordSupplierPaymentInput,
-    userId: number,
+    userId: string,
   ): Promise<void> {
     if (!this.auditService) return;
     try {
       await this.auditService.logAction(
-        userId,
+        Number(userId) || 1,
         "supplierLedger:payment",
         "Supplier",
-        data.supplierId,
-        `Recorded supplier payment for supplier #${data.supplierId}`,
+        entry.supplierId,
+        `Recorded supplier payment for supplier #${entry.supplierId}`,
         {
-          amount: data.amount,
-          paymentMethod: data.paymentMethod,
+          amount: entry.amount,
           ledgerEntryId: entry.id,
           paymentId: entry.paymentId,
         },
@@ -200,5 +193,9 @@ export class RecordSupplierPaymentUseCase {
     } catch (error) {
       console.warn("Audit logging failed for supplier payment:", error);
     }
+  }
+
+  toEntity(result: SupplierLedgerEntry): SupplierLedgerEntry {
+    return result;
   }
 }
