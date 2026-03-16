@@ -158,14 +158,22 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
       matchType = "overpayment"; // payment > invoice
     }
 
-    // ── 7. Determine type (customer | supplier | account) ─────────────────
+    // ── 7. Determine type (customer | supplier) ──────────────────────────
     const firstLine = lines[0];
-    const reconcileType =
-      firstLine.accountCode === "1100"
-        ? "customer"
-        : firstLine.accountCode === "2100"
-          ? "supplier"
-          : "account";
+    let reconcileType: "customer" | "supplier";
+    if (firstLine.accountCode === "1100") {
+      reconcileType = "customer";
+    } else if (firstLine.accountCode === "2100") {
+      reconcileType = "supplier";
+    } else {
+      // This should be unreachable if _validateHomogeneity() already restricts
+      // reconciliation to AR/AP control accounts, but we fail fast here to keep
+      // behavior and contracts consistent.
+      throw new ValidationError(
+        "Reconciliation is only supported for AR (1100) and AP (2100) control accounts.",
+        { accountCode: firstLine.accountCode },
+      );
+    }
 
     // ── 8. Determine reconciliation status ────────────────────────────────
     const status =
