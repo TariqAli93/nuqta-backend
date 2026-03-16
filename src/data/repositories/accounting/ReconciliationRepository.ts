@@ -153,10 +153,10 @@ export class ReconciliationRepository implements IReconciliationRepository {
       .returning();
     return rows.map((r: any) => ({
       id: r.id as number,
-      reconciliationId: r.reconciliation_id as number,
-      journalEntryLineId: r.journal_entry_line_id as number,
+      reconciliationId: r.reconciliationId as number,
+      journalEntryLineId: r.journalEntryLineId as number,
       amount: r.amount as number,
-      createdAt: r.created_at as string,
+      createdAt: r.createdAt as string,
     }));
   }
 
