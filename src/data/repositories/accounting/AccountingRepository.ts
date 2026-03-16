@@ -25,7 +25,7 @@ export class AccountingRepository implements IAccountingRepository {
         return {
           journalEntryId: created.id,
           accountId: line.accountId,
-          partnerId: (line as any).partnerId ?? null,
+          partnerId: line.partnerId ?? null,
           debit: line.debit ?? 0,
           credit: line.credit ?? 0,
           balance,
