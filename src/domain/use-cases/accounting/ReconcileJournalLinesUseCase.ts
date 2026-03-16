@@ -16,9 +16,16 @@
  *  6. Mark journal lines as reconciled.
  *
  * Partial reconciliation support:
- *  When caller passes `amounts[]`, each amount overrides the full balance of the
- *  corresponding line.  This lets the engine reconcile a part of a line without
- *  touching the original journal entry (which is immutable once posted).
+ *  When caller passes `amounts[]`, each amount overrides the full remaining
+ *  balance of the corresponding line.  This lets the engine reconcile a part
+ *  of a line without touching the original journal entry (which is immutable
+ *  once posted).
+ *
+ *  To prevent double-application, the engine computes each line's
+ *  `remainingBalance` (abs(balance) minus the sum of all prior
+ *  reconciliation_lines.amount for that line) and validates that the applied
+ *  amount does not exceed it.  Lines whose remaining balance is zero are
+ *  rejected even if their `reconciled` flag is still false.
  */
 
 import type { IReconciliationRepository } from "../../interfaces/IReconciliationRepository.js";
@@ -94,7 +101,7 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
     // ── 2. Validate homogeneity ───────────────────────────────────────────
     this._validateHomogeneity(lines);
 
-    // ── 3. Check for already-reconciled lines ────────────────────────────
+    // ── 3. Check for already-reconciled or fully-applied lines ───────────
     const alreadyReconciled = lines.filter((l) => l.reconciled);
     if (alreadyReconciled.length > 0) {
       throw new ValidationError(
@@ -104,12 +111,28 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
       );
     }
 
+    // Lines that have been partially applied in prior reconciliations may still
+    // have reconciled=false but zero remaining balance — reject them too.
+    const fullyApplied = lines.filter((l) => {
+      const remaining = l.remainingBalance ?? Math.abs(l.balance);
+      return remaining <= 0;
+    });
+    if (fullyApplied.length > 0) {
+      throw new ValidationError(
+        `Lines have no remaining balance available for reconciliation: ${fullyApplied.map((l) => l.id).join(", ")}. ` +
+          "Their full balance has already been applied in prior partial reconciliations.",
+        { lineIds: fullyApplied.map((l) => l.id) },
+      );
+    }
+
     // ── 4. Resolve effective amounts ──────────────────────────────────────
     const effectiveAmounts: number[] = input.journalLineIds.map((id, idx) => {
       const line = lines.find((l) => l.id === id)!;
+      // Use remaining balance (already-applied amounts subtracted) as the cap.
+      // Falls back to abs(balance) for lines without populated remainingBalance.
+      const maxAmt = line.remainingBalance ?? Math.abs(line.balance);
       const overrideAmt = input.amounts?.[idx];
       if (overrideAmt !== undefined) {
-        const maxAmt = Math.abs(line.balance);
         if (overrideAmt <= 0) {
           throw new ValidationError(
             `Amount at index ${idx} must be positive`,
@@ -117,19 +140,12 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
         }
         if (overrideAmt > maxAmt) {
           throw new ValidationError(
-            `Amount ${overrideAmt} at index ${idx} exceeds line balance ${maxAmt}`,
+            `Amount ${overrideAmt} at index ${idx} exceeds remaining balance ${maxAmt} for line ${id}`,
           );
         }
         return overrideAmt;
       }
-      const defaultAmt = Math.abs(line.balance);
-      if (defaultAmt === 0) {
-        throw new ValidationError(
-          `Journal line ${line.id} has zero open balance and cannot be reconciled without an explicit amount.`,
-          { lineId: line.id },
-        );
-      }
-      return defaultAmt;
+      return maxAmt;
     });
 
     // ── 5. Separate debits from credits ───────────────────────────────────
@@ -207,11 +223,12 @@ export class ReconcileJournalLinesUseCase extends WriteUseCase<
     );
 
     // ── 10. Mark lines reconciled ─────────────────────────────────────────
-    // Only fully consumed lines (full match or explicitly fully applied) are
-    // marked as reconciled.  Partially applied lines remain open.
+    // A line is fully consumed when the effective amount for this reconciliation
+    // exhausts its remaining balance (remaining balance - effective amount = 0).
     const fullyConsumedLineIds = input.journalLineIds.filter((id, idx) => {
       const line = lines.find((l) => l.id === id)!;
-      return effectiveAmounts[idx] === Math.abs(line.balance);
+      const remaining = line.remainingBalance ?? Math.abs(line.balance);
+      return effectiveAmounts[idx] >= remaining;
     });
 
     if (fullyConsumedLineIds.length > 0) {

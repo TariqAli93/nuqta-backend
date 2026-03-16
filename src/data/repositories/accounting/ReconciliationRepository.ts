@@ -44,10 +44,16 @@ export class ReconciliationRepository implements IReconciliationRepository {
         je.entry_number       AS "entryNumber",
         je.entry_date         AS "entryDate",
         je.source_type        AS "sourceType",
-        je.source_id          AS "sourceId"
+        je.source_id          AS "sourceId",
+        GREATEST(0, ABS(jl.balance) - COALESCE(rl_sum.applied, 0)) AS "remainingBalance"
       FROM journal_lines jl
       JOIN journal_entries je ON je.id = jl.journal_entry_id
       JOIN accounts a ON a.id = jl.account_id
+      LEFT JOIN (
+        SELECT journal_entry_line_id, SUM(amount) AS applied
+        FROM reconciliation_lines
+        GROUP BY journal_entry_line_id
+      ) rl_sum ON rl_sum.journal_entry_line_id = jl.id
       WHERE jl.id = ANY(${ids}::int[])
         AND je.is_reversed = false
     `);
@@ -75,10 +81,16 @@ export class ReconciliationRepository implements IReconciliationRepository {
         je.entry_number       AS "entryNumber",
         je.entry_date         AS "entryDate",
         je.source_type        AS "sourceType",
-        je.source_id          AS "sourceId"
+        je.source_id          AS "sourceId",
+        GREATEST(0, ABS(jl.balance) - COALESCE(rl_sum.applied, 0)) AS "remainingBalance"
       FROM journal_lines jl
       JOIN journal_entries je ON je.id = jl.journal_entry_id
       JOIN accounts a ON a.id = jl.account_id
+      LEFT JOIN (
+        SELECT journal_entry_line_id, SUM(amount) AS applied
+        FROM reconciliation_lines
+        GROUP BY journal_entry_line_id
+      ) rl_sum ON rl_sum.journal_entry_line_id = jl.id
       WHERE jl.partner_id = ${params.partnerId}
         AND a.code = ${params.accountCode}
         AND jl.reconciled = false
@@ -108,10 +120,16 @@ export class ReconciliationRepository implements IReconciliationRepository {
         je.entry_number       AS "entryNumber",
         je.entry_date         AS "entryDate",
         je.source_type        AS "sourceType",
-        je.source_id          AS "sourceId"
+        je.source_id          AS "sourceId",
+        GREATEST(0, ABS(jl.balance) - COALESCE(rl_sum.applied, 0)) AS "remainingBalance"
       FROM journal_lines jl
       JOIN journal_entries je ON je.id = jl.journal_entry_id
       JOIN accounts a ON a.id = jl.account_id
+      LEFT JOIN (
+        SELECT journal_entry_line_id, SUM(amount) AS applied
+        FROM reconciliation_lines
+        GROUP BY journal_entry_line_id
+      ) rl_sum ON rl_sum.journal_entry_line_id = jl.id
       WHERE a.code = ${params.accountCode}
         AND jl.reconciled = false
         AND je.is_reversed = false
@@ -390,6 +408,9 @@ export class ReconciliationRepository implements IReconciliationRepository {
       entryDate: r.entryDate ? String(r.entryDate) : undefined,
       sourceType: r.sourceType ?? null,
       sourceId: r.sourceId != null ? Number(r.sourceId) : null,
+      remainingBalance: r.remainingBalance != null
+        ? Number(r.remainingBalance)
+        : Math.abs(Number(r.balance ?? 0)),
     }));
   }
 }

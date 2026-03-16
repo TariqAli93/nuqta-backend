@@ -33,6 +33,12 @@ export const ReconciliableJournalLineSchema = z.object({
   reconciled: z.boolean().default(false),
   reconciliationId: z.number().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),
+  /**
+   * How much of this line's balance is still available for reconciliation.
+   * Equals abs(balance) minus the sum of all reconciliation_lines.amount for this line.
+   * Populated by repository queries; defaults to abs(balance) when not provided.
+   */
+  remainingBalance: z.number().int().optional(),
   // Relations (populated on fetch)
   entryNumber: z.string().optional(),
   entryDate: z.union([z.string(), z.date()]).optional(),
