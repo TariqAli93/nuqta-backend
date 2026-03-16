@@ -49,6 +49,7 @@ export class ReconciliationRepository implements IReconciliationRepository {
       JOIN journal_entries je ON je.id = jl.journal_entry_id
       JOIN accounts a ON a.id = jl.account_id
       WHERE jl.id = ANY(${ids}::int[])
+        AND je.is_reversed = false
     `);
     return this._mapLines(Array.isArray(rows) ? rows : []);
   }
