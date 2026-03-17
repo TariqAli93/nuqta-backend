@@ -43,7 +43,11 @@ export interface AddPurchasePaymentInput {
  * 4) insert supplier ledger entry (if ledgers are enabled)
  * 5) create draft journal entry (if accounting is enabled)
  */
-export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentInput, { updatedPurchase: Purchase }, Purchase> {
+export class AddPurchasePaymentUseCase extends WriteUseCase<
+  AddPurchasePaymentInput,
+  { updatedPurchase: Purchase },
+  Purchase
+> {
   private auditService?: AuditService;
 
   constructor(
@@ -252,6 +256,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentIn
         credit: 0,
         balance: amount,
         description: "Accounts payable settlement",
+        reconciled: false,
       },
       {
         accountId: cashAcct.id,
@@ -259,6 +264,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<AddPurchasePaymentIn
         credit: amount,
         balance: -amount,
         description: "Cash paid to supplier",
+        reconciled: false,
       },
     ];
 

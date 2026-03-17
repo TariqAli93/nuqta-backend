@@ -1,5 +1,8 @@
 import type { JournalLine } from "../../entities/Accounting.js";
-import { InvalidStateError, NotFoundError } from "../../shared/errors/DomainErrors.js";
+import {
+  InvalidStateError,
+  NotFoundError,
+} from "../../shared/errors/DomainErrors.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { IPayrollRepository } from "../../interfaces/IPayrollRepository.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
@@ -7,7 +10,11 @@ import { WriteUseCase } from "../../shared/WriteUseCase.js";
 type TInput = { id: number; userId?: number } | number;
 type TEntity = Awaited<ReturnType<IPayrollRepository["approve"]>>;
 
-export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEntity> {
+export class ApprovePayrollRunUseCase extends WriteUseCase<
+  TInput,
+  TEntity,
+  TEntity
+> {
   constructor(
     private payrollRepo: IPayrollRepository,
     private accountingRepo: IAccountingRepository,
@@ -17,7 +24,10 @@ export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEnt
 
   async executeCommitPhase(input: TInput, _userId: string): Promise<TEntity> {
     const id = typeof input === "number" ? input : input.id;
-    const userId = typeof input === "number" ? (Number(_userId) || 0) : (input.userId ?? (Number(_userId) || 0));
+    const userId =
+      typeof input === "number"
+        ? Number(_userId) || 0
+        : (input.userId ?? (Number(_userId) || 0));
     const run = await this.payrollRepo.findById(id);
     if (!run) {
       throw new NotFoundError("Payroll run not found", { payrollRunId: id });
@@ -59,17 +69,20 @@ export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEnt
       run.items?.reduce((sum, item) => sum + item.netPay, 0) ?? run.totalNetPay;
     const totalExpense = totalGrossPay + totalBonuses;
 
-    let deductionsLiabilityAccount:
-      | Awaited<ReturnType<IAccountingRepository["findAccountByCode"]>>
-      | null = null;
+    let deductionsLiabilityAccount: Awaited<
+      ReturnType<IAccountingRepository["findAccountByCode"]>
+    > | null = null;
     if (totalDeductions > 0) {
       deductionsLiabilityAccount = await this.accountingRepo.findAccountByCode(
         run.deductionsLiabilityAccountCode,
       );
       if (!deductionsLiabilityAccount?.id) {
-        throw new NotFoundError("Payroll deductions liability account not found", {
-          accountCode: run.deductionsLiabilityAccountCode,
-        });
+        throw new NotFoundError(
+          "Payroll deductions liability account not found",
+          {
+            accountCode: run.deductionsLiabilityAccountCode,
+          },
+        );
       }
     }
 
@@ -79,6 +92,8 @@ export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEnt
         debit: totalExpense,
         credit: 0,
         description: `Payroll expense for ${this.formatPeriod(run.periodYear, run.periodMonth)}`,
+        balance: 0,
+        reconciled: false,
       },
     ];
 
@@ -88,6 +103,8 @@ export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEnt
         debit: 0,
         credit: totalDeductions,
         description: "Payroll deductions payable",
+        balance: 0,
+        reconciled: false,
       });
     }
 
@@ -96,6 +113,8 @@ export class ApprovePayrollRunUseCase extends WriteUseCase<TInput, TEntity, TEnt
       debit: 0,
       credit: totalNetPay,
       description: "Payroll cash/bank disbursement",
+      balance: 0,
+      reconciled: false,
     });
 
     const journalEntry = await this.accountingRepo.createJournalEntrySync({

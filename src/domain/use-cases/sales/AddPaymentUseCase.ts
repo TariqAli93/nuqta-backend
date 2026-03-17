@@ -39,7 +39,11 @@ export interface AddPaymentCommitResult {
   updatedSale: Sale;
 }
 
-export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentCommitResult, Sale> {
+export class AddPaymentUseCase extends WriteUseCase<
+  AddPaymentInput,
+  AddPaymentCommitResult,
+  Sale
+> {
   private auditService?: AuditService;
 
   constructor(
@@ -243,6 +247,7 @@ export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentC
         credit: 0,
         balance: amount,
         description: "Cash received",
+        reconciled: false,
       },
       {
         accountId: arAcct.id,
@@ -251,6 +256,7 @@ export class AddPaymentUseCase extends WriteUseCase<AddPaymentInput, AddPaymentC
         credit: amount,
         balance: -amount,
         description: "Accounts receivable settlement",
+        reconciled: false,
       },
     ];
 

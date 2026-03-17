@@ -31,7 +31,11 @@ export interface AdjustStockResult {
   batchId: number;
 }
 
-export class AdjustProductStockUseCase extends WriteUseCase<AdjustStockInput, AdjustStockResult, AdjustStockResult> {
+export class AdjustProductStockUseCase extends WriteUseCase<
+  AdjustStockInput,
+  AdjustStockResult,
+  AdjustStockResult
+> {
   private auditService: AuditService;
 
   constructor(
@@ -246,12 +250,16 @@ export class AdjustProductStockUseCase extends WriteUseCase<AdjustStockInput, Ad
             debit: amount,
             credit: 0,
             description: "Shrinkage expense",
+            balance: 0,
+            reconciled: false,
           },
           {
             accountId: inventoryAcct.id,
             debit: 0,
             credit: amount,
             description: "Inventory decrease",
+            balance: 0,
+            reconciled: false,
           },
         ],
       });
@@ -273,12 +281,16 @@ export class AdjustProductStockUseCase extends WriteUseCase<AdjustStockInput, Ad
             debit: amount,
             credit: 0,
             description: "Inventory increase",
+            balance: 0,
+            reconciled: false,
           },
           {
             accountId: revenueAcct.id,
             debit: 0,
             credit: amount,
             description: "Adjustment gain",
+            balance: 0,
+            reconciled: false,
           },
         ],
       });

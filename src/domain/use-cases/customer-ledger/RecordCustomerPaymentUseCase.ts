@@ -5,7 +5,10 @@ import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
-import { NotFoundError, ValidationError } from "../../shared/errors/DomainErrors.js";
+import {
+  NotFoundError,
+  ValidationError,
+} from "../../shared/errors/DomainErrors.js";
 import { CustomerLedgerEntry } from "../../entities/Ledger.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
@@ -19,7 +22,11 @@ export interface RecordPaymentInput {
   idempotencyKey?: string;
 }
 
-export class RecordCustomerPaymentUseCase extends WriteUseCase<RecordPaymentInput, CustomerLedgerEntry, CustomerLedgerEntry> {
+export class RecordCustomerPaymentUseCase extends WriteUseCase<
+  RecordPaymentInput,
+  CustomerLedgerEntry,
+  CustomerLedgerEntry
+> {
   private auditService?: AuditService;
 
   constructor(
@@ -160,12 +167,16 @@ export class RecordCustomerPaymentUseCase extends WriteUseCase<RecordPaymentInpu
           debit: amount,
           credit: 0,
           description: "Cash received",
+          balance: 0,
+          reconciled: false,
         },
         {
           accountId: arAcct.id,
           debit: 0,
           credit: amount,
           description: "AR settled",
+          balance: 0,
+          reconciled: false,
         },
       ],
     });

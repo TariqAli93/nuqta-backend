@@ -728,6 +728,8 @@ export class CreateSaleUseCase extends WriteUseCase<
       debit: 0,
       credit: netRevenue,
       description: "إيرادات المبيعات",
+      balance: 0,
+      reconciled: false,
     });
 
     // VAT Output (tax collected, if any)
@@ -737,6 +739,8 @@ export class CreateSaleUseCase extends WriteUseCase<
         debit: 0,
         credit: sale.tax,
         description: "ضريبة المخرجات",
+        balance: 0,
+        reconciled: false,
       });
     }
 
@@ -747,6 +751,8 @@ export class CreateSaleUseCase extends WriteUseCase<
         debit: paidAmount,
         credit: 0,
         description: "تحصيل نقدي",
+        balance: 0,
+        reconciled: false,
       });
     }
 
@@ -761,6 +767,7 @@ export class CreateSaleUseCase extends WriteUseCase<
         credit: 0,
         balance: remainingAmount,
         description: "ذمم العملاء",
+        reconciled: false,
       });
     }
 
@@ -771,6 +778,8 @@ export class CreateSaleUseCase extends WriteUseCase<
         debit: totalCOGS,
         credit: 0,
         description: "تكلفة البضاعة المباعة",
+        balance: 0,
+        reconciled: false,
       });
 
       lines.push({
@@ -778,6 +787,8 @@ export class CreateSaleUseCase extends WriteUseCase<
         debit: 0,
         credit: totalCOGS,
         description: "تخفيض المخزون",
+        balance: 0,
+        reconciled: false,
       });
     }
 

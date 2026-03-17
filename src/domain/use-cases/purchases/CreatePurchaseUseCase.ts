@@ -45,7 +45,11 @@ export interface CreatePurchaseCommitResult {
   createdPurchase: Purchase;
 }
 
-export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, CreatePurchaseCommitResult, Purchase> {
+export class CreatePurchaseUseCase extends WriteUseCase<
+  CreatePurchaseInput,
+  CreatePurchaseCommitResult,
+  Purchase
+> {
   private auditService?: AuditService;
 
   constructor(
@@ -264,16 +268,19 @@ export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, Cre
       ? new SettingsAccessor(this.settingsRepository)
       : null;
     const ACCT_CASH = settings ? await settings.getCashAccountCode() : "1001";
-    const ACCT_INVENTORY = settings ? await settings.getInventoryAccountCode() : "1200";
-    const ACCT_VAT_INPUT = settings ? await settings.getVatInputAccountCode() : "1300";
+    const ACCT_INVENTORY = settings
+      ? await settings.getInventoryAccountCode()
+      : "1200";
+    const ACCT_VAT_INPUT = settings
+      ? await settings.getVatInputAccountCode()
+      : "1300";
     const ACCT_AP = settings ? await settings.getApAccountCode() : "2100";
 
     const inventoryAcct =
       await this.accountingRepository.findAccountByCode(ACCT_INVENTORY);
     const cashAcct =
       await this.accountingRepository.findAccountByCode(ACCT_CASH);
-    const apAcct =
-      await this.accountingRepository.findAccountByCode(ACCT_AP);
+    const apAcct = await this.accountingRepository.findAccountByCode(ACCT_AP);
     const vatInputAcct =
       purchase.tax > 0
         ? await this.accountingRepository.findAccountByCode(ACCT_VAT_INPUT)
@@ -302,6 +309,8 @@ export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, Cre
       debit: netInventoryCost,
       credit: 0,
       description: "Inventory received",
+      balance: 0,
+      reconciled: false,
     });
 
     // VAT Input debit (tax paid on purchase, if any)
@@ -311,6 +320,8 @@ export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, Cre
         debit: purchase.tax,
         credit: 0,
         description: "ضريبة المدخلات",
+        balance: 0,
+        reconciled: false,
       });
     }
 
@@ -326,6 +337,8 @@ export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, Cre
         debit: 0,
         credit: paidAmount,
         description: "Cash payment",
+        balance: 0,
+        reconciled: false,
       });
     }
 
@@ -341,6 +354,8 @@ export class CreatePurchaseUseCase extends WriteUseCase<CreatePurchaseInput, Cre
         debit: 0,
         credit: remainingAmount,
         description: "Accounts payable",
+        balance: 0,
+        reconciled: false,
       });
     }
 
