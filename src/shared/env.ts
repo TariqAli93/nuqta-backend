@@ -6,7 +6,14 @@
  * a clear diagnostic message so deployment failures are caught immediately.
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import { z } from "zod";
+
+// Ensure .env is loaded before validation regardless of import order.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -77,10 +84,7 @@ if (!result.success) {
 export const env = result.data;
 
 // Warn (not error) if a known-insecure default is used in production.
-if (
-  env.NODE_ENV === "production" &&
-  env.JWT_SECRET === "nuqta-secret-dev"
-) {
+if (env.NODE_ENV === "production" && env.JWT_SECRET === "nuqta-secret-dev") {
   console.warn(
     "⚠️   WARNING: JWT_SECRET is set to the insecure development default " +
       '("nuqta-secret-dev") in a production environment. ' +

@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1772123959169,
-      "tag": "0000_daily_zeigeist",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1772643600000,
-      "tag": "0001_hr_payroll",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1773273600000,
-      "tag": "0002_settings_tables",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1773360000000,
-      "tag": "0003_optimistic_locking",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1773446400000,
-      "tag": "0004_jwt_revocation",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1773532800000,
-      "tag": "0005_payroll_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1773678698906,
-      "tag": "0006_fat_franklin_richards",
+      "when": 1773711950978,
+      "tag": "0000_stale_blindfold",
       "breakpoints": true
     }
   ]

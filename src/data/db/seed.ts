@@ -369,14 +369,17 @@ async function initializeDatabase(): Promise<void> {
       };
     }
 
-    const created = await createUserUseCase.execute({
-      username: input.username,
-      password: input.password,
-      fullName: input.fullName,
-      phone: input.phone ?? null,
-      role: input.role,
-      isActive: true,
-    } as User);
+    const created = await createUserUseCase.execute(
+      {
+        username: input.username,
+        password: input.password,
+        fullName: input.fullName,
+        phone: input.phone ?? null,
+        role: input.role,
+        isActive: true,
+      } as User,
+      "system",
+    );
 
     const withId = requireId(created, `user:${input.username}`);
     usersByUsername.set(withId.username, withId);
@@ -395,12 +398,15 @@ async function initializeDatabase(): Promise<void> {
       };
     }
 
-    const created = await createCategoryUseCase.execute({
-      name: input.name,
-      description: input.description,
-      isActive: true,
-      createdBy,
-    } as Category);
+    const created = await createCategoryUseCase.execute(
+      {
+        name: input.name,
+        description: input.description,
+        isActive: true,
+        createdBy,
+      } as Category,
+      String(createdBy),
+    );
 
     const withId = requireId(created, `category:${input.name}`);
     categoriesByName.set(withId.name, withId);
@@ -419,18 +425,21 @@ async function initializeDatabase(): Promise<void> {
       };
     }
 
-    const created = await createSupplierUseCase.execute({
-      name: input.name,
-      phone: input.phone,
-      phone2: null,
-      address: input.address,
-      city: input.city,
-      notes: input.notes,
-      openingBalance: 0,
-      currentBalance: 0,
-      isActive: true,
-      createdBy,
-    });
+    const created = await createSupplierUseCase.execute(
+      {
+        name: input.name,
+        phone: input.phone,
+        phone2: null,
+        address: input.address,
+        city: input.city,
+        notes: input.notes,
+        openingBalance: 0,
+        currentBalance: 0,
+        isActive: true,
+        createdBy,
+      },
+      String(createdBy),
+    );
 
     const withId = requireId(created, `supplier:${input.name}`);
     suppliersByName.set(withId.name, withId);
@@ -449,17 +458,20 @@ async function initializeDatabase(): Promise<void> {
       };
     }
 
-    const created = await createCustomerUseCase.execute({
-      name: input.name,
-      phone: input.phone,
-      address: input.address,
-      city: input.city,
-      notes: input.notes,
-      totalPurchases: 0,
-      totalDebt: 0,
-      isActive: true,
-      createdBy,
-    } as Customer);
+    const created = await createCustomerUseCase.execute(
+      {
+        name: input.name,
+        phone: input.phone,
+        address: input.address,
+        city: input.city,
+        notes: input.notes,
+        totalPurchases: 0,
+        totalDebt: 0,
+        isActive: true,
+        createdBy,
+      } as Customer,
+      String(createdBy),
+    );
 
     const withId = requireId(created, `customer:${input.name}`);
     customersByName.set(withId.name, withId);
@@ -480,21 +492,24 @@ async function initializeDatabase(): Promise<void> {
       };
     }
 
-    const created = await createProductUseCase.execute({
-      name: input.name,
-      sku: input.sku,
-      categoryId,
-      costPrice: input.costPrice,
-      sellingPrice: input.sellingPrice,
-      stock: 0,
-      minStock: input.minStock,
-      unit: input.unit,
-      supplier: input.supplier,
-      supplierId,
-      status: input.status,
-      isActive: true,
-      createdBy,
-    });
+    const created = await createProductUseCase.execute(
+      {
+        name: input.name,
+        sku: input.sku,
+        categoryId,
+        costPrice: input.costPrice,
+        sellingPrice: input.sellingPrice,
+        stock: 0,
+        minStock: input.minStock,
+        unit: input.unit,
+        supplier: input.supplier,
+        supplierId,
+        status: input.status,
+        isActive: true,
+        createdBy,
+      },
+      String(createdBy),
+    );
 
     const withId = requireId(created, `product:${input.sku}`);
     if (withId.sku) {
@@ -642,7 +657,7 @@ async function initializeDatabase(): Promise<void> {
         unitFactor: 1,
         createdBy,
       },
-      createdBy,
+      String(createdBy),
     );
 
     return true;
@@ -709,7 +724,7 @@ async function initializeDatabase(): Promise<void> {
         paymentMethod: purchase.paidAmount > 0 ? "cash" : "credit",
         idempotencyKey,
       },
-      createdBy,
+      String(createdBy),
     );
 
     return { entity: created, created: true };
@@ -925,7 +940,7 @@ async function initializeDatabase(): Promise<void> {
               : "cash",
         idempotencyKey,
       },
-      createdBy,
+      String(createdBy),
     );
 
     return { entity: created, created: true };
@@ -1054,10 +1069,12 @@ async function initializeDatabase(): Promise<void> {
       marginRight: 2,
     });
 
-    const accountingResult = await initializeAccountingUseCase.execute({
-      baseCurrency: "IQD",
-      userId: 1,
-    });
+    const accountingResult = await initializeAccountingUseCase.execute(
+      {
+        baseCurrency: "IQD",
+      },
+      "1",
+    );
     for (const warning of accountingResult.warnings) {
       console.warn(warning);
     }
