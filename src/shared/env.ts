@@ -18,6 +18,8 @@ const envSchema = z.object({
       message: 'DATABASE_URL must start with "postgres"',
     }),
 
+  DB_NAME: z.string().min(1, "DB_NAME is required"),
+
   JWT_SECRET: z
     .string()
     .min(1, "JWT_SECRET is required")
@@ -51,6 +53,7 @@ const result = envSchema.safeParse(
   isTest
     ? {
         DATABASE_URL: process.env.DATABASE_URL ?? "postgres://test",
+        DB_NAME: process.env.DB_NAME ?? "test",
         JWT_SECRET: process.env.JWT_SECRET ?? "test-secret-for-vitest-only",
         ...process.env,
       }
