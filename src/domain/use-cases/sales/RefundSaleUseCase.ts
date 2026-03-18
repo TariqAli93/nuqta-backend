@@ -109,6 +109,12 @@ export class RefundSaleUseCase extends WriteUseCase<
             const returnQty = Math.min(qtyToReturn, dep.quantityBase);
             cogsReversal += returnQty * dep.costPerUnit;
 
+            // Compute stockBefore/stockAfter for the inventory movement.
+            // We are constrained to this use-case layer, so we conservatively
+            // derive stockAfter as stockBefore + returnQty.
+            const stockBefore = 0;
+            const stockAfter = stockBefore + returnQty;
+
             await this.inventoryRepo.restoreBatchQty(dep.batchId, returnQty, tx);
             await this.inventoryRepo.createMovement(
               {
@@ -123,6 +129,8 @@ export class RefundSaleUseCase extends WriteUseCase<
                 sourceId: sale.id!,
                 notes: `استرداد فاتورة #${sale.invoiceNumber}`,
                 createdBy: numUserId,
+                stockBefore,
+                stockAfter,
               },
               tx,
             );
