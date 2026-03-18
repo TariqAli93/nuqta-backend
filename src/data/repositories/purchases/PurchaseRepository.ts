@@ -1,5 +1,6 @@
 import { eq, and, like, gte, lte, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import {
   purchases,
   purchaseItems,
@@ -12,10 +13,15 @@ import { IPurchaseRepository, Purchase } from "../../../domain/index.js";
 export class PurchaseRepository implements IPurchaseRepository {
   constructor(private db: DbConnection) {}
 
-  async create(purchase: Purchase): Promise<Purchase> {
-    const { items, payments: _payments, movements, ...purchaseData } = purchase;
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
 
-    const [created] = await this.db
+  async create(purchase: Purchase, tx?: TxOrDb): Promise<Purchase> {
+    const { items, payments: _payments, movements, ...purchaseData } = purchase;
+    const client = this.c(tx);
+
+    const [created] = await client
       .insert(purchases)
       .values(purchaseData as any)
       .returning();
@@ -25,14 +31,14 @@ export class PurchaseRepository implements IPurchaseRepository {
         ...item,
         purchaseId: created.id,
       }));
-      await this.db.insert(purchaseItems).values(itemValues as any);
+      await client.insert(purchaseItems).values(itemValues as any);
     }
 
     return this.mapPurchaseWithDetails(created);
   }
 
-  async createSync(purchase: Purchase): Promise<Purchase> {
-    return this.create(purchase);
+  async createSync(purchase: Purchase, tx?: TxOrDb): Promise<Purchase> {
+    return this.create(purchase, tx);
   }
 
   async findByIdempotencyKey(key: string): Promise<Purchase | null> {

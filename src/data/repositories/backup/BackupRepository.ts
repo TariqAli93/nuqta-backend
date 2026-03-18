@@ -1,5 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { pipeline } from "node:stream/promises";
+import { createReadStream, createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { IBackupRepository, BackupInfo, BackupStats } from "../../../domain/index.js";
@@ -61,6 +64,37 @@ export class BackupRepository implements IBackupRepository {
     await this.ensureDir();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const encryptionKey = process.env.BACKUP_ENCRYPTION_KEY;
+
+    if (encryptionKey) {
+      // Encrypted path: dump to temp file, encrypt, remove plaintext
+      const rawName = `backup-${timestamp}.dump`;
+      const encName = `backup-${timestamp}.dump.enc`;
+      const rawPath = path.join(this.backupDir, rawName);
+      const encPath = path.join(this.backupDir, encName);
+
+      await runPgCommand(process.env.PG_DUMP_PATH || "pg_dump", [
+        "--dbname",
+        this.databaseUrl,
+        "--format",
+        "custom",
+        "--file",
+        rawPath,
+      ]);
+
+      await this.encryptFile(rawPath, encPath, encryptionKey);
+      await fs.unlink(rawPath); // Remove unencrypted backup
+
+      const stat = await fs.stat(encPath);
+      return {
+        name: encName,
+        sizeBytes: stat.size,
+        createdAt: stat.mtime.toISOString(),
+        path: encPath,
+      };
+    }
+
+    // Unencrypted path (development / no key configured)
     const name = `backup-${timestamp}.dump`;
     const filePath = path.join(this.backupDir, name);
 
@@ -74,13 +108,94 @@ export class BackupRepository implements IBackupRepository {
     ]);
 
     const stat = await fs.stat(filePath);
-
     return {
       name,
       sizeBytes: stat.size,
       createdAt: stat.mtime.toISOString(),
       path: filePath,
     };
+  }
+
+  /**
+   * Encrypt a file using AES-256-GCM.
+   * Format: [12-byte IV][ciphertext][16-byte auth tag]
+   */
+  private async encryptFile(
+    inputPath: string,
+    outputPath: string,
+    hexKey: string,
+  ): Promise<void> {
+    const key = Buffer.from(hexKey, "hex");
+    if (key.length !== 32) {
+      throw new Error(
+        "BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)",
+      );
+    }
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+
+    const src = createReadStream(inputPath);
+    const dst = createWriteStream(outputPath);
+
+    // Write IV first
+    dst.write(iv);
+
+    await pipeline(src, cipher, dst);
+
+    // Append auth tag
+    const authTag = cipher.getAuthTag();
+    await fs.appendFile(outputPath, authTag);
+  }
+
+  /**
+   * Decrypt a file that was encrypted with encryptFile().
+   * Used by restore() when the file has a .enc extension.
+   */
+  private async decryptFile(
+    inputPath: string,
+    outputPath: string,
+    hexKey: string,
+  ): Promise<void> {
+    const key = Buffer.from(hexKey, "hex");
+    if (key.length !== 32) {
+      throw new Error(
+        "BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)",
+      );
+    }
+
+    // Get file size so we can read IV (first 12 bytes) and auth tag (last 16 bytes)
+    const stat = await fs.stat(inputPath);
+    if (stat.size < 12 + 16) {
+      throw new Error("Encrypted backup file is too small to contain IV and auth tag");
+    }
+
+    const fileHandle = await fs.open(inputPath, "r");
+    try {
+      // Read IV (12 bytes from the beginning)
+      const iv = Buffer.alloc(12);
+      await fileHandle.read(iv, 0, iv.length, 0);
+
+      // Read auth tag (16 bytes from the end)
+      const authTag = Buffer.alloc(16);
+      await fileHandle.read(authTag, 0, authTag.length, stat.size - authTag.length);
+
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(authTag);
+
+      // Ciphertext is everything between IV and auth tag
+      const ciphertextStart = 12;
+      const ciphertextEnd = stat.size - 16 - 1; // inclusive end index
+
+      const ciphertextStream = createReadStream(inputPath, {
+        start: ciphertextStart,
+        end: ciphertextEnd,
+      });
+      const writeStream = createWriteStream(outputPath);
+
+      await pipeline(ciphertextStream, decipher, writeStream);
+    } finally {
+      await fileHandle.close();
+    }
   }
 
   async list(): Promise<BackupInfo[]> {
@@ -120,15 +235,36 @@ export class BackupRepository implements IBackupRepository {
       throw new Error(`Backup not found: ${backupName}`);
     }
 
-    await runPgCommand(process.env.PG_RESTORE_PATH || "pg_restore", [
-      "--dbname",
-      this.databaseUrl,
-      "--clean",
-      "--if-exists",
-      "--single-transaction",
-      "--no-owner",
-      filePath,
-    ]);
+    let restorePath = filePath;
+    let tempDecryptedPath: string | undefined;
+
+    if (backupName.endsWith(".enc")) {
+      const encryptionKey = process.env.BACKUP_ENCRYPTION_KEY;
+      if (!encryptionKey) {
+        throw new Error(
+          "BACKUP_ENCRYPTION_KEY is required to restore encrypted backups",
+        );
+      }
+      tempDecryptedPath = filePath.replace(/\.enc$/, ".tmp");
+      await this.decryptFile(filePath, tempDecryptedPath, encryptionKey);
+      restorePath = tempDecryptedPath;
+    }
+
+    try {
+      await runPgCommand(process.env.PG_RESTORE_PATH || "pg_restore", [
+        "--dbname",
+        this.databaseUrl,
+        "--clean",
+        "--if-exists",
+        "--single-transaction",
+        "--no-owner",
+        restorePath,
+      ]);
+    } finally {
+      if (tempDecryptedPath) {
+        await fs.unlink(tempDecryptedPath).catch(() => {});
+      }
+    }
   }
 
   async delete(backupName: string): Promise<boolean> {

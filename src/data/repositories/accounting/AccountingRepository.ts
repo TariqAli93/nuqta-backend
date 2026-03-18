@@ -1,5 +1,6 @@
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import { accounts, journalEntries, journalLines } from "../../schema/schema.js";
 import {
   IAccountingRepository,
@@ -7,14 +8,27 @@ import {
   JournalEntry,
   JournalLine,
 } from "../../../domain/index.js";
+import type {
+  ReversalEntryParams,
+  CreditNoteEntryParams,
+  PaymentReversalEntryParams,
+} from "../../../domain/interfaces/IAccountingRepository.js";
 
 export class AccountingRepository implements IAccountingRepository {
   constructor(private db: DbConnection) {}
 
-  async createJournalEntry(entry: JournalEntry): Promise<JournalEntry> {
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
+
+  private async insertJournalEntry(
+    entry: JournalEntry,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    const client = this.c(tx);
     const { lines, ...entryData } = entry;
 
-    const [created] = await this.db
+    const [created] = await client
       .insert(journalEntries)
       .values(entryData as any)
       .returning();
@@ -34,47 +48,59 @@ export class AccountingRepository implements IAccountingRepository {
           reconciliationId: null,
         };
       });
-      await this.db.insert(journalLines).values(lineValues as any);
+      await client.insert(journalLines).values(lineValues as any);
 
       // Update account balances
       for (const line of lines) {
         const netAmount = (line.debit || 0) - (line.credit || 0);
-        await this.db
+        await client
           .update(accounts)
-          .set({
-            balance: sql`${accounts.balance} + ${netAmount}`,
-          } as any)
+          .set({ balance: sql`${accounts.balance} + ${netAmount}` } as any)
           .where(eq(accounts.id, line.accountId));
       }
     }
 
-    return this.getEntryById(created.id) as Promise<JournalEntry>;
+    return this.getEntryById(created.id, tx) as Promise<JournalEntry>;
   }
 
-  async createJournalEntrySync(entry: JournalEntry): Promise<JournalEntry> {
-    return this.createJournalEntry(entry);
+  async createJournalEntry(
+    entry: JournalEntry,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    return this.insertJournalEntry(entry, tx);
+  }
+
+  async createJournalEntrySync(
+    entry: JournalEntry,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    return this.insertJournalEntry(entry, tx);
   }
 
   async createAccountSync(
     account: Omit<Account, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<Account> {
-    const [created] = await this.db
+    const [created] = await this.c(tx)
       .insert(accounts)
       .values(account as any)
       .returning();
     return created as unknown as Account;
   }
 
-  async findAccountByCode(code: string): Promise<Account | null> {
-    const [row] = await this.db
+  async findAccountByCode(code: string, tx?: TxOrDb): Promise<Account | null> {
+    const [row] = await this.c(tx)
       .select()
       .from(accounts)
       .where(eq(accounts.code, code));
     return (row as unknown as Account) || null;
   }
 
-  async getAccounts(): Promise<Account[]> {
-    const rows = await this.db.select().from(accounts).orderBy(accounts.code);
+  async getAccounts(tx?: TxOrDb): Promise<Account[]> {
+    const rows = await this.c(tx)
+      .select()
+      .from(accounts)
+      .orderBy(accounts.code);
     return rows as unknown as Account[];
   }
 
@@ -130,19 +156,251 @@ export class AccountingRepository implements IAccountingRepository {
     return { items, total };
   }
 
-  async getEntryById(id: number): Promise<JournalEntry | null> {
-    const [row] = await this.db
+  async getEntryById(id: number, tx?: TxOrDb): Promise<JournalEntry | null> {
+    const client = this.c(tx);
+    const [row] = await client
       .select()
       .from(journalEntries)
       .where(eq(journalEntries.id, id));
     if (!row) return null;
 
-    const lines = await this.db
+    const lines = await client
       .select()
       .from(journalLines)
       .where(eq(journalLines.journalEntryId, id));
 
     return { ...row, lines } as unknown as JournalEntry;
+  }
+
+  async findEntryBySource(
+    sourceType: string,
+    sourceId: number,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry | null> {
+    const client = this.c(tx);
+    const [row] = await client
+      .select()
+      .from(journalEntries)
+      .where(
+        and(
+          eq(journalEntries.sourceType, sourceType),
+          eq(journalEntries.sourceId, sourceId),
+        ),
+      )
+      .orderBy(desc(journalEntries.id))
+      .limit(1);
+    if (!row) return null;
+    return this.getEntryById(row.id, tx);
+  }
+
+  async createReversalEntry(
+    params: ReversalEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    const client = this.c(tx);
+
+    // Load original entry with its lines
+    const original = await this.getEntryById(params.originalEntryId, tx);
+    if (!original) {
+      throw new Error(
+        `Journal entry ${params.originalEntryId} not found for reversal`,
+      );
+    }
+
+    // Mirror lines (swap debit/credit)
+    const reversedLines = (original.lines ?? []).map((line: JournalLine) => ({
+      accountId: line.accountId,
+      partnerId: line.partnerId ?? null,
+      debit: line.credit ?? 0,
+      credit: line.debit ?? 0,
+      description: line.description ?? null,
+    }));
+
+    // Compute total amount for the reversal entry
+    const reversalTotalAmount = reversedLines.reduce(
+      (sum, line) => sum + (line.debit ?? 0) + (line.credit ?? 0),
+      0,
+    );
+
+    const reversalEntry: JournalEntry = {
+      // derive required fields from the original entry
+      entryNumber: `${original.entryNumber}-REV`,
+      currency: original.currency,
+      totalAmount: reversalTotalAmount,
+      description: params.description,
+      entryDate: params.reversalDate.toISOString(),
+      sourceType: params.sourceType as any,
+      sourceId: params.sourceId,
+      isPosted: true,
+      isReversed: false,
+      reversalOfId: params.originalEntryId,
+      createdBy: params.createdBy,
+      lines: reversedLines as JournalLine[],
+    } as JournalEntry;
+
+    const created = await this.insertJournalEntry(reversalEntry, tx);
+
+    // Mark original as reversed
+    await client
+      .update(journalEntries)
+      .set({ isReversed: true } as any)
+      .where(eq(journalEntries.id, params.originalEntryId));
+
+    return created;
+  }
+
+  async createCreditNoteEntry(
+    params: CreditNoteEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    const netRevenue = params.netRevenue ?? params.amount;
+    const vatAmount = params.vatAmount ?? 0;
+    const cogsReversal = params.cogsReversal ?? 0;
+
+    // Resolve account IDs — fall back to looking up by standard codes
+    const [revenueAcc, cashAcc, vatAcc, cogsAcc, inventoryAcc, arAcc] =
+      await Promise.all([
+        params.revenueAccountId
+          ? Promise.resolve({ id: params.revenueAccountId })
+          : this.findAccountByCode("4000", tx),
+        params.cashAccountId
+          ? Promise.resolve({ id: params.cashAccountId })
+          : this.findAccountByCode("1100", tx),
+        params.vatOutputAccountId
+          ? Promise.resolve({ id: params.vatOutputAccountId })
+          : this.findAccountByCode("2200", tx),
+        params.cogsAccountId
+          ? Promise.resolve({ id: params.cogsAccountId })
+          : this.findAccountByCode("5000", tx),
+        params.inventoryAccountId
+          ? Promise.resolve({ id: params.inventoryAccountId })
+          : this.findAccountByCode("1200", tx),
+        params.arAccountId
+          ? Promise.resolve({ id: params.arAccountId })
+          : this.findAccountByCode("1300", tx),
+      ]);
+
+    const lines: Partial<JournalLine>[] = [];
+
+    // DR Revenue (reverse the sale revenue)
+    if (revenueAcc?.id) {
+      lines.push({
+        accountId: revenueAcc.id,
+        debit: netRevenue,
+        credit: 0,
+        description: "Credit note — revenue reversal",
+      });
+    }
+
+    // DR VAT Output (if VAT was charged)
+    if (vatAmount > 0 && vatAcc?.id) {
+      lines.push({
+        accountId: vatAcc.id,
+        debit: vatAmount,
+        credit: 0,
+        description: "Credit note — VAT reversal",
+      });
+    }
+
+    // CR Cash / AR
+    const cashOrArId = cashAcc?.id ?? arAcc?.id;
+    if (cashOrArId) {
+      lines.push({
+        accountId: cashOrArId,
+        debit: 0,
+        credit: params.amount,
+        description: "Credit note — cash/AR refund",
+      });
+    }
+
+    // COGS reversal (if goods returned): CR COGS, DR Inventory
+    if (cogsReversal > 0) {
+      if (cogsAcc?.id) {
+        lines.push({
+          accountId: cogsAcc.id,
+          debit: 0,
+          credit: cogsReversal,
+          description: "Credit note — COGS reversal",
+        });
+      }
+      if (inventoryAcc?.id) {
+        lines.push({
+          accountId: inventoryAcc.id,
+          debit: cogsReversal,
+          credit: 0,
+          description: "Credit note — inventory restored",
+        });
+      }
+    }
+
+    const entryNumber = `JE-CN-${params.saleId}-${Date.now()}`;
+    const entry: JournalEntry = {
+      entryNumber,
+      description: params.description,
+      entryDate: new Date().toISOString(),
+      sourceType: "sale_refund" as any,
+      sourceId: params.saleId,
+      totalAmount: params.amount,
+      currency: params.currency,
+      isPosted: true,
+      isReversed: false,
+      createdBy: params.createdBy,
+      lines: lines as JournalLine[],
+    } as JournalEntry;
+
+    return this.insertJournalEntry(entry, tx);
+  }
+
+  async createPaymentReversalEntry(
+    params: PaymentReversalEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry> {
+    const [cashAcc, arAcc] = await Promise.all([
+      params.cashAccountId
+        ? Promise.resolve({ id: params.cashAccountId })
+        : this.findAccountByCode("1100", tx),
+      params.arAccountId
+        ? Promise.resolve({ id: params.arAccountId })
+        : this.findAccountByCode("1300", tx),
+    ]);
+
+    const lines: Partial<JournalLine>[] = [];
+
+    // DR AR (reverse the AR reduction that happened at payment time)
+    if (arAcc?.id) {
+      lines.push({
+        accountId: arAcc.id,
+        debit: params.amount,
+        credit: 0,
+        description: "Payment reversal — AR restored",
+      });
+    }
+
+    // CR Cash (cash goes back out)
+    if (cashAcc?.id) {
+      lines.push({
+        accountId: cashAcc.id,
+        debit: 0,
+        credit: params.amount,
+        description: "Payment reversal — cash refunded",
+      });
+    }
+
+    const entry: JournalEntry = {
+      entryNumber: params.entryNumber,
+      totalAmount: params.amount,
+      currency: params.currency,
+      description: params.description,
+      entryDate: new Date().toISOString(),
+      sourceType: "sale_cancellation" as any,
+      sourceId: params.saleId,
+      isPosted: true,
+      isReversed: false,
+      createdBy: params.createdBy,
+      lines: lines as JournalLine[],
+    } as JournalEntry;
+
+    return this.insertJournalEntry(entry, tx);
   }
 
   async getTrialBalance(params?: {

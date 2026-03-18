@@ -1,15 +1,21 @@
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import { customerLedger } from "../../schema/schema.js";
 import { ICustomerLedgerRepository, CustomerLedgerEntry } from "../../../domain/index.js";
 
 export class CustomerLedgerRepository implements ICustomerLedgerRepository {
   constructor(private db: DbConnection) {}
 
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
+
   async create(
     entry: Omit<CustomerLedgerEntry, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<CustomerLedgerEntry> {
-    const [created] = await this.db
+    const [created] = await this.c(tx)
       .insert(customerLedger)
       .values(entry as any)
       .returning();
@@ -18,12 +24,13 @@ export class CustomerLedgerRepository implements ICustomerLedgerRepository {
 
   async createSync(
     entry: Omit<CustomerLedgerEntry, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<CustomerLedgerEntry> {
-    return this.create(entry);
+    return this.create(entry, tx);
   }
 
-  async getLastBalanceSync(customerId: number): Promise<number> {
-    const [row] = await this.db
+  async getLastBalanceSync(customerId: number, tx?: TxOrDb): Promise<number> {
+    const [row] = await this.c(tx)
       .select({ balanceAfter: customerLedger.balanceAfter })
       .from(customerLedger)
       .where(eq(customerLedger.customerId, customerId))

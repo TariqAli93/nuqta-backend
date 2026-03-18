@@ -41,7 +41,7 @@ export const JournalEntrySchema = z.object({
   entryDate: z.union([z.string(), z.date()]),
   description: z.string().min(1),
   sourceType: z
-    .enum(["sale", "purchase", "payment", "adjustment", "manual"])
+    .enum(["sale", "purchase", "payment", "adjustment", "manual", "sale_cancellation", "sale_refund"])
     .optional(),
   sourceId: z.number().optional(),
   isPosted: z.boolean().default(false),

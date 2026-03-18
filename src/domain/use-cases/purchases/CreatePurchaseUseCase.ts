@@ -13,6 +13,11 @@ import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
+import type { DbConnection } from "../../../data/db/db.js";
+import {
+  withTransaction,
+  type TxOrDb,
+} from "../../../data/db/transaction.js";
 
 export interface CreatePurchaseInput {
   invoiceNumber: string;
@@ -53,6 +58,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
   private auditService?: AuditService;
 
   constructor(
+    private db: DbConnection,
     private purchaseRepository: IPurchaseRepository,
     private supplierRepository: ISupplierRepository,
     private paymentRepository: IPaymentRepository,
@@ -207,52 +213,69 @@ export class CreatePurchaseUseCase extends WriteUseCase<
       }),
     };
 
-    const createdPurchase = await this.purchaseRepository.createSync(purchase);
+    const accountingEnabled = await this.isAccountingEnabled();
+    const ledgersEnabled = await this.isLedgersEnabled();
 
-    if (paidAmount > 0) {
-      await this.paymentRepository.createSync({
-        purchaseId: createdPurchase.id,
-        supplierId: createdPurchase.supplierId,
-        amount: paidAmount,
-        currency: createdPurchase.currency || "IQD",
-        exchangeRate: 1,
-        paymentMethod: input.paymentMethod || "cash",
-        referenceNumber: input.referenceNumber,
-        status: "completed",
-        paymentDate: now,
-        createdAt: now,
-        createdBy: numUserId,
-        // Keep payment idempotency deterministic and unique per purchase write.
-        idempotencyKey: input.idempotencyKey
-          ? `${input.idempotencyKey}:payment:initial`
-          : undefined,
-      } as any);
-    }
-
-    if ((await this.isLedgersEnabled()) && remainingAmount > 0) {
-      const balanceBefore =
-        await this.supplierLedgerRepository.getLastBalanceSync(
-          createdPurchase.supplierId,
-        );
-      await this.supplierLedgerRepository.createSync({
-        supplierId: createdPurchase.supplierId,
-        transactionType: "invoice",
-        amount: remainingAmount,
-        balanceAfter: balanceBefore + remainingAmount,
-        purchaseId: createdPurchase.id,
-        notes: `Purchase #${createdPurchase.invoiceNumber}`,
-        createdBy: numUserId,
-      });
-    }
-
-    if (await this.isAccountingEnabled()) {
-      await this.createPurchaseJournalEntry(
-        createdPurchase,
-        paidAmount,
-        remainingAmount,
-        numUserId,
+    const { createdPurchase } = await withTransaction(this.db, async (tx) => {
+      const createdPurchase = await this.purchaseRepository.createSync(
+        purchase,
+        tx,
       );
-    }
+
+      if (paidAmount > 0) {
+        await this.paymentRepository.createSync(
+          {
+            purchaseId: createdPurchase.id,
+            supplierId: createdPurchase.supplierId,
+            amount: paidAmount,
+            currency: createdPurchase.currency || "IQD",
+            exchangeRate: 1,
+            paymentMethod: input.paymentMethod || "cash",
+            referenceNumber: input.referenceNumber,
+            status: "completed",
+            paymentDate: now,
+            createdAt: now,
+            createdBy: numUserId,
+            idempotencyKey: input.idempotencyKey
+              ? `${input.idempotencyKey}:payment:initial`
+              : undefined,
+          } as any,
+          tx,
+        );
+      }
+
+      if (ledgersEnabled && remainingAmount > 0) {
+        const balanceBefore =
+          await this.supplierLedgerRepository.getLastBalanceSync(
+            createdPurchase.supplierId,
+            tx,
+          );
+        await this.supplierLedgerRepository.createSync(
+          {
+            supplierId: createdPurchase.supplierId,
+            transactionType: "invoice",
+            amount: remainingAmount,
+            balanceAfter: balanceBefore + remainingAmount,
+            purchaseId: createdPurchase.id,
+            notes: `Purchase #${createdPurchase.invoiceNumber}`,
+            createdBy: numUserId,
+          },
+          tx,
+        );
+      }
+
+      if (accountingEnabled) {
+        await this.createPurchaseJournalEntry(
+          createdPurchase,
+          paidAmount,
+          remainingAmount,
+          numUserId,
+          tx,
+        );
+      }
+
+      return { createdPurchase };
+    });
 
     return { createdPurchase };
   }
@@ -262,6 +285,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
     paidAmount: number,
     remainingAmount: number,
     userId: number,
+    tx?: TxOrDb,
   ): Promise<void> {
     // Resolve account codes from settings (not hardcoded)
     const settings = this.settingsRepository
@@ -277,13 +301,13 @@ export class CreatePurchaseUseCase extends WriteUseCase<
     const ACCT_AP = settings ? await settings.getApAccountCode() : "2100";
 
     const inventoryAcct =
-      await this.accountingRepository.findAccountByCode(ACCT_INVENTORY);
+      await this.accountingRepository.findAccountByCode(ACCT_INVENTORY, tx);
     const cashAcct =
-      await this.accountingRepository.findAccountByCode(ACCT_CASH);
-    const apAcct = await this.accountingRepository.findAccountByCode(ACCT_AP);
+      await this.accountingRepository.findAccountByCode(ACCT_CASH, tx);
+    const apAcct = await this.accountingRepository.findAccountByCode(ACCT_AP, tx);
     const vatInputAcct =
       purchase.tax > 0
-        ? await this.accountingRepository.findAccountByCode(ACCT_VAT_INPUT)
+        ? await this.accountingRepository.findAccountByCode(ACCT_VAT_INPUT, tx)
         : null;
 
     if (!inventoryAcct?.id) {
@@ -370,19 +394,22 @@ export class CreatePurchaseUseCase extends WriteUseCase<
 
     const autoPost = await this.resolveAutoPosting();
 
-    await this.accountingRepository.createJournalEntrySync({
-      entryNumber: `JE-PUR-${purchase.id || Date.now()}`,
-      entryDate: new Date(),
-      description: `Purchase #${purchase.invoiceNumber}`,
-      sourceType: "purchase",
-      sourceId: purchase.id,
-      isPosted: autoPost,
-      isReversed: false,
-      totalAmount: purchase.total,
-      currency: purchase.currency || "IQD",
-      createdBy: userId,
-      lines,
-    });
+    await this.accountingRepository.createJournalEntrySync(
+      {
+        entryNumber: `JE-PUR-${purchase.id || Date.now()}`,
+        entryDate: new Date(),
+        description: `Purchase #${purchase.invoiceNumber}`,
+        sourceType: "purchase",
+        sourceId: purchase.id,
+        isPosted: autoPost,
+        isReversed: false,
+        totalAmount: purchase.total,
+        currency: purchase.currency || "IQD",
+        createdBy: userId,
+        lines,
+      },
+      tx,
+    );
   }
 
   async executeSideEffectsPhase(

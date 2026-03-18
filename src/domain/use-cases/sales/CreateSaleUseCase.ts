@@ -29,6 +29,11 @@ import {
   calculateSaleTotals,
   roundByCurrency,
 } from "../../shared/utils/helpers.js";
+import type { DbConnection } from "../../../data/db/db.js";
+import {
+  withTransaction,
+  type TxOrDb,
+} from "../../../data/db/transaction.js";
 
 function logDevDiagnostics(event: Record<string, unknown>): void {
   if (process.env.NODE_ENV === "production") return;
@@ -91,6 +96,7 @@ export class CreateSaleUseCase extends WriteUseCase<
   private auditService: AuditService;
 
   constructor(
+    private db: DbConnection,
     private saleRepo: ISaleRepository,
     private productRepo: IProductRepository,
     private customerRepo: ICustomerRepository,
@@ -409,231 +415,274 @@ export class CreateSaleUseCase extends WriteUseCase<
       remainingAmount = roundByCurrency(remainingAmount, currency);
     }
 
-    // ── Step 5: Create sale record ──────────────────────────────
-    const saleData: Sale = {
-      invoiceNumber: generateInvoiceNumber(),
-      customerId: input.customerId,
-      subtotal: totals.subtotal,
-      discount: totals.discount,
-      tax: totals.tax,
-      total: finalTotal,
-      currency,
-      exchangeRate: 1,
-      paymentType: input.paymentType,
-      paidAmount,
-      remainingAmount,
-      status: remainingAmount <= 0 ? "completed" : "pending",
-      notes: input.notes,
-      interestRate: interestRateBps,
-      interestAmount: roundByCurrency(interestAmount, currency),
-      idempotencyKey: input.idempotencyKey,
-      createdBy: numUserId,
-      items: saleItems.map((si) => ({
-        productId: si.productId,
-        productName: si.productName,
-        quantity: si.quantity,
-        unitName: si.unitName,
-        unitFactor: si.unitFactor,
-        quantityBase: si.quantityBase,
-        batchId: si.batchId,
-        unitPrice: si.unitPrice,
-        discount: si.discount,
-        subtotal: si.subtotal,
-      })),
-      createdAt: new Date(),
-    };
-
-    const createdSale = await this.saleRepo.create(saleData);
-    const persistedItems = createdSale.items || [];
-    if (persistedItems.length !== saleItems.length) {
-      throw new ConflictError(
-        "Persisted sale items do not match requested sale items",
-        {
-          saleId: createdSale.id,
-          expectedItems: saleItems.length,
-          persistedItems: persistedItems.length,
-        },
-      );
-    }
-
-    // ── Step 6 & 7: FIFO batch depletion + inventory movements ──
-    let totalCOGS = 0;
-
-    for (const [index, item] of saleItems.entries()) {
-      const persistedItem = persistedItems[index];
-      const saleItemId = persistedItem?.id;
-      if (!saleItemId) {
-        throw new ConflictError("Persisted sale item is missing id", {
-          saleId: createdSale.id,
-          index,
-        });
-      }
-
-      const currentProduct = (await this.productRepo.findById(item.productId))!;
-      const stockBefore = currentProduct.stock || 0;
-
-      if (this.fifoService) {
-        // ── FIFO path: deplete from oldest batches, calculate real COGS ──
-        const fifoResult = await this.fifoService.deplete(
-          item.productId,
-          item.quantityBase,
-        );
-        totalCOGS += fifoResult.totalCost;
-        await this.saleRepo.createItemDepletions(
-          fifoResult.depletions.map((depletion) => ({
-            saleId: createdSale.id!,
-            saleItemId,
-            productId: item.productId,
-            batchId: depletion.batchId,
-            quantityBase: depletion.quantity,
-            costPerUnit: depletion.costPerUnit,
-            totalCost: depletion.totalCost,
-          })),
-        );
-
-        // Create one inventory movement per batch depletion for full traceability
-        let runningStock = stockBefore;
-        for (const depletion of fifoResult.depletions) {
-          const newStock = runningStock - depletion.quantity;
-          await this.inventoryRepo.createMovementSync({
-            productId: item.productId,
-            batchId: depletion.batchId,
-            movementType: "out",
-            reason: "sale",
-            quantityBase: depletion.quantity,
-            unitName: item.unitName,
-            unitFactor: item.unitFactor,
-            stockBefore: runningStock,
-            stockAfter: newStock,
-            costPerUnit: depletion.costPerUnit,
-            totalCost: depletion.totalCost,
-            sourceType: "sale",
-            sourceId: createdSale.id,
-            notes: `Sale #${createdSale.invoiceNumber} (batch ${depletion.batchId})`,
-            createdBy: numUserId,
-          });
-          diagnostics.inventoryMovementsCreated += 1;
-          runningStock = newStock;
-        }
-
-        // Update products.stock cache (one atomic update per product)
-        await this.productRepo.updateStock(item.productId, -item.quantityBase);
-      } else {
-        // ── Legacy path: no FIFO, flat stock deduction ──
-        const stockAfter = stockBefore - item.quantityBase;
-        totalCOGS += item.fallbackCostTotal;
-
-        await this.inventoryRepo.createMovementSync({
-          productId: item.productId,
-          batchId: item.batchId,
-          movementType: "out",
-          reason: "sale",
-          quantityBase: item.quantityBase,
-          unitName: item.unitName,
-          unitFactor: item.unitFactor,
-          stockBefore,
-          stockAfter,
-          costPerUnit: item.costPrice,
-          totalCost: item.fallbackCostTotal,
-          sourceType: "sale",
-          sourceId: createdSale.id,
-          notes: `Sale #${createdSale.invoiceNumber}`,
-          createdBy: numUserId,
-        });
-        diagnostics.inventoryMovementsCreated += 1;
-
-        await this.productRepo.updateStock(item.productId, -item.quantityBase);
-
-        if (item.batchId) {
-          await this.productRepo.updateBatchStock(
-            item.batchId,
-            -item.quantityBase,
-          );
-          await this.saleRepo.createItemDepletions([
-            {
-              saleId: createdSale.id!,
-              saleItemId,
-              productId: item.productId,
-              batchId: item.batchId,
-              quantityBase: item.quantityBase,
-              costPerUnit: item.costPrice,
-              totalCost: item.fallbackCostTotal,
-            },
-          ]);
-        }
-      }
-    }
-
-    // ── Step 8: Create payment ──────────────────────────────────
-    if (paidAmount > 0) {
-      await this.paymentRepo.createSync({
-        saleId: createdSale.id,
-        customerId: input.customerId,
-        amount: paidAmount,
-        currency,
-        exchangeRate: 1,
-        paymentMethod: input.paymentMethod || "cash",
-        referenceNumber: input.referenceNumber,
-        idempotencyKey: input.idempotencyKey
-          ? `${input.idempotencyKey}:payment:initial`
-          : undefined,
-        createdBy: numUserId,
-      });
-      diagnostics.paymentCreated = { created: true, reason: "paidAmount>0" };
-    } else {
-      diagnostics.paymentCreated = { created: false, reason: "paidAmount<=0" };
-    }
-
-    // ── Step 9: Accounting journal entry ─────────────────────────
+    // ── Steps 5-10: All writes inside a single transaction ─────
     const accountingEnabled = await this.isAccountingEnabled();
     const ledgersEnabled = await this.isLedgersEnabled();
-    diagnostics.journalCreated = accountingEnabled
-      ? await this.createSaleJournalEntry(
-          createdSale,
-          totalCOGS,
+
+    const { createdSale, totalCOGS } = await withTransaction(
+      this.db,
+      async (tx) => {
+        // ── Step 5: Create sale record ────────────────────────────
+        const saleData: Sale = {
+          invoiceNumber: generateInvoiceNumber(),
+          customerId: input.customerId,
+          subtotal: totals.subtotal,
+          discount: totals.discount,
+          tax: totals.tax,
+          total: finalTotal,
+          currency,
+          exchangeRate: 1,
+          paymentType: input.paymentType,
           paidAmount,
           remainingAmount,
-          currency,
-          numUserId,
-        )
-      : { created: false, reason: "accounting-disabled" };
+          status: remainingAmount <= 0 ? "completed" : "pending",
+          notes: input.notes,
+          interestRate: interestRateBps,
+          interestAmount: roundByCurrency(interestAmount, currency),
+          idempotencyKey: input.idempotencyKey,
+          createdBy: numUserId,
+          items: saleItems.map((si) => ({
+            productId: si.productId,
+            productName: si.productName,
+            quantity: si.quantity,
+            unitName: si.unitName,
+            unitFactor: si.unitFactor,
+            quantityBase: si.quantityBase,
+            batchId: si.batchId,
+            unitPrice: si.unitPrice,
+            discount: si.discount,
+            subtotal: si.subtotal,
+          })),
+          createdAt: new Date(),
+        };
 
-    // ── Step 10: Customer ledger + debt ──────────────────────────
-    if (!ledgersEnabled) {
-      diagnostics.customerLedgerCreated = {
-        created: false,
-        reason: "ledgers-disabled",
-      };
-    } else if (input.customerId && remainingAmount > 0) {
-      const currentDebt = await this.customerLedgerRepo.getLastBalanceSync(
-        input.customerId,
-      );
-      const newBalance = currentDebt + remainingAmount;
+        const createdSale = await this.saleRepo.create(saleData, tx);
+        const persistedItems = createdSale.items || [];
+        if (persistedItems.length !== saleItems.length) {
+          throw new ConflictError(
+            "Persisted sale items do not match requested sale items",
+            {
+              saleId: createdSale.id,
+              expectedItems: saleItems.length,
+              persistedItems: persistedItems.length,
+            },
+          );
+        }
 
-      await this.customerLedgerRepo.createSync({
-        customerId: input.customerId,
-        transactionType: "invoice",
-        amount: remainingAmount,
-        balanceAfter: newBalance,
-        saleId: createdSale.id,
-        notes: `Sale #${createdSale.invoiceNumber}`,
-        createdBy: numUserId,
-      });
-      diagnostics.customerLedgerCreated = {
-        created: true,
-        reason: "remainingAmount>0",
-      };
-    } else if (!input.customerId) {
-      diagnostics.customerLedgerCreated = {
-        created: false,
-        reason: "missing-customerId",
-      };
-    } else {
-      diagnostics.customerLedgerCreated = {
-        created: false,
-        reason: "remainingAmount<=0",
-      };
-    }
+        // ── Step 6 & 7: FIFO batch depletion + inventory movements ──
+        let totalCOGS = 0;
+
+        for (const [index, item] of saleItems.entries()) {
+          const persistedItem = persistedItems[index];
+          const saleItemId = persistedItem?.id;
+          if (!saleItemId) {
+            throw new ConflictError("Persisted sale item is missing id", {
+              saleId: createdSale.id,
+              index,
+            });
+          }
+
+          const currentProduct = (await this.productRepo.findById(
+            item.productId,
+            tx,
+          ))!;
+          const stockBefore = currentProduct.stock || 0;
+
+          if (this.fifoService) {
+            // ── FIFO path: deplete from oldest batches, calculate real COGS ──
+            const fifoResult = await this.fifoService.deplete(
+              item.productId,
+              item.quantityBase,
+              tx,
+            );
+            totalCOGS += fifoResult.totalCost;
+            await this.saleRepo.createItemDepletions(
+              fifoResult.depletions.map((depletion) => ({
+                saleId: createdSale.id!,
+                saleItemId,
+                productId: item.productId,
+                batchId: depletion.batchId,
+                quantityBase: depletion.quantity,
+                costPerUnit: depletion.costPerUnit,
+                totalCost: depletion.totalCost,
+              })),
+              tx,
+            );
+
+            // Create one inventory movement per batch depletion for full traceability
+            let runningStock = stockBefore;
+            for (const depletion of fifoResult.depletions) {
+              const newStock = runningStock - depletion.quantity;
+              await this.inventoryRepo.createMovementSync(
+                {
+                  productId: item.productId,
+                  batchId: depletion.batchId,
+                  movementType: "out",
+                  reason: "sale",
+                  quantityBase: depletion.quantity,
+                  unitName: item.unitName,
+                  unitFactor: item.unitFactor,
+                  stockBefore: runningStock,
+                  stockAfter: newStock,
+                  costPerUnit: depletion.costPerUnit,
+                  totalCost: depletion.totalCost,
+                  sourceType: "sale",
+                  sourceId: createdSale.id,
+                  notes: `Sale #${createdSale.invoiceNumber} (batch ${depletion.batchId})`,
+                  createdBy: numUserId,
+                },
+                tx,
+              );
+              diagnostics.inventoryMovementsCreated += 1;
+              runningStock = newStock;
+            }
+
+            // Update products.stock cache (one atomic update per product)
+            await this.productRepo.updateStock(
+              item.productId,
+              -item.quantityBase,
+              tx,
+            );
+          } else {
+            // ── Legacy path: no FIFO, flat stock deduction ──
+            const stockAfter = stockBefore - item.quantityBase;
+            totalCOGS += item.fallbackCostTotal;
+
+            await this.inventoryRepo.createMovementSync(
+              {
+                productId: item.productId,
+                batchId: item.batchId,
+                movementType: "out",
+                reason: "sale",
+                quantityBase: item.quantityBase,
+                unitName: item.unitName,
+                unitFactor: item.unitFactor,
+                stockBefore,
+                stockAfter,
+                costPerUnit: item.costPrice,
+                totalCost: item.fallbackCostTotal,
+                sourceType: "sale",
+                sourceId: createdSale.id,
+                notes: `Sale #${createdSale.invoiceNumber}`,
+                createdBy: numUserId,
+              },
+              tx,
+            );
+            diagnostics.inventoryMovementsCreated += 1;
+
+            await this.productRepo.updateStock(
+              item.productId,
+              -item.quantityBase,
+              tx,
+            );
+
+            if (item.batchId) {
+              await this.productRepo.updateBatchStock(
+                item.batchId,
+                -item.quantityBase,
+                tx,
+              );
+              await this.saleRepo.createItemDepletions(
+                [
+                  {
+                    saleId: createdSale.id!,
+                    saleItemId,
+                    productId: item.productId,
+                    batchId: item.batchId,
+                    quantityBase: item.quantityBase,
+                    costPerUnit: item.costPrice,
+                    totalCost: item.fallbackCostTotal,
+                  },
+                ],
+                tx,
+              );
+            }
+          }
+        }
+
+        // ── Step 8: Create payment ────────────────────────────────
+        if (paidAmount > 0) {
+          await this.paymentRepo.createSync(
+            {
+              saleId: createdSale.id,
+              customerId: input.customerId,
+              amount: paidAmount,
+              currency,
+              exchangeRate: 1,
+              paymentMethod: input.paymentMethod || "cash",
+              referenceNumber: input.referenceNumber,
+              idempotencyKey: input.idempotencyKey
+                ? `${input.idempotencyKey}:payment:initial`
+                : undefined,
+              createdBy: numUserId,
+            },
+            tx,
+          );
+          diagnostics.paymentCreated = { created: true, reason: "paidAmount>0" };
+        } else {
+          diagnostics.paymentCreated = {
+            created: false,
+            reason: "paidAmount<=0",
+          };
+        }
+
+        // ── Step 9: Accounting journal entry ─────────────────────
+        diagnostics.journalCreated = accountingEnabled
+          ? await this.createSaleJournalEntry(
+              createdSale,
+              totalCOGS,
+              paidAmount,
+              remainingAmount,
+              currency,
+              numUserId,
+              tx,
+            )
+          : { created: false, reason: "accounting-disabled" };
+
+        // ── Step 10: Customer ledger + debt ──────────────────────
+        if (!ledgersEnabled) {
+          diagnostics.customerLedgerCreated = {
+            created: false,
+            reason: "ledgers-disabled",
+          };
+        } else if (input.customerId && remainingAmount > 0) {
+          const currentDebt = await this.customerLedgerRepo.getLastBalanceSync(
+            input.customerId,
+            tx,
+          );
+          const newBalance = currentDebt + remainingAmount;
+
+          await this.customerLedgerRepo.createSync(
+            {
+              customerId: input.customerId,
+              transactionType: "invoice",
+              amount: remainingAmount,
+              balanceAfter: newBalance,
+              saleId: createdSale.id,
+              notes: `Sale #${createdSale.invoiceNumber}`,
+              createdBy: numUserId,
+            },
+            tx,
+          );
+          diagnostics.customerLedgerCreated = {
+            created: true,
+            reason: "remainingAmount>0",
+          };
+        } else if (!input.customerId) {
+          diagnostics.customerLedgerCreated = {
+            created: false,
+            reason: "missing-customerId",
+          };
+        } else {
+          diagnostics.customerLedgerCreated = {
+            created: false,
+            reason: "remainingAmount<=0",
+          };
+        }
+
+        return { createdSale, totalCOGS };
+      },
+    );
 
     createdSale.cogs = totalCOGS;
     createdSale.totalCogs = totalCOGS;
@@ -669,6 +718,7 @@ export class CreateSaleUseCase extends WriteUseCase<
     remainingAmount: number,
     currency: string,
     userId: number,
+    tx?: TxOrDb,
   ): Promise<{
     created: boolean;
     reason: string;
@@ -684,16 +734,16 @@ export class CreateSaleUseCase extends WriteUseCase<
     const ACCT_VAT_OUTPUT = await settings.getVatOutputAccountCode();
 
     // Look up account IDs by code
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
-    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR);
+    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH, tx);
+    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR, tx);
     const revenueAcct =
-      await this.accountingRepo.findAccountByCode(ACCT_REVENUE);
-    const cogsAcct = await this.accountingRepo.findAccountByCode(ACCT_COGS);
+      await this.accountingRepo.findAccountByCode(ACCT_REVENUE, tx);
+    const cogsAcct = await this.accountingRepo.findAccountByCode(ACCT_COGS, tx);
     const inventoryAcct =
-      await this.accountingRepo.findAccountByCode(ACCT_INVENTORY);
+      await this.accountingRepo.findAccountByCode(ACCT_INVENTORY, tx);
     const vatOutputAcct =
       sale.tax > 0
-        ? await this.accountingRepo.findAccountByCode(ACCT_VAT_OUTPUT)
+        ? await this.accountingRepo.findAccountByCode(ACCT_VAT_OUTPUT, tx)
         : null;
 
     // If required accounts are missing, skip journal entry creation
@@ -811,19 +861,22 @@ export class CreateSaleUseCase extends WriteUseCase<
 
     const autoPost = await this.resolveAutoPosting();
 
-    await this.accountingRepo.createJournalEntrySync({
-      entryNumber,
-      entryDate: new Date(),
-      description: `Sale #${sale.invoiceNumber}`,
-      sourceType: "sale",
-      sourceId: sale.id,
-      isPosted: autoPost,
-      isReversed: false,
-      totalAmount: sale.total,
-      currency,
-      createdBy: userId,
-      lines,
-    });
+    await this.accountingRepo.createJournalEntrySync(
+      {
+        entryNumber,
+        entryDate: new Date(),
+        description: `Sale #${sale.invoiceNumber}`,
+        sourceType: "sale",
+        sourceId: sale.id,
+        isPosted: autoPost,
+        isReversed: false,
+        totalAmount: sale.total,
+        currency,
+        createdBy: userId,
+        lines,
+      },
+      tx,
+    );
     return { created: true, reason: "created" };
   }
 

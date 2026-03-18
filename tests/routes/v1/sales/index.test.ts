@@ -97,7 +97,7 @@ describe("/api/v1/sales", () => {
       },
       setup: () =>
         mockUseCase("CreateSaleUseCase", {
-          executeCommitPhase: { createdSale: sale },
+          execute: sale,
         }),
       assert: (data: typeof sale) => {
         expect(data.invoiceNumber).toBe(sale.invoiceNumber);

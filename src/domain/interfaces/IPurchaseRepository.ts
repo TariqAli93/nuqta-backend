@@ -1,8 +1,9 @@
 import { Purchase } from "../entities/Purchase.js";
+import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface IPurchaseRepository {
-  create(purchase: Purchase): Promise<Purchase>;
-  createSync(purchase: Purchase): Promise<Purchase>;
+  create(purchase: Purchase, tx?: TxOrDb): Promise<Purchase>;
+  createSync(purchase: Purchase, tx?: TxOrDb): Promise<Purchase>;
   findByIdempotencyKey(key: string): Promise<Purchase | null>;
   findAll(params?: {
     search?: string;
