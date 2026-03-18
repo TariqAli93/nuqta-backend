@@ -387,6 +387,9 @@ export class AccountingRepository implements IAccountingRepository {
     }
 
     const entry: JournalEntry = {
+      entryNumber: params.entryNumber,
+      totalAmount: params.amount,
+      currency: params.currency,
       description: params.description,
       entryDate: new Date().toISOString(),
       sourceType: "sale_cancellation" as any,
