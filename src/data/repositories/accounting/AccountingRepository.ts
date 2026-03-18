@@ -216,7 +216,17 @@ export class AccountingRepository implements IAccountingRepository {
       description: line.description ?? null,
     }));
 
+    // Compute total amount for the reversal entry
+    const reversalTotalAmount = reversedLines.reduce(
+      (sum, line) => sum + (line.debit ?? 0) + (line.credit ?? 0),
+      0,
+    );
+
     const reversalEntry: JournalEntry = {
+      // derive required fields from the original entry
+      entryNumber: `${original.entryNumber}-REV`,
+      currency: original.currency,
+      totalAmount: reversalTotalAmount,
       description: params.description,
       entryDate: params.reversalDate.toISOString(),
       sourceType: params.sourceType as any,
