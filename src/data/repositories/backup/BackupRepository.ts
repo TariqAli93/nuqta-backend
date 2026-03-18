@@ -163,21 +163,39 @@ export class BackupRepository implements IBackupRepository {
       );
     }
 
-    const fileBuffer = await fs.readFile(inputPath);
-    const iv = fileBuffer.subarray(0, 12);
-    // Auth tag is the last 16 bytes
-    const authTag = fileBuffer.subarray(fileBuffer.length - 16);
-    const ciphertext = fileBuffer.subarray(12, fileBuffer.length - 16);
+    // Get file size so we can read IV (first 12 bytes) and auth tag (last 16 bytes)
+    const stat = await fs.stat(inputPath);
+    if (stat.size < 12 + 16) {
+      throw new Error("Encrypted backup file is too small to contain IV and auth tag");
+    }
 
-    const decipher = createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
+    const fileHandle = await fs.open(inputPath, "r");
+    try {
+      // Read IV (12 bytes from the beginning)
+      const iv = Buffer.alloc(12);
+      await fileHandle.read(iv, 0, iv.length, 0);
 
-    const decrypted = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
+      // Read auth tag (16 bytes from the end)
+      const authTag = Buffer.alloc(16);
+      await fileHandle.read(authTag, 0, authTag.length, stat.size - authTag.length);
 
-    await fs.writeFile(outputPath, decrypted);
+      const decipher = createDecipheriv("aes-256-gcm", key, iv);
+      decipher.setAuthTag(authTag);
+
+      // Ciphertext is everything between IV and auth tag
+      const ciphertextStart = 12;
+      const ciphertextEnd = stat.size - 16 - 1; // inclusive end index
+
+      const ciphertextStream = createReadStream(inputPath, {
+        start: ciphertextStart,
+        end: ciphertextEnd,
+      });
+      const writeStream = createWriteStream(outputPath);
+
+      await pipeline(ciphertextStream, decipher, writeStream);
+    } finally {
+      await fileHandle.close();
+    }
   }
 
   async list(): Promise<BackupInfo[]> {
