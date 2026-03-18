@@ -92,6 +92,8 @@ export class CancelSaleUseCase extends WriteUseCase<
             sourceId: sale.id!,
             notes: `إلغاء فاتورة #${sale.invoiceNumber}`,
             createdBy: numUserId,
+            stockBefore: 0,
+            stockAfter: dep.quantityBase,
           },
           tx,
         );
