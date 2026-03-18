@@ -484,6 +484,7 @@ export class CreateSaleUseCase extends WriteUseCase<
 
           const currentProduct = (await this.productRepo.findById(
             item.productId,
+            tx,
           ))!;
           const stockBefore = currentProduct.stock || 0;
 
@@ -537,7 +538,11 @@ export class CreateSaleUseCase extends WriteUseCase<
             }
 
             // Update products.stock cache (one atomic update per product)
-            await this.productRepo.updateStock(item.productId, -item.quantityBase);
+            await this.productRepo.updateStock(
+              item.productId,
+              -item.quantityBase,
+              tx,
+            );
           } else {
             // ── Legacy path: no FIFO, flat stock deduction ──
             const stockAfter = stockBefore - item.quantityBase;
@@ -565,12 +570,17 @@ export class CreateSaleUseCase extends WriteUseCase<
             );
             diagnostics.inventoryMovementsCreated += 1;
 
-            await this.productRepo.updateStock(item.productId, -item.quantityBase);
+            await this.productRepo.updateStock(
+              item.productId,
+              -item.quantityBase,
+              tx,
+            );
 
             if (item.batchId) {
               await this.productRepo.updateBatchStock(
                 item.batchId,
                 -item.quantityBase,
+                tx,
               );
               await this.saleRepo.createItemDepletions(
                 [
