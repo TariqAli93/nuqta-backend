@@ -168,7 +168,7 @@ export class CreateSaleUseCase extends WriteUseCase<
       throw new ValidationError("Card payments require a reference number");
     }
 
-    if (input.paymentMethod === "credit" && !input.customerId) {
+    if (input.paymentType === "credit" && !input.customerId) {
       throw new ValidationError("Credit/debt payments require a customer");
     }
 
@@ -241,6 +241,19 @@ export class CreateSaleUseCase extends WriteUseCase<
           {
             productId: item.productId,
             discount: item.discount,
+          },
+        );
+      }
+      if (
+        item.discount !== undefined &&
+        item.discount > item.unitPrice
+      ) {
+        throw new ValidationError(
+          "Item discount per unit cannot exceed unit price",
+          {
+            productId: item.productId,
+            discount: item.discount,
+            unitPrice: item.unitPrice,
           },
         );
       }
@@ -366,7 +379,28 @@ export class CreateSaleUseCase extends WriteUseCase<
     }
 
     // ── Step 4: Calculate totals ────────────────────────────────
-    const totals = calculateSaleTotals(input.items, input.discount, input.tax);
+    // Server-side tax: if accounting settings have taxEnabled, compute tax
+    // from defaultTaxRate rather than trusting the client-supplied value.
+    let effectiveTax = input.tax ?? 0;
+    if (this.accountingSettingsRepo) {
+      const acctSettings = await this.accountingSettingsRepo.get();
+      if (acctSettings.taxEnabled && acctSettings.defaultTaxRate > 0) {
+        // Compute taxable base = subtotal after all discounts (tax=0 pass)
+        const preTaxTotals = calculateSaleTotals(
+          input.items,
+          input.discount ?? 0,
+          0,
+        );
+        effectiveTax = Math.round(
+          preTaxTotals.total * (acctSettings.defaultTaxRate / 100),
+        );
+      }
+    }
+    const totals = calculateSaleTotals(
+      input.items,
+      input.discount ?? 0,
+      effectiveTax,
+    );
 
     let interestAmount = 0;
     let finalTotal = totals.total;
