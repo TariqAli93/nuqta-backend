@@ -11,7 +11,7 @@ import cors, { FastifyCorsOptions } from "@fastify/cors";
  */
 export default fp<FastifyCorsOptions>(async (fastify) => {
   const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim())
+    ? process.env.CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
     : [];
 
   // In production, refuse to start without explicit CORS configuration
