@@ -7,6 +7,12 @@ import type { DbConnection } from "./db.js";
 type TransactionClient = Parameters<Parameters<DbConnection["transaction"]>[0]>[0];
 
 /**
+ * Union type that allows any repository method to work both inside and outside
+ * a database transaction.  Use `tx ?? this.db` as the Drizzle client.
+ */
+export type TxOrDb = DbConnection | TransactionClient;
+
+/**
  * Execute a function within a database transaction.
  * If the function throws, the transaction is automatically rolled back.
  *

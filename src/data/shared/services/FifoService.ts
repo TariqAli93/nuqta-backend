@@ -1,5 +1,6 @@
 import { eq, and, gt, asc, sql } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import { productBatches } from "../../schema/schema.js";
 import type {
   IFifoDepletionService,
@@ -17,12 +18,19 @@ import { OptimisticLockError } from "../../../domain/index.js";
 export class FifoService implements IFifoDepletionService {
   constructor(private db: DbConnection) {}
 
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
+
   async deplete(
     productId: number,
     quantityNeeded: number,
+    tx?: TxOrDb,
   ): Promise<FifoDepletionResult> {
+    const client = this.c(tx);
+
     // Get active batches with stock, ordered by FEFO then FIFO
-    const batches = await this.db
+    const batches = await client
       .select()
       .from(productBatches)
       .where(
@@ -55,7 +63,7 @@ export class FifoService implements IFifoDepletionService {
         const depleted = Math.min(remaining, currentBatch.quantityOnHand);
         const newQty = currentBatch.quantityOnHand - depleted;
 
-        const result = await this.db
+        const result = await client
           .update(productBatches)
           .set({
             quantityOnHand: newQty,
@@ -87,7 +95,7 @@ export class FifoService implements IFifoDepletionService {
 
         // Version mismatch: re-fetch the batch and retry
         if (attempt < MAX_LOCK_RETRIES - 1) {
-          const [fresh] = await this.db
+          const [fresh] = await client
             .select()
             .from(productBatches)
             .where(

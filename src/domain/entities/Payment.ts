@@ -5,6 +5,7 @@ export const PaymentMethodEnum = z.enum([
   "card",
   "bank_transfer",
   "credit",
+  "refund",
 ]);
 export type PaymentMethod = z.infer<typeof PaymentMethodEnum>;
 
@@ -14,7 +15,7 @@ export const PaymentSchema = z.object({
   purchaseId: z.number().nullable().optional(),
   customerId: z.number().nullable().optional(),
   supplierId: z.number().nullable().optional(),
-  amount: z.number().int().min(0),
+  amount: z.number().int(),
   currency: z.string().default("IQD"),
   exchangeRate: z.number().default(1),
   paymentMethod: PaymentMethodEnum,

@@ -3,6 +3,7 @@
 // Batch-level stock depletion using First-In-First-Out ordering
 // with First-Expiry-First-Out (FEFO) tie-breaking.
 // ═══════════════════════════════════════════════════════════════
+import type { TxOrDb } from "../../../data/db/transaction.js";
 
 export interface BatchDepletion {
   /** Batch that was depleted */
@@ -46,6 +47,7 @@ export interface IFifoDepletionService {
   deplete(
     productId: number,
     quantityNeeded: number,
+    tx?: TxOrDb,
   ): Promise<FifoDepletionResult>;
 
   /**

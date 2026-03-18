@@ -309,6 +309,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const userId = String(request.user?.sub ?? "system");
       const fifoService = new FifoService(fastify.db);
       const uc = new CreateSaleUseCase(
+        fastify.db,
         fastify.repos.sale,
         fastify.repos.product,
         fastify.repos.customer,
@@ -321,16 +322,16 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fifoService,
         fastify.repos.accountingSettings,
       );
-      const result = await uc.executeCommitPhase(body, userId);
+      const createdSale = await uc.execute(body, userId);
 
       // Emit real-time event for other terminals
       fastify.emitDomainEvent("sale:created", {
-        id: result.createdSale.id,
-        total: result.createdSale.total,
-        itemCount: result.createdSale.items?.length ?? 0,
+        id: createdSale.id,
+        total: createdSale.total,
+        itemCount: createdSale.items?.length ?? 0,
       });
 
-      return { ok: true, data: result.createdSale };
+      return { ok: true, data: createdSale };
     },
   );
 
@@ -367,7 +368,16 @@ const sales: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const saleId = parseInt(request.params.id, 10);
       const userId = String(request.user?.sub ?? "system");
-      const uc = new CancelSaleUseCase(fastify.repos.sale);
+      const uc = new CancelSaleUseCase(
+        fastify.db,
+        fastify.repos.sale,
+        fastify.repos.inventory,
+        fastify.repos.accounting,
+        fastify.repos.customerLedger,
+        fastify.repos.payment,
+        fastify.repos.settings,
+        fastify.repos.audit,
+      );
       await uc.execute({ saleId }, userId);
 
       fastify.emitDomainEvent("sale:cancelled", { id: saleId });
@@ -384,7 +394,16 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const saleId = parseInt(request.params.id, 10);
       const body = request.body as { amount: number; reason?: string };
       const userId = String(request.user?.sub ?? "system");
-      const uc = new RefundSaleUseCase(fastify.repos.sale);
+      const uc = new RefundSaleUseCase(
+        fastify.db,
+        fastify.repos.sale,
+        fastify.repos.payment,
+        fastify.repos.inventory,
+        fastify.repos.accounting,
+        fastify.repos.customerLedger,
+        fastify.repos.settings,
+        fastify.repos.audit,
+      );
       const data = await uc.execute(
         { saleId, amount: body.amount, reason: body.reason },
         userId,

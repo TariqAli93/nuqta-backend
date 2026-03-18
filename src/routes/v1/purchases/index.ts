@@ -240,6 +240,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
       const body = request.body as CreatePurchaseInput;
       const userId = String(request.user?.sub ?? "system");
       const uc = new CreatePurchaseUseCase(
+        fastify.db,
         fastify.repos.purchase,
         fastify.repos.supplier,
         fastify.repos.payment,

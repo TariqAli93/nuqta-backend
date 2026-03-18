@@ -1,5 +1,5 @@
 import { InventoryMovement } from "../entities/InventoryMovement.js";
-import { Product } from "../entities/Product.js";
+import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface StockReconciliationRow {
   productId: number;
@@ -18,9 +18,11 @@ export interface StockReconciliationResult {
 export interface IInventoryRepository {
   createMovement(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<InventoryMovement>;
   createMovementSync(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<InventoryMovement>;
   getMovements(params?: {
     productId?: number;
@@ -57,4 +59,10 @@ export interface IInventoryRepository {
    * Returns count of corrected rows.
    */
   repairStockDrift(): Promise<number>;
+
+  /**
+   * Restore quantity to a batch (used during cancellation or refund).
+   * Increments quantityOnHand and re-activates the batch if it was depleted.
+   */
+  restoreBatchQty(batchId: number, qty: number, tx?: TxOrDb): Promise<void>;
 }

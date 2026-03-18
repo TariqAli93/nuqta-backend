@@ -168,12 +168,25 @@ const changePasswordSchema = {
 
 // ─── Logout ────────────────────────────────────────────────────────
 
+const LogoutBodySchema = {
+  type: "object" as const,
+  properties: {
+    refreshToken: {
+      type: "string",
+      minLength: 1,
+      description: "Pass the refresh token to invalidate it server-side",
+    },
+  },
+  additionalProperties: false,
+} as const;
+
 const logoutSchema = {
   tags: ["Auth"],
   summary: "Logout",
   description:
-    "Client should discard tokens. Server-side blacklist is optional.",
+    "Revokes access token (and refresh token if provided) server-side.",
   security: [{ bearerAuth: [] }],
+  body: LogoutBodySchema,
   response: {
     200: SuccessNullResponse,
     ...ErrorResponses,
@@ -302,12 +315,31 @@ const auth: FastifyPluginAsync = async (fastify) => {
       if (accessPayload?.jti) {
         const uc = new LogoutUseCase(fastify.repos.revokedToken);
         const userId = String(request.user?.sub ?? "system");
-        // exp comes from the decoded JWT; cast is safe when jti is present
         const tokenWithClaims = accessPayload as typeof accessPayload & {
           jti: string;
           exp: number;
         };
-        await uc.execute({ accessToken: tokenWithClaims }, userId);
+
+        // Revoke refresh token if provided
+        const body = request.body as { refreshToken?: string } | undefined;
+        let refreshPayload:
+          | (ReturnType<typeof fastify.jwt.verifyRefresh> & {
+              jti: string;
+              exp: number;
+            })
+          | undefined;
+
+        if (body?.refreshToken) {
+          const raw = fastify.jwt.verifyRefresh(body.refreshToken);
+          if (raw?.jti && raw.exp) {
+            refreshPayload = raw as typeof refreshPayload;
+          }
+        }
+
+        await uc.execute(
+          { accessToken: tokenWithClaims, refreshToken: refreshPayload },
+          userId,
+        );
       }
 
       return { ok: true, data: null };

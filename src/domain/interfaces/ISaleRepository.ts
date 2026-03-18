@@ -1,9 +1,10 @@
 import { Sale, SaleItemDepletion } from "../entities/Sale.js";
 import { SaleReceipt } from "../entities/SaleReceipt.js";
+import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface ISaleRepository {
-  create(sale: Sale): Promise<Sale>;
-  findById(id: number): Promise<Sale | null>;
+  create(sale: Sale, tx?: TxOrDb): Promise<Sale>;
+  findById(id: number, tx?: TxOrDb): Promise<Sale | null>;
   findByIdempotencyKey(key: string): Promise<Sale | null>;
   findAll(params?: {
     page: number;
@@ -14,15 +15,16 @@ export interface ISaleRepository {
     items: Sale[];
     total: number;
   }>;
-  updateStatus(id: number, status: "completed" | "cancelled"): Promise<void>;
-  update(id: number, data: Partial<Sale>): Promise<void>;
+  updateStatus(id: number, status: "completed" | "cancelled", tx?: TxOrDb): Promise<void>;
+  update(id: number, data: Partial<Sale>, tx?: TxOrDb): Promise<void>;
   createItemDepletions(
     depletions: Omit<
       SaleItemDepletion,
       "id" | "createdAt" | "batchNumber" | "expiryDate"
     >[],
+    tx?: TxOrDb,
   ): Promise<void>;
-  getItemDepletionsBySaleId(saleId: number): Promise<SaleItemDepletion[]>;
+  getItemDepletionsBySaleId(saleId: number, tx?: TxOrDb): Promise<SaleItemDepletion[]>;
   getDailySummary(date: Date): Promise<{
     revenue: number;
     count: number;

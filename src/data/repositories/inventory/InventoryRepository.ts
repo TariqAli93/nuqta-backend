@@ -1,5 +1,6 @@
 import { eq, and, gte, lte, sql, desc, SQL } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import {
   inventoryMovements,
   products,
@@ -41,12 +42,17 @@ const LEDGER_SUM_EXPR = sql`
 export class InventoryRepository implements IInventoryRepository {
   constructor(private db: DbConnection) {}
 
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
+
   /* ── Movements ──────────────────────────────────────────────── */
 
   async createMovement(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<InventoryMovement> {
-    const [created] = await this.db
+    const [created] = await this.c(tx)
       .insert(inventoryMovements)
       .values(movement as typeof inventoryMovements.$inferInsert)
       .returning();
@@ -59,8 +65,36 @@ export class InventoryRepository implements IInventoryRepository {
    */
   async createMovementSync(
     movement: Omit<InventoryMovement, "id" | "createdAt">,
+    tx?: TxOrDb,
   ): Promise<InventoryMovement> {
-    return this.createMovement(movement);
+    return this.createMovement(movement, tx);
+  }
+
+  async restoreBatchQty(
+    batchId: number,
+    qty: number,
+    tx?: TxOrDb,
+  ): Promise<void> {
+    await this.c(tx)
+      .update(productBatches)
+      .set({
+        quantityOnHand: sql`${productBatches.quantityOnHand} + ${qty}`,
+        isActive: true,
+      } as any)
+      .where(eq(productBatches.id, batchId));
+
+    // Keep products.stock in sync
+    const [batch] = await this.c(tx)
+      .select({ productId: productBatches.productId })
+      .from(productBatches)
+      .where(eq(productBatches.id, batchId));
+
+    if (batch?.productId) {
+      await this.c(tx)
+        .update(products)
+        .set({ stock: sql`${products.stock} + ${qty}` } as any)
+        .where(eq(products.id, batch.productId));
+    }
   }
 
   async getMovements(params?: {

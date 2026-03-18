@@ -1,5 +1,6 @@
 import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import {
   customers,
   posSettings,
@@ -21,10 +22,15 @@ import {
 export class SaleRepository implements ISaleRepository {
   constructor(private db: DbConnection) {}
 
-  async create(sale: Sale): Promise<Sale> {
-    const { items, ...saleData } = sale;
+  private c(tx?: TxOrDb): TxOrDb {
+    return tx ?? this.db;
+  }
 
-    const [created] = await this.db
+  async create(sale: Sale, tx?: TxOrDb): Promise<Sale> {
+    const { items, ...saleData } = sale;
+    const client = this.c(tx);
+
+    const [created] = await client
       .insert(sales)
       .values(saleData as any)
       .returning();
@@ -34,16 +40,17 @@ export class SaleRepository implements ISaleRepository {
         ...item,
         saleId: created.id,
       }));
-      await this.db.insert(saleItems).values(itemValues as any);
+      await client.insert(saleItems).values(itemValues as any);
     }
 
-    return this.mapSaleWithDetails(created);
+    return this.mapSaleWithDetails(created, tx);
   }
 
-  async findById(id: number): Promise<Sale | null> {
-    const [row] = await this.db.select().from(sales).where(eq(sales.id, id));
+  async findById(id: number, tx?: TxOrDb): Promise<Sale | null> {
+    const client = this.c(tx);
+    const [row] = await client.select().from(sales).where(eq(sales.id, id));
     if (!row) return null;
-    return this.mapSaleWithDetails(row);
+    return this.mapSaleWithDetails(row, tx);
   }
 
   async findByIdempotencyKey(key: string): Promise<Sale | null> {
@@ -100,16 +107,17 @@ export class SaleRepository implements ISaleRepository {
   async updateStatus(
     id: number,
     status: "completed" | "cancelled",
+    tx?: TxOrDb,
   ): Promise<void> {
-    await this.db
+    await this.c(tx)
       .update(sales)
       .set({ status, updatedAt: new Date() } as any)
       .where(eq(sales.id, id));
   }
 
-  async update(id: number, data: Partial<Sale>): Promise<void> {
+  async update(id: number, data: Partial<Sale>, tx?: TxOrDb): Promise<void> {
     const { items, ...saleData } = data;
-    await this.db
+    await this.c(tx)
       .update(sales)
       .set({ ...saleData, updatedAt: new Date() } as any)
       .where(eq(sales.id, id));
@@ -120,15 +128,17 @@ export class SaleRepository implements ISaleRepository {
       SaleItemDepletion,
       "id" | "createdAt" | "batchNumber" | "expiryDate"
     >[],
+    tx?: TxOrDb,
   ): Promise<void> {
     if (depletions.length === 0) return;
-    await this.db.insert(saleItemDepletions).values(depletions as any);
+    await this.c(tx).insert(saleItemDepletions).values(depletions as any);
   }
 
   async getItemDepletionsBySaleId(
     saleId: number,
+    tx?: TxOrDb,
   ): Promise<SaleItemDepletion[]> {
-    const rows = await this.db
+    const rows = await this.c(tx)
       .select({
         id: saleItemDepletions.id,
         saleId: saleItemDepletions.saleId,
@@ -453,8 +463,9 @@ export class SaleRepository implements ISaleRepository {
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private async mapSaleWithDetails(row: any): Promise<Sale> {
-    const items = await this.db
+  private async mapSaleWithDetails(row: any, tx?: TxOrDb): Promise<Sale> {
+    const client = this.c(tx);
+    const items = await client
       .select()
       .from(saleItems)
       .where(eq(saleItems.saleId, row.id));
@@ -462,7 +473,7 @@ export class SaleRepository implements ISaleRepository {
     // Fetch depletions for each item and attach
     const itemsWithDepletions = await Promise.all(
       items.map(async (item) => {
-        const depletions = await this.db
+        const depletions = await client
           .select({
             id: saleItemDepletions.id,
             saleId: saleItemDepletions.saleId,
@@ -481,7 +492,7 @@ export class SaleRepository implements ISaleRepository {
             productBatches,
             eq(saleItemDepletions.batchId, productBatches.id),
           )
-          .where(eq(saleItemDepletions.saleItemId, item.id));
+          .where(eq(saleItemDepletions.saleItemId, item.id as number));
 
         const cogs = depletions.reduce((sum, d) => sum + d.totalCost, 0);
         const weightedAverageCost =
