@@ -333,11 +333,15 @@ export class AccountingRepository implements IAccountingRepository {
       }
     }
 
+    const entryNumber = `JE-CN-${params.saleId}-${Date.now()}`;
     const entry: JournalEntry = {
+      entryNumber,
       description: params.description,
       entryDate: new Date().toISOString(),
       sourceType: "sale_refund" as any,
       sourceId: params.saleId,
+      totalAmount: params.amount,
+      currency: params.currency,
       isPosted: true,
       isReversed: false,
       createdBy: params.createdBy,
