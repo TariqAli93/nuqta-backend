@@ -19,6 +19,8 @@ import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
+import type { DbConnection } from "../../../data/db/db.js";
+import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
 const ACCT_CASH = "1001";
 const ACCT_AR = "1100";
@@ -47,6 +49,7 @@ export class AddPaymentUseCase extends WriteUseCase<
   private auditService?: AuditService;
 
   constructor(
+    private db: DbConnection,
     private saleRepo: ISaleRepository,
     private paymentRepo: IPaymentRepository,
     private customerRepo: ICustomerRepository,
@@ -144,79 +147,100 @@ export class AddPaymentUseCase extends WriteUseCase<
 
     const actualPaymentAmount = Math.min(amount, saleRemaining);
 
-    const payment = await this.paymentRepo.createSync({
-      saleId: sale.id!,
-      customerId: sale.customerId || input.customerId || undefined,
-      amount: actualPaymentAmount,
-      currency: input.currency || currency,
-      exchangeRate: input.exchangeRate || sale.exchangeRate,
-      paymentMethod: input.paymentMethod || "cash",
-      referenceNumber: input.referenceNumber,
-      notes: input.notes,
-      createdBy: numUserId,
-      status: "completed",
-      paymentDate: new Date(),
-      idempotencyKey: input.idempotencyKey,
-    });
-
-    const newPaidAmount = roundByCurrency(
-      sale.paidAmount + actualPaymentAmount,
-      currency,
-    );
-    let newRemainingAmount = roundByCurrency(
-      sale.remainingAmount - actualPaymentAmount,
-      currency,
-    );
-
-    const threshold = currency === "IQD" ? 0 : 0.01;
-    if (newRemainingAmount < threshold) newRemainingAmount = 0;
-
-    const newStatus = newRemainingAmount <= 0 ? "completed" : "pending";
-
-    await this.saleRepo.update(sale.id!, {
-      paidAmount: newPaidAmount,
-      remainingAmount: newRemainingAmount,
-      status: newStatus,
-      updatedAt: new Date(),
-    });
-
+    // Pre-fetch settings outside the transaction (read-only, no locks needed)
     const accountingEnabled = await this.isAccountingEnabled();
     const ledgersEnabled = await this.isLedgersEnabled();
     const effectiveCustomerId = sale.customerId || input.customerId;
-    if (ledgersEnabled && effectiveCustomerId) {
-      const balanceBefore =
-        await this.customerLedgerRepo.getLastBalanceSync(effectiveCustomerId);
-      await this.customerLedgerRepo.createSync({
-        customerId: effectiveCustomerId,
-        transactionType: "payment",
-        amount: -actualPaymentAmount,
-        balanceAfter: balanceBefore - actualPaymentAmount,
-        saleId: sale.id,
-        paymentId: payment.id,
-        notes: input.notes || `Payment for sale #${sale.invoiceNumber}`,
-        createdBy: numUserId,
-      });
-    } else if (!ledgersEnabled && sale.customerId) {
-      // Legacy fallback when ledgers are intentionally disabled.
-      await this.customerRepo.updateDebt(sale.customerId, -actualPaymentAmount);
-    }
 
-    if (accountingEnabled) {
-      await this.createPaymentJournalEntry(
-        payment.id!,
-        actualPaymentAmount,
-        currency,
-        numUserId,
-        effectiveCustomerId,
+    const updatedSale = await withTransaction(this.db, async (tx) => {
+      const payment = await this.paymentRepo.createSync(
+        {
+          saleId: sale.id!,
+          customerId: sale.customerId || input.customerId || undefined,
+          amount: actualPaymentAmount,
+          currency: input.currency || currency,
+          exchangeRate: input.exchangeRate || sale.exchangeRate,
+          paymentMethod: input.paymentMethod || "cash",
+          referenceNumber: input.referenceNumber,
+          notes: input.notes,
+          createdBy: numUserId,
+          status: "completed",
+          paymentDate: new Date(),
+          idempotencyKey: input.idempotencyKey,
+        },
+        tx,
       );
-    }
 
-    const updatedSale = await this.saleRepo.findById(sale.id!);
-    if (!updatedSale) {
-      throw new NotFoundError("Sale not found after payment update", {
-        saleId: sale.id,
-      });
-    }
+      const newPaidAmount = roundByCurrency(
+        sale.paidAmount + actualPaymentAmount,
+        currency,
+      );
+      let newRemainingAmount = roundByCurrency(
+        sale.remainingAmount - actualPaymentAmount,
+        currency,
+      );
+
+      const threshold = currency === "IQD" ? 0 : 0.01;
+      if (newRemainingAmount < threshold) newRemainingAmount = 0;
+
+      const newStatus = newRemainingAmount <= 0 ? "completed" : "pending";
+
+      await this.saleRepo.update(
+        sale.id!,
+        {
+          paidAmount: newPaidAmount,
+          remainingAmount: newRemainingAmount,
+          status: newStatus,
+          updatedAt: new Date(),
+        },
+        tx,
+      );
+
+      if (ledgersEnabled && effectiveCustomerId) {
+        const balanceBefore = await this.customerLedgerRepo.getLastBalanceSync(
+          effectiveCustomerId,
+          tx,
+        );
+        await this.customerLedgerRepo.createSync(
+          {
+            customerId: effectiveCustomerId,
+            transactionType: "payment",
+            amount: -actualPaymentAmount,
+            balanceAfter: balanceBefore - actualPaymentAmount,
+            saleId: sale.id,
+            paymentId: payment.id,
+            notes: input.notes || `Payment for sale #${sale.invoiceNumber}`,
+            createdBy: numUserId,
+          },
+          tx,
+        );
+      } else if (!ledgersEnabled && sale.customerId) {
+        // Legacy fallback when ledgers are intentionally disabled.
+        await this.customerRepo.updateDebt(
+          sale.customerId,
+          -actualPaymentAmount,
+        );
+      }
+
+      if (accountingEnabled) {
+        await this.createPaymentJournalEntry(
+          payment.id!,
+          actualPaymentAmount,
+          currency,
+          numUserId,
+          effectiveCustomerId,
+          tx,
+        );
+      }
+
+      const refreshed = await this.saleRepo.findById(sale.id!, tx);
+      if (!refreshed) {
+        throw new NotFoundError("Sale not found after payment update", {
+          saleId: sale.id,
+        });
+      }
+      return refreshed;
+    });
 
     return { updatedSale };
   }
@@ -227,9 +251,13 @@ export class AddPaymentUseCase extends WriteUseCase<
     currency: string,
     userId: number,
     customerId?: number,
+    tx?: TxOrDb,
   ): Promise<void> {
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
-    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR);
+    const cashAcct = await this.accountingRepo.findAccountByCode(
+      ACCT_CASH,
+      tx,
+    );
+    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR, tx);
 
     if (!cashAcct?.id || !arAcct?.id) {
       console.warn(
@@ -260,19 +288,22 @@ export class AddPaymentUseCase extends WriteUseCase<
       },
     ];
 
-    await this.accountingRepo.createJournalEntrySync({
-      entryNumber: `JE-PAY-${paymentId}`,
-      entryDate: new Date(),
-      description: `Customer payment #${paymentId}`,
-      sourceType: "payment",
-      sourceId: paymentId,
-      isPosted: autoPost,
-      isReversed: false,
-      totalAmount: amount,
-      currency,
-      createdBy: userId,
-      lines,
-    });
+    await this.accountingRepo.createJournalEntrySync(
+      {
+        entryNumber: `JE-PAY-${paymentId}`,
+        entryDate: new Date(),
+        description: `Customer payment #${paymentId}`,
+        sourceType: "payment",
+        sourceId: paymentId,
+        isPosted: autoPost,
+        isReversed: false,
+        totalAmount: amount,
+        currency,
+        createdBy: userId,
+        lines,
+      },
+      tx,
+    );
   }
 
   async executeSideEffectsPhase(

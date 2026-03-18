@@ -347,6 +347,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const body = request.body as Omit<AddPaymentInput, "saleId">;
       const userId = String(request.user?.sub ?? "system");
       const uc = new AddPaymentUseCase(
+        fastify.db,
         fastify.repos.sale,
         fastify.repos.payment,
         fastify.repos.customer,
