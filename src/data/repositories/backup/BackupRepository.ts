@@ -118,7 +118,7 @@ export class BackupRepository implements IBackupRepository {
 
   /**
    * Encrypt a file using AES-256-GCM.
-   * Format: [12-byte IV][16-byte auth tag][ciphertext]
+   * Format: [12-byte IV][ciphertext][16-byte auth tag]
    */
   private async encryptFile(
     inputPath: string,
