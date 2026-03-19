@@ -51,6 +51,8 @@ const MovementsQuerySchema = {
       description: "Filter by product",
     },
     movementType: { type: "string", enum: ["in", "out", "adjust"] },
+    dateFrom: { type: "string", format: "date", description: "Filter from date (inclusive)" },
+    dateTo: { type: "string", format: "date", description: "Filter to date (inclusive)" },
     limit: { type: "string", pattern: "^\\d+$" },
     offset: { type: "string", pattern: "^\\d+$" },
   },
@@ -186,6 +188,8 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       const query = request.query as {
         productId?: string;
         movementType?: string;
+        dateFrom?: string;
+        dateTo?: string;
         limit?: string;
         offset?: string;
       };
@@ -193,6 +197,8 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       const data = await uc.execute({
         productId: query.productId ? parseInt(query.productId, 10) : undefined,
         movementType: query.movementType,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });
@@ -243,6 +249,9 @@ const inventory: FastifyPluginAsync = async (fastify) => {
         limit?: string;
         offset?: string;
       };
+      // Also accept repair from body (for backwards compat with frontend POST body)
+      const body = (request.body as { repair?: boolean } | null) ?? {};
+      const repairFlag = query.repair === "true" || body.repair === true;
 
       const uc = new ReconcileStockUseCase(
         fastify.repos.product,
@@ -250,7 +259,7 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       );
 
       // Repair mode: fix all drift in a single batch UPDATE
-      if (query.repair === "true") {
+      if (repairFlag) {
         const corrected = await uc.repair();
 
         fastify.emitDomainEvent("inventory:reconciled", { corrected });

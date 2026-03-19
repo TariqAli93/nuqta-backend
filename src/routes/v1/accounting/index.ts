@@ -228,6 +228,60 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // PUT /accounting/accounts/:id
+  fastify.put<{ Params: { id: string } }>(
+    "/accounts/:id",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Update chart of accounts entry",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        body: {
+          type: "object" as const,
+          properties: {
+            name: { type: "string", minLength: 1 },
+            nameAr: { type: "string", nullable: true },
+            accountType: {
+              type: "string",
+              enum: ["asset", "liability", "equity", "revenue", "expense"],
+            },
+            parentId: { type: "integer", nullable: true },
+            isActive: { type: "boolean" },
+          },
+          additionalProperties: false,
+        },
+        response: {
+          200: successEnvelope(AccountSchema, "Updated account"),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
+    },
+    async (request) => {
+      const id = parseInt(request.params.id, 10);
+      const body = request.body as Partial<{
+        name: string;
+        nameAr: string | null;
+        accountType: string;
+        parentId: number | null;
+        isActive: boolean;
+      }>;
+      const { accounts } = await import("../../../data/schema/schema.js");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await fastify.db
+        .update(accounts)
+        .set({ ...body })
+        .where(eq(accounts.id, id))
+        .returning();
+      if (!updated) {
+        return (request as any).server.httpErrors?.notFound?.() ??
+          { ok: false, error: { code: "NOT_FOUND", message: "Account not found" } };
+      }
+      return { ok: true, data: updated };
+    },
+  );
+
   // GET /accounting/journal-entries
   fastify.get(
     "/journal-entries",

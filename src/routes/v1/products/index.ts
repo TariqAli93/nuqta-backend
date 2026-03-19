@@ -348,7 +348,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         { productId, opts: { limit, offset } },
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data: { data: result.items } };
+      return { ok: true, data: { items: result.items, total: result.items.length } };
     },
   );
 
@@ -373,7 +373,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         { productId, opts: { limit, offset } },
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data: { data: result.items } };
+      return { ok: true, data: { items: result.items, total: result.items.length } };
     },
   );
 };

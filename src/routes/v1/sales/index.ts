@@ -56,7 +56,7 @@ const SaleSchema = {
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
     paidAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
-    status: { type: "string", enum: ["pending", "completed", "cancelled"] },
+    status: { type: "string", enum: ["pending", "completed", "cancelled", "refunded", "partial"] },
     notes: { type: "string", nullable: true },
     idempotencyKey: { type: "string", nullable: true },
     createdAt: { type: "string", format: "date-time" },
