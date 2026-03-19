@@ -240,6 +240,7 @@ async function initializeDatabase(): Promise<void> {
   const createCustomerUseCase = new CreateCustomerUseCase(customerRepo);
   const createUserUseCase = new CreateUserUseCase(userRepo);
   const createPurchaseUseCase = new CreatePurchaseUseCase(
+    db,
     purchaseRepo,
     supplierRepo,
     paymentRepo,
@@ -249,6 +250,7 @@ async function initializeDatabase(): Promise<void> {
     auditRepo,
   );
   const createSaleUseCase = new CreateSaleUseCase(
+    db,
     saleRepo,
     productRepo,
     customerRepo,

@@ -23,6 +23,7 @@ import {
   NotFoundError,
   InvalidStateError,
 } from "../../shared/errors/DomainErrors.js";
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
@@ -78,7 +79,11 @@ export class CancelSaleUseCase extends WriteUseCase<
       );
 
       for (const dep of depletions) {
-        await this.inventoryRepo.restoreBatchQty(dep.batchId, dep.quantityBase, tx);
+        await this.inventoryRepo.restoreBatchQty(
+          dep.batchId,
+          dep.quantityBase,
+          tx,
+        );
         await this.inventoryRepo.createMovement(
           {
             productId: dep.productId,
@@ -86,6 +91,8 @@ export class CancelSaleUseCase extends WriteUseCase<
             movementType: "in",
             reason: "cancellation",
             quantityBase: dep.quantityBase,
+            unitName: "piece",
+            unitFactor: 1,
             costPerUnit: dep.costPerUnit,
             totalCost: dep.totalCost,
             sourceType: "sale_cancellation",
@@ -138,7 +145,11 @@ export class CancelSaleUseCase extends WriteUseCase<
       await this.paymentRepo.voidBySaleId(sale.id!, tx);
 
       // 5. Customer ledger cancellation entry
-      if (ledgersEnabled && sale.customerId && (sale.remainingAmount ?? 0) > 0) {
+      if (
+        ledgersEnabled &&
+        sale.customerId &&
+        (sale.remainingAmount ?? 0) > 0
+      ) {
         const currentBalance = await this.customerLedgerRepo.getLastBalanceSync(
           sale.customerId,
           tx,
@@ -147,7 +158,7 @@ export class CancelSaleUseCase extends WriteUseCase<
           {
             customerId: sale.customerId,
             transactionType: "cancellation",
-            amount: -(sale.remainingAmount!),
+            amount: -sale.remainingAmount!,
             balanceAfter: currentBalance - sale.remainingAmount!,
             saleId: sale.id!,
             notes: `إلغاء فاتورة #${sale.invoiceNumber}`,
@@ -170,13 +181,16 @@ export class CancelSaleUseCase extends WriteUseCase<
   ): Promise<void> {
     if (!this.auditRepo) return;
     try {
-      await this.auditRepo.create({
-        userId: Number(userId),
-        action: "cancel",
-        entityType: "Sale",
-        entityId: String(result.sale.id),
-        changeDescription: `إلغاء فاتورة #${result.sale.invoiceNumber} (${result.depletionsRestored} batch depletions restored)`,
-      });
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "cancel",
+          entityType: "Sale",
+          entityId: result.sale.id!,
+          timestamp: new Date().toISOString(),
+          changeDescription: `إلغاء فاتورة #${result.sale.invoiceNumber} (${result.depletionsRestored} batch depletions restored)`,
+        }),
+      );
     } catch {
       // Audit must not break committed cancellation.
     }

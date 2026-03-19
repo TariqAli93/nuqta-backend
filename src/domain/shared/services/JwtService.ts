@@ -22,26 +22,28 @@ import { env } from "../../../shared/env.js";
 export type TokenType = "access" | "refresh";
 
 export interface JwtPayload {
-  sub: string;        // user ID
-  role: string;       // user role
+  sub: string; // user ID
+  role: string; // user role
   permissions: string[];
   username: string;
   fullName: string;
   phone?: string;
   type: TokenType;
-  jti?: string;       // JWT ID for revocation
+  jti?: string; // JWT ID for revocation
+  iat?: number; // issued at (added by jwt.sign)
+  exp?: number; // expiration (added by jwt.sign)
 }
 
 export interface JwtOptions {
   secret: string;
-  accessExpiresIn: number;   // seconds (default 900 = 15 min)
-  refreshExpiresIn: number;  // seconds (default 604_800 = 7 days)
+  accessExpiresIn: number; // seconds (default 900 = 15 min)
+  refreshExpiresIn: number; // seconds (default 604_800 = 7 days)
 }
 
 export class JwtService {
   private readonly algorithm: Algorithm;
-  private readonly signingKey: string;   // private key or HMAC secret
-  private readonly verifyKey: string;    // public key or HMAC secret
+  private readonly signingKey: string; // private key or HMAC secret
+  private readonly verifyKey: string; // public key or HMAC secret
   private readonly accessExpiresIn: number;
   private readonly refreshExpiresIn: number;
 

@@ -17,6 +17,7 @@ export * from "./entities/AuditEvent.js";
 export * from "./entities/Barcode.js";
 export * from "./entities/Category.js";
 export * from "./entities/Customer.js";
+export * from "./entities/Department.js";
 export * from "./entities/Employee.js";
 export * from "./entities/InventoryMovement.js";
 export * from "./entities/Ledger.js";
@@ -48,6 +49,7 @@ export * from "./interfaces/IBarcodeRepository.js";
 export * from "./interfaces/ICategoryRepository.js";
 export * from "./interfaces/ICustomerLedgerRepository.js";
 export * from "./interfaces/ICustomerRepository.js";
+export * from "./interfaces/IDepartmentRepository.js";
 export * from "./interfaces/IEmployeeRepository.js";
 export * from "./interfaces/IInventoryRepository.js";
 export * from "./interfaces/IPaymentRepository.js";
@@ -108,6 +110,9 @@ export * from "./use-cases/dashboard/GetDashboardStatsUseCase.js";
 
 // ── Use Cases: HR ──
 export * from "./use-cases/hr/ApprovePayrollRunUseCase.js";
+export * from "./use-cases/hr/CreateDepartmentUseCase.js";
+export * from "./use-cases/hr/GetDepartmentByIdUseCase.js";
+export * from "./use-cases/hr/UpdateDepartmentUseCase.js";
 export * from "./use-cases/hr/CancelPayrollUseCase.js";
 export * from "./use-cases/hr/CreateEmployeeUseCase.js";
 export * from "./use-cases/hr/CreatePayrollRunUseCase.js";

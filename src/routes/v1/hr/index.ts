@@ -2,13 +2,17 @@ import { FastifyPluginAsync } from "fastify";
 import {
   ApprovePayrollRunUseCase,
   CancelPayrollUseCase,
+  CreateDepartmentUseCase,
   CreateEmployeeUseCase,
   CreatePayrollRunUseCase,
   DisbursePayrollUseCase,
+  GetDepartmentByIdUseCase,
   GetEmployeeByIdUseCase,
   GetPayrollRunByIdUseCase,
   SubmitPayrollUseCase,
+  UpdateDepartmentUseCase,
   UpdateEmployeeUseCase,
+  type Department,
   type Employee,
   type CreatePayrollRunInput,
 } from "../../../domain/index.js";
@@ -39,6 +43,30 @@ const EmployeeListSchema = {
     items: {
       type: "array" as const,
       items: EmployeeSchema,
+    },
+    total: { type: "integer" },
+  },
+};
+
+const DepartmentSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    name: { type: "string" },
+    description: { type: "string", nullable: true },
+    isActive: { type: "boolean" },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", nullable: true, format: "date-time" },
+    createdBy: { type: "integer", nullable: true },
+  },
+};
+
+const DepartmentListSchema = {
+  type: "object" as const,
+  properties: {
+    items: {
+      type: "array" as const,
+      items: DepartmentSchema,
     },
     total: { type: "integer" },
   },
@@ -140,6 +168,37 @@ const UpdateEmployeeBodySchema = {
   additionalProperties: false,
 } as const;
 
+const DepartmentListQuerySchema = {
+  type: "object" as const,
+  properties: {
+    search: { type: "string", description: "Search by department name" },
+    isActive: { type: "string", enum: ["true", "false"] },
+    limit: { type: "string", pattern: "^\\d+$" },
+    offset: { type: "string", pattern: "^\\d+$" },
+  },
+} as const;
+
+const CreateDepartmentBodySchema = {
+  type: "object" as const,
+  required: ["name"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    description: { type: "string", nullable: true },
+    isActive: { type: "boolean", default: true },
+  },
+  additionalProperties: false,
+} as const;
+
+const UpdateDepartmentBodySchema = {
+  type: "object" as const,
+  properties: {
+    name: { type: "string", minLength: 1 },
+    description: { type: "string", nullable: true },
+    isActive: { type: "boolean" },
+  },
+  additionalProperties: false,
+} as const;
+
 const PayrollRunListQuerySchema = {
   type: "object" as const,
   properties: {
@@ -235,6 +294,51 @@ const updateEmployeeSchema = {
   body: UpdateEmployeeBodySchema,
   response: {
     200: successEnvelope(EmployeeSchema, "Updated employee"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const getDepartmentsSchema = {
+  tags: ["HR & Payroll"],
+  summary: "List departments",
+  security: [{ bearerAuth: [] }],
+  querystring: DepartmentListQuerySchema,
+  response: {
+    200: successEnvelope(DepartmentListSchema, "Departments"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const getDepartmentByIdSchema = {
+  tags: ["HR & Payroll"],
+  summary: "Get department by ID",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successEnvelope(DepartmentSchema, "Department"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const createDepartmentSchema = {
+  tags: ["HR & Payroll"],
+  summary: "Create department",
+  security: [{ bearerAuth: [] }],
+  body: CreateDepartmentBodySchema,
+  response: {
+    200: successEnvelope(DepartmentSchema, "Created department"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const updateDepartmentSchema = {
+  tags: ["HR & Payroll"],
+  summary: "Update department",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  body: UpdateDepartmentBodySchema,
+  response: {
+    200: successEnvelope(DepartmentSchema, "Updated department"),
     ...ErrorResponses,
   },
 } as const;
@@ -365,6 +469,82 @@ const hr: FastifyPluginAsync = async (fastify) => {
       return { ok: true, data };
     },
   );
+
+  // ── Departments ─────────────────────────────────────────────
+
+  fastify.get(
+    "/departments",
+    {
+      schema: getDepartmentsSchema,
+      preHandler: requirePermission("hr:read"),
+    },
+    async (request) => {
+      const query = request.query as {
+        search?: string;
+        isActive?: string;
+        limit?: string;
+        offset?: string;
+      };
+      const data = await fastify.repos.department.findAll({
+        search: query.search,
+        isActive:
+          query.isActive !== undefined ? query.isActive === "true" : undefined,
+        limit: query.limit ? parseInt(query.limit, 10) : undefined,
+        offset: query.offset ? parseInt(query.offset, 10) : undefined,
+      });
+      return { ok: true, data };
+    },
+  );
+
+  fastify.get<{ Params: { id: string } }>(
+    "/departments/:id",
+    {
+      schema: getDepartmentByIdSchema,
+      preHandler: requirePermission("hr:read"),
+    },
+    async (request) => {
+      const uc = new GetDepartmentByIdUseCase(fastify.repos.department);
+      const data = await uc.execute(parseInt(request.params.id, 10));
+      return { ok: true, data };
+    },
+  );
+
+  fastify.post(
+    "/departments",
+    {
+      schema: createDepartmentSchema,
+      preHandler: requirePermission("hr:update"),
+    },
+    async (request) => {
+      const body = request.body as Department;
+      const uc = new CreateDepartmentUseCase(fastify.repos.department);
+      const data = await uc.execute(
+        body,
+        String(request.user?.sub ?? "system"),
+      );
+      return { ok: true, data };
+    },
+  );
+
+  fastify.put<{ Params: { id: string } }>(
+    "/departments/:id",
+    {
+      schema: updateDepartmentSchema,
+      preHandler: requirePermission("hr:update"),
+    },
+    async (request) => {
+      const id = parseInt(request.params.id, 10);
+      const body = request.body as Partial<Department>;
+      const uc = new UpdateDepartmentUseCase(fastify.repos.department);
+      const data = await uc.execute(
+        { id, department: body },
+        String(request.user?.sub ?? "system"),
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // ── Payroll ─────────────────────────────────────────────────
 
   fastify.get(
     "/payroll-runs",

@@ -15,6 +15,7 @@ export interface CreditNoteEntryParams {
   amount: number;
   description: string;
   createdBy: number;
+  currency?: string;
   /** Pre-tax revenue amount to reverse (defaults to amount if not supplied) */
   netRevenue?: number;
   /** VAT amount to reverse (0 if none) */
@@ -34,13 +35,18 @@ export interface PaymentReversalEntryParams {
   amount: number;
   description: string;
   createdBy: number;
+  entryNumber?: string;
+  currency?: string;
   cashAccountId?: number;
   arAccountId?: number;
 }
 
 export interface IAccountingRepository {
   createJournalEntry(entry: JournalEntry, tx?: TxOrDb): Promise<JournalEntry>;
-  createJournalEntrySync(entry: JournalEntry, tx?: TxOrDb): Promise<JournalEntry>;
+  createJournalEntrySync(
+    entry: JournalEntry,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry>;
   createAccountSync(
     account: Omit<Account, "id" | "createdAt">,
     tx?: TxOrDb,
@@ -100,17 +106,26 @@ export interface IAccountingRepository {
    * Each debit becomes a credit and vice-versa.
    * Sets isReversed=true on the original and reversalOfId on the new entry.
    */
-  createReversalEntry(params: ReversalEntryParams, tx?: TxOrDb): Promise<JournalEntry>;
+  createReversalEntry(
+    params: ReversalEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry>;
 
   /**
    * Create a credit note journal entry for a sale refund.
    * Debits revenue, credits cash (or AR).  If goods were returned, also
    * debits inventory and credits COGS.
    */
-  createCreditNoteEntry(params: CreditNoteEntryParams, tx?: TxOrDb): Promise<JournalEntry>;
+  createCreditNoteEntry(
+    params: CreditNoteEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry>;
 
   /**
    * Reverse a cash payment: Credit Cash, Debit AR (or vice-versa for credit sales).
    */
-  createPaymentReversalEntry(params: PaymentReversalEntryParams, tx?: TxOrDb): Promise<JournalEntry>;
+  createPaymentReversalEntry(
+    params: PaymentReversalEntryParams,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry>;
 }

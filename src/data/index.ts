@@ -17,6 +17,7 @@ export * from "./repositories/barcode/BarcodeRepository.js";
 export * from "./repositories/categories/CategoryRepository.js";
 export * from "./repositories/customer-ledger/CustomerLedgerRepository.js";
 export * from "./repositories/customers/CustomerRepository.js";
+export * from "./repositories/departments/DepartmentRepository.js";
 export * from "./repositories/employees/EmployeeRepository.js";
 export * from "./repositories/inventory/InventoryRepository.js";
 export * from "./repositories/payments/PaymentRepository.js";

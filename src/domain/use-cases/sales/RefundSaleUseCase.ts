@@ -22,6 +22,7 @@ import {
   InvalidStateError,
   ValidationError,
 } from "../../shared/errors/DomainErrors.js";
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
@@ -115,7 +116,11 @@ export class RefundSaleUseCase extends WriteUseCase<
             const stockBefore = 0;
             const stockAfter = stockBefore + returnQty;
 
-            await this.inventoryRepo.restoreBatchQty(dep.batchId, returnQty, tx);
+            await this.inventoryRepo.restoreBatchQty(
+              dep.batchId,
+              returnQty,
+              tx,
+            );
             await this.inventoryRepo.createMovement(
               {
                 productId: saleItem.productId!,
@@ -123,6 +128,8 @@ export class RefundSaleUseCase extends WriteUseCase<
                 movementType: "in",
                 reason: "refund",
                 quantityBase: returnQty,
+                unitName: saleItem.unitName ?? "piece",
+                unitFactor: saleItem.unitFactor ?? 1,
                 costPerUnit: dep.costPerUnit,
                 totalCost: returnQty * dep.costPerUnit,
                 sourceType: "sale_refund",
@@ -187,11 +194,10 @@ export class RefundSaleUseCase extends WriteUseCase<
 
       // 6. Customer ledger refund entry
       if (ledgersEnabled && sale.customerId) {
-        const currentBalance =
-          await this.customerLedgerRepo.getLastBalanceSync(
-            sale.customerId,
-            tx,
-          );
+        const currentBalance = await this.customerLedgerRepo.getLastBalanceSync(
+          sale.customerId,
+          tx,
+        );
         await this.customerLedgerRepo.createSync(
           {
             customerId: sale.customerId,
@@ -221,13 +227,16 @@ export class RefundSaleUseCase extends WriteUseCase<
   ): Promise<void> {
     if (!this.auditRepo) return;
     try {
-      await this.auditRepo.create({
-        userId: Number(userId),
-        action: "refund",
-        entityType: "Sale",
-        entityId: String(result.saleId),
-        changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result.saleId}`,
-      });
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "refund",
+          entityType: "Sale",
+          entityId: result.saleId,
+          timestamp: new Date().toISOString(),
+          changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result.saleId}`,
+        }),
+      );
     } catch {
       // Audit must not break committed refund.
     }

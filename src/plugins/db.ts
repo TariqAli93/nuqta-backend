@@ -11,6 +11,7 @@ import type {
   CustomerLedgerRepository,
   CustomerRepository,
   DbConnection,
+  DepartmentRepository,
   EmployeeRepository,
   InventoryRepository,
   PaymentRepository,
@@ -35,6 +36,7 @@ export interface Repositories {
   category: CategoryRepository;
   customer: CustomerRepository;
   supplier: SupplierRepository;
+  department: DepartmentRepository;
   employee: EmployeeRepository;
   product: ProductRepository;
   sale: SaleRepository;
@@ -71,6 +73,7 @@ export default fp<AppOptions>(async (fastify, opts) => {
     repos ??= {
       category: new data.CategoryRepository(connection),
       customer: new data.CustomerRepository(connection),
+      department: new data.DepartmentRepository(connection),
       supplier: new data.SupplierRepository(connection),
       employee: new data.EmployeeRepository(connection),
       product: new data.ProductRepository(connection),

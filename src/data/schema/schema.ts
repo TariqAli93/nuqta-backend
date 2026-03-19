@@ -375,6 +375,23 @@ export const inventoryMovements = pgTable(
 // CHART OF ACCOUNTS (Double-Entry Accounting)
 // ═══════════════════════════════════════════════════════════════
 
+export const departments = pgTable(
+  "departments",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull().unique(),
+    description: text("description"),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "string" }).defaultNow(),
+    createdBy: integer("created_by"),
+  },
+  (table) => [
+    index("idx_departments_name").on(table.name),
+    index("idx_departments_active").on(table.isActive),
+  ],
+);
+
 export const employees = pgTable(
   "employees",
   {

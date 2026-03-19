@@ -1,5 +1,6 @@
 import { eq, like, and, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import { products, productBatches, productUnits } from "../../schema/schema.js";
 import {
   IProductRepository,
@@ -66,8 +67,9 @@ export class ProductRepository implements IProductRepository {
     return { items: items as unknown as Product[], total };
   }
 
-  async findById(id: number): Promise<Product | null> {
-    const [item] = await this.db
+  async findById(id: number, tx?: TxOrDb): Promise<Product | null> {
+    const client = tx ?? this.db;
+    const [item] = await client
       .select()
       .from(products)
       .where(eq(products.id, id));
@@ -119,8 +121,13 @@ export class ProductRepository implements IProductRepository {
     await this.db.delete(products).where(eq(products.id, id));
   }
 
-  async updateStock(id: number, quantityChange: number): Promise<void> {
-    await this.db
+  async updateStock(
+    id: number,
+    quantityChange: number,
+    tx?: TxOrDb,
+  ): Promise<void> {
+    const client = tx ?? this.db;
+    await client
       .update(products)
       .set({
         stock: sql`${products.stock} + ${quantityChange}`,
@@ -139,8 +146,10 @@ export class ProductRepository implements IProductRepository {
   async updateBatchStock(
     batchId: number,
     quantityChange: number,
+    tx?: TxOrDb,
   ): Promise<void> {
-    await this.db
+    const client = tx ?? this.db;
+    await client
       .update(productBatches)
       .set({
         quantityOnHand: sql`${productBatches.quantityOnHand} + ${quantityChange}`,

@@ -1,6 +1,7 @@
 import { Product } from "../entities/Product.js";
 import { ProductBatch } from "../entities/ProductBatch.js";
 import { ProductUnit } from "../entities/ProductUnit.js";
+import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface IProductRepository {
   findAll(params?: {
@@ -13,15 +14,19 @@ export interface IProductRepository {
     lowStockOnly?: boolean;
     expiringSoonOnly?: boolean;
   }): Promise<{ items: Product[]; total: number }>;
-  findById(id: number): Promise<Product | null>;
+  findById(id: number, tx?: TxOrDb): Promise<Product | null>;
   findByBarcode?(barcode: string): Promise<Product | null>;
   create(product: Product): Promise<Product>;
   update(id: number, product: Partial<Product>): Promise<Product>;
   delete(id: number): Promise<void>;
-  updateStock(id: number, quantityChange: number): Promise<void>;
+  updateStock(id: number, quantityChange: number, tx?: TxOrDb): Promise<void>;
   /** Set products.stock to the exact value (used for cache sync from batch totals) */
   setStock(id: number, absoluteStock: number): Promise<void>;
-  updateBatchStock(batchId: number, quantityChange: number): Promise<void>;
+  updateBatchStock(
+    batchId: number,
+    quantityChange: number,
+    tx?: TxOrDb,
+  ): Promise<void>;
   countLowStock(threshold: number): Promise<number>;
 
   // ── Product Batches ────────────────────────────────────────────
