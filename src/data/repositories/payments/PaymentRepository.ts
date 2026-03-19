@@ -31,8 +31,8 @@ export class PaymentRepository implements IPaymentRepository {
     return (item as unknown as Payment) || null;
   }
 
-  async findBySaleId(saleId: number): Promise<Payment[]> {
-    const items = await this.db
+  async findBySaleId(saleId: number, tx?: TxOrDb): Promise<Payment[]> {
+    const items = await this.c(tx)
       .select()
       .from(payments)
       .where(eq(payments.saleId, saleId));
@@ -68,9 +68,13 @@ export class PaymentRepository implements IPaymentRepository {
   }
 
   async voidBySaleId(saleId: number, tx?: TxOrDb): Promise<void> {
+    // Only void "completed" payments — "refunded" payments represent cash already
+    // returned to the customer and must not be overwritten.
     await this.c(tx)
       .update(payments)
       .set({ status: "voided" } as any)
-      .where(eq(payments.saleId, saleId));
+      .where(
+        sql`${payments.saleId} = ${saleId} AND ${payments.status} = 'completed'`,
+      );
   }
 }

@@ -51,7 +51,7 @@ export const SaleSchema = z.object({
   paymentType: z.enum(["cash", "credit", "mixed"]).default("cash"),
   paidAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
-  status: z.enum(["pending", "completed", "cancelled"]).default("pending"),
+  status: z.enum(["pending", "completed", "cancelled", "refunded", "partial_refund"]).default("pending"),
   notes: z.string().nullable().optional(),
   idempotencyKey: z.string().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),
