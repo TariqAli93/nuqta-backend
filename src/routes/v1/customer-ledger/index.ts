@@ -237,12 +237,14 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("ledger:adjust"),
     },
     async (request) => {
-      const { repair } = (request.query as { repair?: string }) || {};
+      const { repair: repairQuery } = (request.query as { repair?: string }) || {};
+      const bodyRepair = (request.body as { repair?: boolean } | null)?.repair;
+      const repair = repairQuery === "true" || bodyRepair === true;
       const uc = new ReconcileCustomerDebtUseCase(
         fastify.repos.customer,
         fastify.repos.customerLedger,
       );
-      if (repair === "true") {
+      if (repair) {
         const corrected = await uc.repair();
         return { ok: true, data: { corrected } };
       }

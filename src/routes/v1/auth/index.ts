@@ -195,12 +195,20 @@ const logoutSchema = {
 
 // ─── Me ────────────────────────────────────────────────────────────
 
+const MeDataSchema = {
+  type: "object" as const,
+  properties: {
+    ...UserSafeSchema.properties,
+    permissions: { type: "array", items: { type: "string" } },
+  },
+};
+
 const meSchema = {
   tags: ["Auth"],
   summary: "Current user info",
   security: [{ bearerAuth: [] }],
   response: {
-    200: successEnvelope(UserSafeSchema, "Current user"),
+    200: successEnvelope(MeDataSchema, "Current user with permissions"),
     ...ErrorResponses,
   },
 } as const;
@@ -438,7 +446,8 @@ const auth: FastifyPluginAsync = async (fastify) => {
         });
       }
       const { password, ...safeUser } = user;
-      return { ok: true, data: safeUser };
+      const permissions = (request.user as { permissions?: string[] })?.permissions ?? [];
+      return { ok: true, data: { ...safeUser, permissions } };
     },
   );
 };
