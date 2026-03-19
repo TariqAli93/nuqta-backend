@@ -22,6 +22,7 @@ import {
   InvalidStateError,
   ValidationError,
 } from "../../shared/errors/DomainErrors.js";
+import type { TxOrDb } from "../../../data/db/transaction.js";
 import { AuditEvent } from "../../entities/AuditEvent.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
@@ -189,12 +190,14 @@ export class RefundSaleUseCase extends WriteUseCase<
 
       // 5. Credit note journal entry
       if (accountingEnabled) {
-        await this.accountingRepo.createCreditNoteEntry(
+        await this._postCreditNoteEntry(
           {
             saleId: sale.id!,
+            invoiceNumber: sale.invoiceNumber,
+            customerId: sale.customerId,
+            paymentType: sale.paymentType,
             amount: input.amount,
             cogsReversal,
-            description: `استرداد - فاتورة #${sale.invoiceNumber}`,
             createdBy: numUserId,
           },
           tx,
@@ -228,6 +231,88 @@ export class RefundSaleUseCase extends WriteUseCase<
         newRemainingAmount,
       };
     });
+  }
+
+  /**
+   * Resolve chart-of-account IDs from settings (same pattern as CreateSaleUseCase)
+   * and post a balanced credit note journal entry for the refund.
+   *
+   * For a cash sale: DR Revenue / CR Cash
+   * For a credit sale: DR Revenue / CR AR
+   * If goods returned: additionally DR Inventory / CR COGS
+   *
+   * Throws ValidationError if required accounts are not in the chart of accounts.
+   */
+  private async _postCreditNoteEntry(
+    params: {
+      saleId: number;
+      invoiceNumber: string;
+      customerId?: number | null;
+      paymentType?: string | null;
+      amount: number;
+      cogsReversal: number;
+      createdBy: number;
+    },
+    tx: TxOrDb,
+  ): Promise<void> {
+    const settings = new SettingsAccessor(this.settingsRepo);
+
+    const ACCT_CASH = await settings.getCashAccountCode();
+    const ACCT_AR = await settings.getArAccountCode();
+    const ACCT_REVENUE = await settings.getSalesRevenueAccountCode();
+    const ACCT_COGS = await settings.getCogsAccountCode();
+    const ACCT_INVENTORY = await settings.getInventoryAccountCode();
+
+    const [cashAcct, arAcct, revenueAcct, cogsAcct, inventoryAcct] =
+      await Promise.all([
+        this.accountingRepo.findAccountByCode(ACCT_CASH, tx),
+        this.accountingRepo.findAccountByCode(ACCT_AR, tx),
+        this.accountingRepo.findAccountByCode(ACCT_REVENUE, tx),
+        this.accountingRepo.findAccountByCode(ACCT_COGS, tx),
+        this.accountingRepo.findAccountByCode(ACCT_INVENTORY, tx),
+      ]);
+
+    // Determine counter account: for credit sales credit AR; for cash sales credit Cash.
+    // Fall back to the other if only one is configured.
+    const isCreditSale = params.paymentType === "credit";
+    const counterAcct = isCreditSale
+      ? (arAcct ?? cashAcct)
+      : (cashAcct ?? arAcct);
+
+    const missing: string[] = [];
+    if (!revenueAcct?.id) missing.push(ACCT_REVENUE);
+    if (!counterAcct?.id)
+      missing.push(isCreditSale ? ACCT_AR : ACCT_CASH);
+    if (params.cogsReversal > 0) {
+      if (!cogsAcct?.id) missing.push(ACCT_COGS);
+      if (!inventoryAcct?.id) missing.push(ACCT_INVENTORY);
+    }
+
+    if (missing.length > 0) {
+      throw new ValidationError(
+        `لا يمكن تسجيل قيد محاسبي للاسترداد: حسابات مفقودة [${missing.join(", ")}]. ` +
+          `تأكد من تهيئة دليل الحسابات.`,
+      );
+    }
+
+    await this.accountingRepo.createCreditNoteEntry(
+      {
+        saleId: params.saleId,
+        amount: params.amount,
+        cogsReversal: params.cogsReversal,
+        description: `استرداد - فاتورة #${params.invoiceNumber}`,
+        createdBy: params.createdBy,
+        // Pass resolved IDs so the repository uses the correct accounts
+        revenueAccountId: revenueAcct!.id!,
+        // Pass counter-account in the correct slot
+        ...(isCreditSale
+          ? { arAccountId: counterAcct!.id! }
+          : { cashAccountId: counterAcct!.id! }),
+        cogsAccountId: cogsAcct?.id,
+        inventoryAccountId: inventoryAcct?.id,
+      },
+      tx,
+    );
   }
 
   async executeSideEffectsPhase(

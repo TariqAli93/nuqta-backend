@@ -34,6 +34,16 @@ export class AccountingRepository implements IAccountingRepository {
       .returning();
 
     if (lines && lines.length > 0) {
+      // ── Balance guard: never persist an unbalanced journal entry ──────
+      const totalDebit = lines.reduce((s, l) => s + (l.debit || 0), 0);
+      const totalCredit = lines.reduce((s, l) => s + (l.credit || 0), 0);
+      if (totalDebit !== totalCredit) {
+        throw new Error(
+          `Unbalanced journal entry "${entry.entryNumber}": debit ${totalDebit} ≠ credit ${totalCredit}. ` +
+            `Entry will not be persisted. Fix the posting logic for sourceType="${entry.sourceType}".`,
+        );
+      }
+
       const lineValues = lines.map((line) => {
         const balance = (line.debit || 0) - (line.credit || 0);
         return {
@@ -265,27 +275,28 @@ export class AccountingRepository implements IAccountingRepository {
     const vatAmount = params.vatAmount ?? 0;
     const cogsReversal = params.cogsReversal ?? 0;
 
-    // Resolve account IDs — fall back to looking up by standard codes
+    // Resolve account IDs — fall back to looking up by standard codes.
+    // Codes must match DEFAULT_ACCOUNTING_CODES in InitializeAccountingUseCase.
     const [revenueAcc, cashAcc, vatAcc, cogsAcc, inventoryAcc, arAcc] =
       await Promise.all([
         params.revenueAccountId
           ? Promise.resolve({ id: params.revenueAccountId })
-          : this.findAccountByCode("4000", tx),
+          : this.findAccountByCode("4001", tx), // salesRevenueAccountCode default
         params.cashAccountId
           ? Promise.resolve({ id: params.cashAccountId })
-          : this.findAccountByCode("1100", tx),
+          : this.findAccountByCode("1001", tx), // cashAccountCode default
         params.vatOutputAccountId
           ? Promise.resolve({ id: params.vatOutputAccountId })
-          : this.findAccountByCode("2200", tx),
+          : this.findAccountByCode("2200", tx), // vatOutputAccountCode default
         params.cogsAccountId
           ? Promise.resolve({ id: params.cogsAccountId })
-          : this.findAccountByCode("5000", tx),
+          : this.findAccountByCode("5001", tx), // cogsAccountCode default
         params.inventoryAccountId
           ? Promise.resolve({ id: params.inventoryAccountId })
-          : this.findAccountByCode("1200", tx),
+          : this.findAccountByCode("1200", tx), // inventoryAccountCode default
         params.arAccountId
           ? Promise.resolve({ id: params.arAccountId })
-          : this.findAccountByCode("1300", tx),
+          : this.findAccountByCode("1100", tx), // arAccountCode default
       ]);
 
     const lines: Partial<JournalLine>[] = [];
@@ -363,13 +374,14 @@ export class AccountingRepository implements IAccountingRepository {
     params: PaymentReversalEntryParams,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
+    // Codes must match DEFAULT_ACCOUNTING_CODES in InitializeAccountingUseCase.
     const [cashAcc, arAcc] = await Promise.all([
       params.cashAccountId
         ? Promise.resolve({ id: params.cashAccountId })
-        : this.findAccountByCode("1100", tx),
+        : this.findAccountByCode("1001", tx), // cashAccountCode default
       params.arAccountId
         ? Promise.resolve({ id: params.arAccountId })
-        : this.findAccountByCode("1300", tx),
+        : this.findAccountByCode("1100", tx), // arAccountCode default
     ]);
 
     const lines: Partial<JournalLine>[] = [];
