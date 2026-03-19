@@ -81,8 +81,12 @@ export class RefundSaleUseCase extends WriteUseCase<
       if (!sale) throw new NotFoundError("الفاتورة غير موجودة");
       if (sale.status === "cancelled")
         throw new InvalidStateError("لا يمكن استرداد فاتورة ملغية");
+      if (sale.status === "refunded")
+        throw new InvalidStateError("تم استرداد هذه الفاتورة بالكامل بالفعل");
       if (input.amount <= 0)
         throw new ValidationError("مبلغ الاسترداد يجب أن يكون أكبر من صفر");
+      if ((sale.paidAmount ?? 0) <= 0)
+        throw new InvalidStateError("لا يوجد مبلغ مدفوع لاسترداده");
       if (input.amount > (sale.paidAmount ?? 0))
         throw new ValidationError("مبلغ الاسترداد أكبر من المبلغ المدفوع");
 
@@ -162,15 +166,20 @@ export class RefundSaleUseCase extends WriteUseCase<
         tx,
       );
 
-      // 4. Update sale amounts
+      // 4. Update sale amounts and status
       const newPaidAmount = (sale.paidAmount ?? 0) - input.amount;
       const newRemainingAmount = (sale.total ?? 0) - newPaidAmount;
+
+      // Determine new invoice status based on refund outcome
+      const newStatus =
+        newPaidAmount === 0 ? "refunded" : "partial_refund";
 
       await this.saleRepo.update(
         input.saleId,
         {
           paidAmount: newPaidAmount,
           remainingAmount: newRemainingAmount,
+          status: newStatus,
           notes: sale.notes
             ? `${sale.notes}\nاسترداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}`
             : `استرداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}`,

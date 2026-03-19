@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { PermissionDeniedError } from "../../../../src/domain/index.js";
+import { InvalidStateError, NotFoundError, PermissionDeniedError, ValidationError } from "../../../../src/domain/index.js";
 import { expectError, expectOk } from "../../../helpers/assertions.ts";
 import { buildApp, type BuiltApp } from "../../../helpers/buildApp.ts";
 import { paymentResult, sale, saleList } from "../../../helpers/fixtures.ts";
@@ -320,5 +320,258 @@ describe("/api/v1/sales", () => {
     });
 
     expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  // ══════════════════════════════════════════════════════
+  // CANCEL ROUTE — POST /sales/:id/cancel
+  // ══════════════════════════════════════════════════════
+
+  test("POST /:id/cancel succeeds and returns null data", async () => {
+    mockUseCase("CancelSaleUseCase", {
+      execute: async () => undefined,
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/cancel",
+      headers: ctx.authHeaders(),
+    });
+
+    const data = expectOk(response);
+    expect(data).toBeNull();
+  });
+
+  test("POST /:id/cancel returns 401 when unauthenticated", async () => {
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/cancel",
+    });
+
+    expectError(response, 401, "UNAUTHORIZED");
+  });
+
+  test("POST /:id/cancel returns 404 when sale does not exist", async () => {
+    mockUseCase("CancelSaleUseCase", {
+      execute: async () => {
+        throw new NotFoundError("الفاتورة غير موجودة");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/999/cancel",
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 404, "NOT_FOUND");
+  });
+
+  test("POST /:id/cancel returns 409 when sale is already cancelled", async () => {
+    mockUseCase("CancelSaleUseCase", {
+      execute: async () => {
+        throw new InvalidStateError("الفاتورة ملغية بالفعل");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/cancel",
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 409, "INVALID_STATE");
+  });
+
+  test("POST /:id/cancel returns 409 when refunds exist on the sale", async () => {
+    mockUseCase("CancelSaleUseCase", {
+      execute: async () => {
+        throw new InvalidStateError(
+          "لا يمكن إلغاء فاتورة تم معالجة استرداد لها",
+        );
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/cancel",
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 409, "INVALID_STATE");
+  });
+
+  // ══════════════════════════════════════════════════════
+  // REFUND ROUTE — POST /sales/:id/refund
+  // ══════════════════════════════════════════════════════
+
+  const refundResult = {
+    saleId: 11,
+    refundedAmount: 20000,
+    newPaidAmount: 0,
+    newRemainingAmount: 20000,
+  };
+
+  const partialRefundResult = {
+    saleId: 11,
+    refundedAmount: 10000,
+    newPaidAmount: 10000,
+    newRemainingAmount: 10000,
+  };
+
+  test("POST /:id/refund succeeds with full refund", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => refundResult,
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 20000, reason: "Customer dissatisfied" },
+      headers: ctx.authHeaders(),
+    });
+
+    const data = expectOk(response) as typeof refundResult;
+    expect(data.saleId).toBe(11);
+    expect(data.refundedAmount).toBe(20000);
+    expect(data.newPaidAmount).toBe(0);
+    expect(data.newRemainingAmount).toBe(20000);
+  });
+
+  test("POST /:id/refund succeeds with partial refund and returnItems", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => partialRefundResult,
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: {
+        amount: 10000,
+        reason: "Partial return",
+        returnItems: [{ saleItemId: 1, quantity: 1 }],
+      },
+      headers: ctx.authHeaders(),
+    });
+
+    const data = expectOk(response) as typeof partialRefundResult;
+    expect(data.refundedAmount).toBe(10000);
+    expect(data.newPaidAmount).toBe(10000);
+  });
+
+  test("POST /:id/refund returns 401 when unauthenticated", async () => {
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 10000 },
+    });
+
+    expectError(response, 401, "UNAUTHORIZED");
+  });
+
+  test("POST /:id/refund returns 400 when amount is missing", async () => {
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { reason: "missing amount" },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  test("POST /:id/refund returns 400 when amount is zero", async () => {
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 0 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  test("POST /:id/refund returns 404 when sale does not exist", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => {
+        throw new NotFoundError("الفاتورة غير موجودة");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/999/refund",
+      payload: { amount: 10000 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 404, "NOT_FOUND");
+  });
+
+  test("POST /:id/refund returns 409 when sale is cancelled", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => {
+        throw new InvalidStateError("لا يمكن استرداد فاتورة ملغية");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 10000 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 409, "INVALID_STATE");
+  });
+
+  test("POST /:id/refund returns 409 when sale is already fully refunded", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => {
+        throw new InvalidStateError("تم استرداد هذه الفاتورة بالكامل بالفعل");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 10000 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 409, "INVALID_STATE");
+  });
+
+  test("POST /:id/refund returns 400 when amount exceeds paidAmount", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => {
+        throw new ValidationError("مبلغ الاسترداد أكبر من المبلغ المدفوع");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 99999 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 400, "VALIDATION_ERROR");
+  });
+
+  test("POST /:id/refund returns 409 when nothing has been paid yet", async () => {
+    mockUseCase("RefundSaleUseCase", {
+      execute: async () => {
+        throw new InvalidStateError("لا يوجد مبلغ مدفوع لاسترداده");
+      },
+    });
+
+    const response = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/sales/11/refund",
+      payload: { amount: 5000 },
+      headers: ctx.authHeaders(),
+    });
+
+    expectError(response, 409, "INVALID_STATE");
   });
 });

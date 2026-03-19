@@ -56,7 +56,7 @@ const SaleSchema = {
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
     paidAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
-    status: { type: "string", enum: ["pending", "completed", "cancelled", "refunded", "partial"] },
+    status: { type: "string", enum: ["pending", "completed", "cancelled", "refunded", "partial_refund"] },
     notes: { type: "string", nullable: true },
     idempotencyKey: { type: "string", nullable: true },
     createdAt: { type: "string", format: "date-time" },
@@ -151,6 +151,19 @@ const RefundSaleBodySchema = {
       description: "Refund amount in minor units",
     },
     reason: { type: "string" },
+    returnItems: {
+      type: "array",
+      description: "Items being physically returned to inventory",
+      items: {
+        type: "object",
+        required: ["saleItemId", "quantity"],
+        properties: {
+          saleItemId: { type: "integer", minimum: 1 },
+          quantity: { type: "integer", minimum: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
   },
   additionalProperties: false,
 } as const;
@@ -393,7 +406,11 @@ const sales: FastifyPluginAsync = async (fastify) => {
     { schema: refundSaleSchema, preHandler: requirePermission("sales:refund") },
     async (request) => {
       const saleId = parseInt(request.params.id, 10);
-      const body = request.body as { amount: number; reason?: string };
+      const body = request.body as {
+        amount: number;
+        reason?: string;
+        returnItems?: { saleItemId: number; quantity: number }[];
+      };
       const userId = String(request.user?.sub ?? "system");
       const uc = new RefundSaleUseCase(
         fastify.db,
@@ -406,7 +423,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute(
-        { saleId, amount: body.amount, reason: body.reason },
+        { saleId, amount: body.amount, reason: body.reason, returnItems: body.returnItems },
         userId,
       );
 

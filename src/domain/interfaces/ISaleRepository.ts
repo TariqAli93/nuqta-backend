@@ -15,7 +15,7 @@ export interface ISaleRepository {
     items: Sale[];
     total: number;
   }>;
-  updateStatus(id: number, status: "completed" | "cancelled", tx?: TxOrDb): Promise<void>;
+  updateStatus(id: number, status: "completed" | "cancelled" | "refunded" | "partial_refund", tx?: TxOrDb): Promise<void>;
   update(id: number, data: Partial<Sale>, tx?: TxOrDb): Promise<void>;
   createItemDepletions(
     depletions: Omit<

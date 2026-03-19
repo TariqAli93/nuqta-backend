@@ -71,6 +71,19 @@ export class CancelSaleUseCase extends WriteUseCase<
       if (!sale) throw new NotFoundError("الفاتورة غير موجودة");
       if (sale.status === "cancelled")
         throw new InvalidStateError("الفاتورة ملغية بالفعل");
+      if (sale.status === "refunded")
+        throw new InvalidStateError("لا يمكن إلغاء فاتورة تم استردادها بالكامل");
+
+      // Guard: block cancel when refund payments exist to prevent double inventory reversal
+      const existingPayments = await this.paymentRepo.findBySaleId(
+        input.saleId,
+        tx,
+      );
+      const hasRefunds = existingPayments.some((p) => p.status === "refunded");
+      if (hasRefunds)
+        throw new InvalidStateError(
+          "لا يمكن إلغاء فاتورة تم معالجة استرداد لها — قم بمراجعة حركات الاسترداد أولاً",
+        );
 
       // 2. Restore inventory for every batch-depletion
       const depletions = await this.saleRepo.getItemDepletionsBySaleId(
@@ -141,31 +154,59 @@ export class CancelSaleUseCase extends WriteUseCase<
         }
       }
 
-      // 4. Void associated payments
+      // 4. Void associated payments (only "completed" payments; "refunded" are preserved)
       await this.paymentRepo.voidBySaleId(sale.id!, tx);
 
-      // 5. Customer ledger cancellation entry
-      if (
-        ledgersEnabled &&
-        sale.customerId &&
-        (sale.remainingAmount ?? 0) > 0
-      ) {
-        const currentBalance = await this.customerLedgerRepo.getLastBalanceSync(
-          sale.customerId,
-          tx,
+      // 5. Customer ledger entries on cancellation
+      if (ledgersEnabled && sale.customerId) {
+        // 5a. Reverse ledger entries for every completed payment that was just voided.
+        // This restores the customer's outstanding balance that was previously
+        // reduced by those payments.
+        const completedPayments = existingPayments.filter(
+          (p) => p.status === "completed",
         );
-        await this.customerLedgerRepo.createSync(
-          {
-            customerId: sale.customerId,
-            transactionType: "cancellation",
-            amount: -sale.remainingAmount!,
-            balanceAfter: currentBalance - sale.remainingAmount!,
-            saleId: sale.id!,
-            notes: `إلغاء فاتورة #${sale.invoiceNumber}`,
-            createdBy: numUserId,
-          },
-          tx,
-        );
+        for (const payment of completedPayments) {
+          const bal = await this.customerLedgerRepo.getLastBalanceSync(
+            sale.customerId,
+            tx,
+          );
+          await this.customerLedgerRepo.createSync(
+            {
+              customerId: sale.customerId,
+              transactionType: "payment_reversal",
+              amount: payment.amount,
+              balanceAfter: bal + payment.amount,
+              saleId: sale.id!,
+              paymentId: payment.id,
+              notes: `عكس الدفع - إلغاء فاتورة #${sale.invoiceNumber}`,
+              createdBy: numUserId,
+            },
+            tx,
+          );
+        }
+
+        // 5b. Cancellation entry to remove the remaining outstanding debt
+        // (the unpaid portion that was never settled by a payment).
+        if ((sale.remainingAmount ?? 0) > 0) {
+          const balAfterPaymentReversals =
+            await this.customerLedgerRepo.getLastBalanceSync(
+              sale.customerId,
+              tx,
+            );
+          await this.customerLedgerRepo.createSync(
+            {
+              customerId: sale.customerId,
+              transactionType: "cancellation",
+              amount: -sale.remainingAmount!,
+              balanceAfter:
+                balAfterPaymentReversals - sale.remainingAmount!,
+              saleId: sale.id!,
+              notes: `إلغاء فاتورة #${sale.invoiceNumber}`,
+              createdBy: numUserId,
+            },
+            tx,
+          );
+        }
       }
 
       // 6. Mark sale as cancelled
