@@ -96,6 +96,14 @@ export class AccountingRepository implements IAccountingRepository {
     return (row as unknown as Account) || null;
   }
 
+  async findAccountById(id: number, tx?: TxOrDb): Promise<Account | null> {
+    const [row] = await this.c(tx)
+      .select()
+      .from(accounts)
+      .where(eq(accounts.id, id));
+    return (row as unknown as Account) || null;
+  }
+
   async getAccounts(tx?: TxOrDb): Promise<Account[]> {
     const rows = await this.c(tx)
       .select()

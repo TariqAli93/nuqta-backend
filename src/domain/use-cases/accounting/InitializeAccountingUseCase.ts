@@ -9,8 +9,7 @@ export const ACCOUNTING_SETTING_KEYS = {
   baseCurrency: "currency.base",
   cashAccountCode: "accounting.cashAccountCode",
   salaryExpenseAccountCode: "accounting.salaryExpenseAccountCode",
-  deductionsLiabilityAccountCode:
-    "accounting.deductionsLiabilityAccountCode",
+  deductionsLiabilityAccountCode: "accounting.deductionsLiabilityAccountCode",
   inventoryAccountCode: "accounting.inventoryAccountCode",
   arAccountCode: "accounting.arAccountCode",
   apAccountCode: "accounting.apAccountCode",
@@ -91,14 +90,14 @@ const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
   },
   {
     selectionKey: "salaryExpenseAccountCode",
-    name: "Salary Expense",
-    nameAr: "Salary Expense",
+    name: "مصروفات الرواتب",
+    nameAr: "مصروفات الرواتب",
     accountType: "expense",
   },
   {
     selectionKey: "deductionsLiabilityAccountCode",
-    name: "Payroll Deductions Payable",
-    nameAr: "Payroll Deductions Payable",
+    name: "اقتطاعات الرواتب المستحقة",
+    nameAr: "اقتطاعات الرواتب المستحقة",
     accountType: "liability",
   },
   {
@@ -145,7 +144,11 @@ const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
   },
 ];
 
-export class InitializeAccountingUseCase extends WriteUseCase<InitializeAccountingInput, InitializeAccountingResult, InitializeAccountingResult> {
+export class InitializeAccountingUseCase extends WriteUseCase<
+  InitializeAccountingInput,
+  InitializeAccountingResult,
+  InitializeAccountingResult
+> {
   constructor(
     private settingsRepo: ISettingsRepository,
     private accountingRepo: IAccountingRepository,
@@ -270,7 +273,10 @@ export class InitializeAccountingUseCase extends WriteUseCase<InitializeAccounti
     };
   }
 
-  executeSideEffectsPhase(_result: InitializeAccountingResult, _userId: string): Promise<void> {
+  executeSideEffectsPhase(
+    _result: InitializeAccountingResult,
+    _userId: string,
+  ): Promise<void> {
     return Promise.resolve();
   }
 

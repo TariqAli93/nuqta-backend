@@ -52,6 +52,7 @@ export interface IAccountingRepository {
     tx?: TxOrDb,
   ): Promise<Account>;
   findAccountByCode(code: string, tx?: TxOrDb): Promise<Account | null>;
+  findAccountById(id: number, tx?: TxOrDb): Promise<Account | null>;
   getAccounts(tx?: TxOrDb): Promise<Account[]>;
   getJournalEntries(params?: {
     sourceType?: string;

@@ -5,6 +5,7 @@ import {
   CancelSaleUseCase,
   RefundSaleUseCase,
   GetSaleReceiptUseCase,
+  SettleSaleUseCase,
   NotFoundError,
   type CreateSaleInput,
   type AddPaymentInput,
@@ -56,7 +57,10 @@ const SaleSchema = {
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
     paidAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
-    status: { type: "string", enum: ["pending", "completed", "cancelled", "refunded", "partial_refund"] },
+    status: {
+      type: "string",
+      enum: ["pending", "completed", "cancelled", "refunded", "partial_refund"],
+    },
     notes: { type: "string", nullable: true },
     idempotencyKey: { type: "string", nullable: true },
     createdAt: { type: "string", format: "date-time" },
@@ -235,6 +239,46 @@ const cancelSaleSchema = {
   params: { $ref: "IdParams#" },
   response: {
     200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+const settleSaleBodySchema = {
+  type: "object" as const,
+  properties: {
+    paymentMethod: {
+      type: "string",
+      enum: ["cash", "card", "bank_transfer", "credit"],
+      description:
+        "Payment method used to clear the remaining balance (defaults to cash)",
+    },
+    referenceNumber: { type: "string" },
+    notes: { type: "string" },
+    idempotencyKey: { type: "string" },
+  },
+  additionalProperties: false,
+} as const;
+
+const settleSaleSchema = {
+  tags: ["Sales"],
+  summary: "Settle a sale",
+  description:
+    "Clears the full remaining balance of a pending or partial sale, marking it as completed.",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  body: settleSaleBodySchema,
+  response: {
+    200: successEnvelope(
+      {
+        type: "object" as const,
+        properties: {
+          saleId: { type: "integer" },
+          settledAmount: { type: "integer" },
+          newStatus: { type: "string" },
+        },
+      },
+      "Settlement result",
+    ),
     ...ErrorResponses,
   },
 } as const;
@@ -423,7 +467,12 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.audit,
       );
       const data = await uc.execute(
-        { saleId, amount: body.amount, reason: body.reason, returnItems: body.returnItems },
+        {
+          saleId,
+          amount: body.amount,
+          reason: body.reason,
+          returnItems: body.returnItems,
+        },
         userId,
       );
 
@@ -448,6 +497,51 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const uc = new GetSaleReceiptUseCase(fastify.repos.sale);
       const data = await uc.execute(saleId);
       return { ok: true, data };
+    },
+  );
+
+  // POST /sales/:id/settle
+  fastify.post<{ Params: { id: string } }>(
+    "/:id/settle",
+    {
+      schema: settleSaleSchema,
+      preHandler: requirePermission("sales:settle"),
+    },
+    async (request) => {
+      const saleId = parseInt(request.params.id, 10);
+      const body = request.body as {
+        paymentMethod?: "cash" | "card" | "bank_transfer" | "credit";
+        referenceNumber?: string;
+        notes?: string;
+        idempotencyKey?: string;
+      };
+      const userId = String(request.user?.sub ?? "system");
+      const uc = new SettleSaleUseCase(
+        fastify.db,
+        fastify.repos.sale,
+        fastify.repos.payment,
+        fastify.repos.customer,
+        fastify.repos.customerLedger,
+        fastify.repos.accounting,
+        fastify.repos.settings,
+        fastify.repos.audit,
+        fastify.repos.accountingSettings,
+      );
+      const result = await uc.execute({ saleId, ...body }, userId);
+
+      fastify.emitDomainEvent("sale:settled", {
+        id: saleId,
+        settledAmount: result.settledAmount,
+      });
+
+      return {
+        ok: true,
+        data: {
+          saleId: result.sale.id,
+          settledAmount: result.settledAmount,
+          newStatus: result.sale.status,
+        },
+      };
     },
   );
 };

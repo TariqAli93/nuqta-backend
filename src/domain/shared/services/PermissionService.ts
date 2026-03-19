@@ -21,6 +21,7 @@ const PERMISSION_MATRIX: Record<string, UserRole[]> = {
   "sales:refund": ["admin", "manager"],
   "sales:payment": ["admin", "manager", "cashier"],
   "sales:receipt": ["admin", "manager", "cashier", "viewer"],
+  "sales:settle": ["admin", "manager", "cashier"],
 
   // ── Products ───────────────────────────────────────────────────────
   "products:create": ["admin", "manager"],
@@ -71,8 +72,18 @@ const PERMISSION_MATRIX: Record<string, UserRole[]> = {
   "suppliers:delete": ["admin", "manager"],
 
   // ── Accounting ─────────────────────────────────────────────────────
+  "accounting:write": ["admin"],
   "accounting:read": ["admin", "manager"],
   "accounting:update": ["admin"],
+  "accounting:reconcile": ["admin", "manager"],
+  "accounting:reports": ["admin", "manager"],
+  "accounting:entries": ["admin", "manager"],
+  "accounting:reversal": ["admin", "manager"],
+  "accounting:creditNote": ["admin", "manager"],
+  "accounting:paymentReversal": ["admin", "manager"],
+
+  // ── HR & Payroll ───────────────────────────────────────────────────
+  "hr:create": ["admin", "manager"],
   "hr:read": ["admin", "manager"],
   "hr:update": ["admin", "manager"],
   "payroll:read": ["admin", "manager"],
@@ -111,6 +122,9 @@ const PERMISSION_MATRIX: Record<string, UserRole[]> = {
 
   // ── POS ────────────────────────────────────────────────────────────
   "pos:create": ["admin", "manager", "cashier"],
+  "pos:read": ["admin", "manager", "cashier", "viewer"],
+  "pos:update": ["admin", "manager", "cashier"],
+  "pos:delete": ["admin", "manager"],
 
   // ── Simple mode ────────────────────────────────────────────────────
   "simpleMode:toggle": ["admin", "manager"],
@@ -133,11 +147,17 @@ export function hasPermission(role: UserRole, permission: string): boolean {
   return allowedRoles ? allowedRoles.includes(role) : false;
 }
 
-export function hasAnyPermission(role: UserRole, permissions: string[]): boolean {
+export function hasAnyPermission(
+  role: UserRole,
+  permissions: string[],
+): boolean {
   return permissions.some((permission) => hasPermission(role, permission));
 }
 
-export function hasAllPermissions(role: UserRole, permissions: string[]): boolean {
+export function hasAllPermissions(
+  role: UserRole,
+  permissions: string[],
+): boolean {
   return permissions.every((permission) => hasPermission(role, permission));
 }
 

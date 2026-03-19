@@ -75,6 +75,7 @@ export * from "./use-cases/accounting/UnreconcileUseCase.js";
 export * from "./use-cases/accounting/GetReconciliationsUseCase.js";
 export * from "./use-cases/accounting/GetPartnerLedgerUseCase.js";
 export * from "./use-cases/accounting/GetUnreconciledLinesUseCase.js";
+export * from "./use-cases/accounting/CreateAccountUseCase.js";
 
 // ── Use Cases: Auth ──
 export * from "./use-cases/auth/ChangePasswordUseCase.js";
@@ -161,6 +162,7 @@ export * from "./use-cases/sales/CreateSaleUseCase.js";
 export * from "./use-cases/sales/GetSaleReceiptUseCase.js";
 export * from "./use-cases/sales/GetSaleUseCase.js";
 export * from "./use-cases/sales/RefundSaleUseCase.js";
+export * from "./use-cases/sales/SettleSaleUseCase.js";
 
 // ── Use Cases: Settings ──
 export * from "./use-cases/settings/CompleteSetupWizardUseCase.js";

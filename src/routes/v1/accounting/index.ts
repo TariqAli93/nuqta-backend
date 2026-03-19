@@ -1,5 +1,8 @@
 import { FastifyPluginAsync } from "fastify";
-import { InitializeAccountingUseCase } from "../../../domain/index.js";
+import {
+  InitializeAccountingUseCase,
+  CreateAccountUseCase,
+} from "../../../domain/index.js";
 import {
   ReconcileJournalLinesUseCase,
   UnreconcileUseCase,
@@ -228,6 +231,53 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // POST /accounting/accounts
+  fastify.post(
+    "/accounts",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Create a new account",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object" as const,
+          required: ["code", "name", "nameAr", "accountType"],
+          properties: {
+            code: { type: "string", minLength: 1 },
+            name: { type: "string", minLength: 1 },
+            nameAr: { type: "string" },
+            accountType: {
+              type: "string",
+              enum: ["asset", "liability", "equity", "revenue", "expense"],
+            },
+            parentId: { type: "integer", nullable: true },
+          },
+          additionalProperties: false,
+        },
+        response: {
+          200: successEnvelope(AccountSchema, "Created account"),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
+    },
+    async (request) => {
+      const body = request.body as {
+        code: string;
+        name: string;
+        nameAr: string;
+        accountType: "asset" | "liability" | "equity" | "revenue" | "expense";
+        parentId?: number | null;
+      };
+      const uc = new CreateAccountUseCase(
+        fastify.repos.accounting,
+        fastify.repos.audit,
+      );
+      const data = await uc.execute(body, String(request.user?.sub ?? "0"));
+      return { ok: true, data };
+    },
+  );
+
   // PUT /accounting/accounts/:id
   fastify.put<{ Params: { id: string } }>(
     "/accounts/:id",
@@ -275,8 +325,12 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         .where(eq(accounts.id, id))
         .returning();
       if (!updated) {
-        return (request as any).server.httpErrors?.notFound?.() ??
-          { ok: false, error: { code: "NOT_FOUND", message: "Account not found" } };
+        return (
+          (request as any).server.httpErrors?.notFound?.() ?? {
+            ok: false,
+            error: { code: "NOT_FOUND", message: "Account not found" },
+          }
+        );
       }
       return { ok: true, data: updated };
     },
@@ -588,7 +642,10 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         querystring: {
           type: "object" as const,
           properties: {
-            accountCode: { type: "string", description: "e.g. 1100 (AR) or 2100 (AP)" },
+            accountCode: {
+              type: "string",
+              description: "e.g. 1100 (AR) or 2100 (AP)",
+            },
             partnerId: { type: "string", pattern: "^\\d+$" },
           },
         },
