@@ -22,9 +22,6 @@ import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
 import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
-const ACCT_CASH = "1001";
-const ACCT_AR = "1100";
-
 export interface AddPaymentInput {
   saleId: number;
   customerId?: number;
@@ -253,11 +250,18 @@ export class AddPaymentUseCase extends WriteUseCase<
     customerId?: number,
     tx?: TxOrDb,
   ): Promise<void> {
+    // Resolve account codes from settings (not hardcoded)
+    const settings = this.settingsRepo
+      ? new SettingsAccessor(this.settingsRepo)
+      : null;
+    const cashCode = settings ? await settings.getCashAccountCode() : "1001";
+    const arCode = settings ? await settings.getArAccountCode() : "1100";
+
     const cashAcct = await this.accountingRepo.findAccountByCode(
-      ACCT_CASH,
+      cashCode,
       tx,
     );
-    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR, tx);
+    const arAcct = await this.accountingRepo.findAccountByCode(arCode, tx);
 
     if (!cashAcct?.id || !arAcct?.id) {
       console.warn(

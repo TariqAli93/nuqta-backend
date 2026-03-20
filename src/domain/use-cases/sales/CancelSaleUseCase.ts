@@ -12,6 +12,7 @@
  * step rolls back the entire operation — no partial writes.
  */
 import { ISaleRepository } from "../../interfaces/ISaleRepository.js";
+import { IProductRepository } from "../../interfaces/IProductRepository.js";
 import { IInventoryRepository } from "../../interfaces/IInventoryRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
@@ -50,6 +51,7 @@ export class CancelSaleUseCase extends WriteUseCase<
     private paymentRepo: IPaymentRepository,
     private settingsRepo: ISettingsRepository,
     private auditRepo?: IAuditRepository,
+    private productRepo?: IProductRepository,
   ) {
     super();
   }
@@ -91,7 +93,29 @@ export class CancelSaleUseCase extends WriteUseCase<
         tx,
       );
 
+      // Group depletions by product so we can track running stock per product
+      const productStockMap = new Map<number, number>();
+
       for (const dep of depletions) {
+        // Fetch current product stock once per product (before any restores)
+        if (!productStockMap.has(dep.productId)) {
+          if (this.productRepo) {
+            const product = await this.productRepo.findById(dep.productId, tx);
+            productStockMap.set(dep.productId, product?.stock ?? 0);
+            if (!product) {
+              console.warn(
+                `[CancelSaleUseCase] Product ${dep.productId} not found during cancel stock lookup, using 0`,
+              );
+            }
+          } else {
+            productStockMap.set(dep.productId, 0);
+          }
+        }
+
+        const stockBefore = productStockMap.get(dep.productId)!;
+        const stockAfter = stockBefore + dep.quantityBase;
+        productStockMap.set(dep.productId, stockAfter);
+
         await this.inventoryRepo.restoreBatchQty(
           dep.batchId,
           dep.quantityBase,
@@ -112,14 +136,14 @@ export class CancelSaleUseCase extends WriteUseCase<
             sourceId: sale.id!,
             notes: `إلغاء فاتورة #${sale.invoiceNumber}`,
             createdBy: numUserId,
-            stockBefore: 0,
-            stockAfter: dep.quantityBase,
+            stockBefore,
+            stockAfter,
           },
           tx,
         );
       }
 
-      // 3. Reversal journal entry
+      // 3. Reversal journal entries
       if (accountingEnabled) {
         const originalEntry = await this.accountingRepo.findEntryBySource(
           "sale",
@@ -140,17 +164,32 @@ export class CancelSaleUseCase extends WriteUseCase<
           );
         }
 
-        // Payment reversal journal entry (if payments existed)
-        if ((sale.paidAmount ?? 0) > 0) {
-          await this.accountingRepo.createPaymentReversalEntry(
-            {
-              saleId: sale.id!,
-              amount: sale.paidAmount!,
-              description: `استرداد دفع - إلغاء فاتورة #${sale.invoiceNumber}`,
-              createdBy: numUserId,
-            },
+        // Reverse only the *separately recorded* payment journal entries.
+        // The original sale entry already includes the initial payment lines,
+        // so only subsequent AddPayment entries (sourceType="payment") need
+        // individual reversal to avoid double-reversing Cash/AR.
+        const completedPayments = existingPayments.filter(
+          (p) => p.status === "completed",
+        );
+        for (const payment of completedPayments) {
+          const paymentEntry = await this.accountingRepo.findEntryBySource(
+            "payment",
+            payment.id!,
             tx,
           );
+          if (paymentEntry?.id) {
+            await this.accountingRepo.createReversalEntry(
+              {
+                originalEntryId: paymentEntry.id,
+                reversalDate: new Date(),
+                description: `استرداد دفع - إلغاء فاتورة #${sale.invoiceNumber}`,
+                sourceType: "sale_cancellation",
+                sourceId: sale.id!,
+                createdBy: numUserId,
+              },
+              tx,
+            );
+          }
         }
       }
 

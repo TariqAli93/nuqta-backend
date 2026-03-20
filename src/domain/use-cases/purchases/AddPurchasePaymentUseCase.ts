@@ -18,9 +18,8 @@ import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
-
-const ACCT_CASH = "1001";
-const ACCT_AP = "2100";
+import type { DbConnection } from "../../../data/db/db.js";
+import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
 export interface AddPurchasePaymentInput {
   purchaseId: number;
@@ -51,6 +50,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
   private auditService?: AuditService;
 
   constructor(
+    private db: DbConnection,
     private purchaseRepo: IPurchaseRepository,
     private paymentRepo: IPaymentRepository,
     private supplierLedgerRepo: ISupplierLedgerRepository,
@@ -171,60 +171,68 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
 
     const supplierId = input.supplierId || purchase.supplierId;
 
-    const payment = await this.paymentRepo.createSync({
-      purchaseId: input.purchaseId,
-      supplierId,
-      amount,
-      currency,
-      exchangeRate: input.exchangeRate || purchase.exchangeRate || 1,
-      paymentMethod: input.paymentMethod || "cash",
-      referenceNumber: input.referenceNumber,
-      notes: input.notes,
-      createdBy: numUserId,
-      status: "completed",
-      paymentDate: new Date(),
-      idempotencyKey: input.idempotencyKey,
-    });
-
-    await this.updatePurchasePaymentSync(
-      input.purchaseId,
-      newPaidAmount,
-      newRemainingAmount,
-    );
-
+    // Pre-fetch settings outside the transaction (read-only, no locks needed)
     const ledgersEnabled = await this.isLedgersEnabled();
-    if (ledgersEnabled && supplierId) {
-      const balanceBefore =
-        await this.supplierLedgerRepo.getLastBalanceSync(supplierId);
-      await this.supplierLedgerRepo.createSync({
-        supplierId,
-        transactionType: "payment",
-        amount: -amount,
-        balanceAfter: balanceBefore - amount,
-        purchaseId: input.purchaseId,
-        paymentId: payment.id,
-        notes: input.notes || `Payment for purchase #${input.purchaseId}`,
-        createdBy: numUserId,
-      });
-    }
+    const accountingEnabled = await this.isAccountingEnabled();
 
-    if (await this.isAccountingEnabled()) {
-      await this.createPaymentJournalEntry(
-        payment.id!,
+    const updatedPurchase = await withTransaction(this.db, async (tx) => {
+      const payment = await this.paymentRepo.createSync({
+        purchaseId: input.purchaseId,
+        supplierId,
         amount,
         currency,
-        numUserId,
-        input.purchaseId,
-        supplierId,
-      );
-    }
+        exchangeRate: input.exchangeRate || purchase.exchangeRate || 1,
+        paymentMethod: input.paymentMethod || "cash",
+        referenceNumber: input.referenceNumber,
+        notes: input.notes,
+        createdBy: numUserId,
+        status: "completed",
+        paymentDate: new Date(),
+        idempotencyKey: input.idempotencyKey,
+      } as any, tx);
 
-    const updatedPurchase = await this.findPurchaseSync(input.purchaseId);
-    if (!updatedPurchase) {
-      throw new NotFoundError("Purchase not found after payment update", {
-        purchaseId: input.purchaseId,
-      });
-    }
+      await this.updatePurchasePaymentSync(
+        input.purchaseId,
+        newPaidAmount,
+        newRemainingAmount,
+        tx,
+      );
+
+      if (ledgersEnabled && supplierId) {
+        const balanceBefore =
+          await this.supplierLedgerRepo.getLastBalanceSync(supplierId, tx);
+        await this.supplierLedgerRepo.createSync({
+          supplierId,
+          transactionType: "payment",
+          amount: -amount,
+          balanceAfter: balanceBefore - amount,
+          purchaseId: input.purchaseId,
+          paymentId: payment.id,
+          notes: input.notes || `Payment for purchase #${input.purchaseId}`,
+          createdBy: numUserId,
+        } as any, tx);
+      }
+
+      if (accountingEnabled) {
+        await this.createPaymentJournalEntry(
+          payment.id!,
+          amount,
+          currency,
+          numUserId,
+          input.purchaseId,
+          supplierId,
+          tx,
+        );
+      }
+
+      const result = await this.findPurchaseSync(input.purchaseId, tx);
+      if (!result) {
+        throw new NotFoundError("Purchase not found after payment update", {
+          purchaseId: input.purchaseId,
+        });
+      }
+      return result;
+    });
 
     return { updatedPurchase };
   }
@@ -236,9 +244,17 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     userId: number,
     purchaseId: number,
     supplierId?: number,
+    tx?: TxOrDb,
   ): Promise<void> {
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH);
-    const apAcct = await this.accountingRepo.findAccountByCode(ACCT_AP);
+    // Resolve account codes from settings (not hardcoded)
+    const settings = this.settingsRepo
+      ? new SettingsAccessor(this.settingsRepo)
+      : null;
+    const cashCode = settings ? await settings.getCashAccountCode() : "1001";
+    const apCode = settings ? await settings.getApAccountCode() : "2100";
+
+    const cashAcct = await this.accountingRepo.findAccountByCode(cashCode, tx);
+    const apAcct = await this.accountingRepo.findAccountByCode(apCode, tx);
     if (!cashAcct?.id || !apAcct?.id) {
       console.warn(
         "[AddPurchasePaymentUseCase] Missing cash/AP accounts, skipping journal entry",
@@ -280,7 +296,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
       currency,
       createdBy: userId,
       lines,
-    });
+    }, tx);
   }
 
   async executeSideEffectsPhase(
@@ -334,7 +350,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     );
   }
 
-  private async findPurchaseSync(id: number): Promise<Purchase | null> {
+  private async findPurchaseSync(id: number, _tx?: TxOrDb): Promise<Purchase | null> {
     if (typeof this.purchaseRepo.findByIdSync === "function") {
       return await this.purchaseRepo.findByIdSync(id);
     }
@@ -347,6 +363,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    _tx?: TxOrDb,
   ): Promise<void> {
     if (typeof this.purchaseRepo.updatePaymentSync === "function") {
       await this.purchaseRepo.updatePaymentSync(
