@@ -134,9 +134,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /purchases response matches getPurchasesSchema", async () => {
-    mockUseCase("GetPurchasesUseCase", {
-      execute: { items: [purchase], total: 1 },
-    });
+    ctx.repos.purchase.findAll = async () => ({ items: [purchase], total: 1 });
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -151,7 +149,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /customer-ledger/:id response matches getCustomerLedgerSchema", async () => {
-    mockUseCase("GetCustomerLedgerUseCase", { execute: customerLedger });
+    ctx.repos.customerLedger.findAll = async () => customerLedger;
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -166,7 +164,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /supplier-ledger/:id response matches getSupplierLedgerSchema", async () => {
-    mockUseCase("GetSupplierLedgerUseCase", { execute: supplierLedger });
+    ctx.repos.supplierLedger.findAll = async () => supplierLedger;
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -220,9 +218,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /accounting/journal-entries response matches getJournalEntriesSchema", async () => {
-    mockUseCase("GetJournalEntriesUseCase", {
-      execute: { items: [journalEntry], total: 1 },
-    });
+    ctx.repos.accounting.getJournalEntries = async () => ({ items: [journalEntry], total: 1 });
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -237,7 +233,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /accounting/accounts response returns array envelope", async () => {
-    mockUseCase("GetAccountsUseCase", { execute: [account] });
+    ctx.repos.accounting.getAccounts = async () => [account];
 
     const response = await ctx.app.inject({
       method: "GET",
@@ -331,9 +327,7 @@ describe("Response contract validation", () => {
   });
 
   test("GET /posting/batches response matches getPostingBatchesSchema", async () => {
-    mockUseCase("GetPostingBatchesUseCase", {
-      execute: { items: [postingBatch], total: 1 },
-    });
+    ctx.repos.posting.getBatches = async () => ({ items: [postingBatch], total: 1 });
 
     const response = await ctx.app.inject({
       method: "GET",

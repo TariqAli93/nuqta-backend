@@ -242,7 +242,7 @@ describe("/api/v1/accounting", () => {
       expect(data).toMatchObject({ updated: true });
       expect(
         getUseCaseMock("InitializeAccountingUseCase", "execute"),
-      ).toHaveBeenCalledWith({});
+      ).toHaveBeenCalledWith({}, "system");
     } finally {
       await branchCtx.close();
     }

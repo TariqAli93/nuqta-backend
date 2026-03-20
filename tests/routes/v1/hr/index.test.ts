@@ -173,7 +173,7 @@ describe("/api/v1/hr", () => {
         ...payload,
         items: [{ employeeId: employee.id, deductions: 0, bonuses: 0 }],
       },
-      77,
+      "77",
     );
   });
 

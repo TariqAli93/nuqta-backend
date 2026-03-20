@@ -120,7 +120,11 @@ describe("AddPaymentUseCase auto-posting", () => {
       get: vi.fn(async () => ({ autoPosting })),
       update: vi.fn(),
     };
+    const db = {
+      transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+    };
     return {
+      db,
       saleRepo,
       paymentRepo,
       customerRepo,
@@ -134,6 +138,7 @@ describe("AddPaymentUseCase auto-posting", () => {
   test("creates journal entry with isPosted=true when autoPosting is enabled", async () => {
     const deps = buildDeps(true);
     const uc = new AddPaymentUseCase(
+      deps.db as any,
       deps.saleRepo as any,
       deps.paymentRepo as any,
       deps.customerRepo as any,
@@ -155,12 +160,14 @@ describe("AddPaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: true }),
+      expect.anything(),
     );
   });
 
   test("creates journal entry with isPosted=false when autoPosting is disabled", async () => {
     const deps = buildDeps(false);
     const uc = new AddPaymentUseCase(
+      deps.db as any,
       deps.saleRepo as any,
       deps.paymentRepo as any,
       deps.customerRepo as any,
@@ -182,6 +189,7 @@ describe("AddPaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: false }),
+      expect.anything(),
     );
   });
 });

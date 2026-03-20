@@ -15,6 +15,269 @@ import {
   GetProductSalesHistoryUseCase,
 } from "../../../domain/index.js";
 import { requirePermission } from "../../../middleware/rbac.js";
+import {
+  ErrorResponses,
+  successEnvelope,
+  successPaginatedEnvelope,
+  SuccessNullResponse,
+} from "../../../shared/schema-helpers.js";
+
+// ── Shared sub-schemas ─────────────────────────────────────────────
+
+const ProductSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    name: { type: "string" },
+    sku: { type: "string", nullable: true },
+    barcode: { type: "string", nullable: true },
+    categoryId: { type: "integer", nullable: true },
+    description: { type: "string", nullable: true },
+    costPrice: { type: "integer" },
+    sellingPrice: { type: "integer" },
+    currency: { type: "string" },
+    stock: { type: "integer" },
+    minStock: { type: "integer" },
+    unit: { type: "string" },
+    supplier: { type: "string", nullable: true },
+    supplierId: { type: "integer", nullable: true },
+    expireDate: { type: "string", nullable: true, format: "date-time" },
+    isExpire: { type: "boolean" },
+    status: { type: "string", enum: ["available", "out_of_stock", "discontinued"] },
+    isActive: { type: "boolean" },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", nullable: true, format: "date-time" },
+    createdBy: { type: "integer", nullable: true },
+  },
+};
+
+const PurchaseHistoryItemSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    purchaseId: { type: "integer" },
+    invoiceNumber: { type: "string" },
+    quantity: { type: "number" },
+    unitName: { type: "string" },
+    unitFactor: { type: "number" },
+    quantityBase: { type: "number" },
+    unitCost: { type: "integer" },
+    lineSubtotal: { type: "integer" },
+    batchId: { type: "integer", nullable: true },
+    expiryDate: { type: "string", nullable: true, format: "date-time" },
+    createdAt: { type: "string", format: "date-time" },
+    supplierName: { type: "string", nullable: true },
+  },
+};
+
+const SalesHistoryItemSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    saleId: { type: "integer" },
+    invoiceNumber: { type: "string" },
+    quantity: { type: "number" },
+    unitName: { type: "string" },
+    unitFactor: { type: "number" },
+    quantityBase: { type: "number" },
+    unitPrice: { type: "integer" },
+    subtotal: { type: "integer" },
+    createdAt: { type: "string", format: "date-time" },
+    customerName: { type: "string", nullable: true },
+  },
+};
+
+// ── Querystring schemas ────────────────────────────────────────────
+
+const ProductsQuerySchema = {
+  type: "object" as const,
+  properties: {
+    search: { type: "string" },
+    page: { type: "string", pattern: "^\\d+$" },
+    limit: { type: "string", pattern: "^\\d+$" },
+    categoryId: { type: "string", pattern: "^\\d+$" },
+    supplierId: { type: "string", pattern: "^\\d+$" },
+    status: { type: "string" },
+    lowStockOnly: { type: "string", enum: ["true", "false"] },
+    expiringSoonOnly: { type: "string", enum: ["true", "false"] },
+  },
+  additionalProperties: false,
+} as const;
+
+// ── Body schemas ───────────────────────────────────────────────────
+
+const CreateProductBodySchema = {
+  type: "object" as const,
+  required: ["name", "costPrice", "sellingPrice"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    sku: { type: "string" },
+    barcode: { type: "string" },
+    categoryId: { type: "integer" },
+    description: { type: "string" },
+    costPrice: { type: "integer", minimum: 0 },
+    sellingPrice: { type: "integer", minimum: 0 },
+    currency: { type: "string" },
+    stock: { type: "integer", minimum: 0 },
+    minStock: { type: "integer", minimum: 0 },
+    unit: { type: "string" },
+    supplier: { type: "string" },
+    supplierId: { type: "integer" },
+    expireDate: { type: "string" },
+    isExpire: { type: "boolean" },
+    status: { type: "string", enum: ["available", "out_of_stock", "discontinued"] },
+    isActive: { type: "boolean" },
+  },
+  additionalProperties: false,
+} as const;
+
+const UpdateProductBodySchema = {
+  type: "object" as const,
+  properties: {
+    name: { type: "string", minLength: 1 },
+    sku: { type: "string" },
+    barcode: { type: "string" },
+    categoryId: { type: "integer" },
+    description: { type: "string" },
+    costPrice: { type: "integer", minimum: 0 },
+    sellingPrice: { type: "integer", minimum: 0 },
+    currency: { type: "string" },
+    stock: { type: "integer", minimum: 0 },
+    minStock: { type: "integer", minimum: 0 },
+    unit: { type: "string" },
+    supplier: { type: "string" },
+    supplierId: { type: "integer" },
+    expireDate: { type: "string" },
+    isExpire: { type: "boolean" },
+    status: { type: "string", enum: ["available", "out_of_stock", "discontinued"] },
+    isActive: { type: "boolean" },
+  },
+  additionalProperties: false,
+} as const;
+
+const AdjustStockBodySchema = {
+  type: "object" as const,
+  required: ["quantityChange"],
+  properties: {
+    quantityChange: { type: "integer" },
+    reason: { type: "string", enum: ["manual", "damage", "opening"] },
+    notes: { type: "string" },
+    batchId: { type: "integer" },
+    unitName: { type: "string" },
+    unitFactor: { type: "number" },
+  },
+  additionalProperties: false,
+} as const;
+
+// ── Exported route schemas (used by response-contract tests) ───────
+
+export const getProductsSchema = {
+  tags: ["Products"],
+  summary: "List products",
+  security: [{ bearerAuth: [] }],
+  querystring: ProductsQuerySchema,
+  response: {
+    200: successPaginatedEnvelope(ProductSchema, "Products", {
+      page: { type: "integer" },
+      limit: { type: "integer" },
+    }),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const getProductPurchaseHistorySchema = {
+  tags: ["Products"],
+  summary: "Get product purchase history",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successPaginatedEnvelope(PurchaseHistoryItemSchema, "Purchase history"),
+    ...ErrorResponses,
+  },
+} as const;
+
+export const getProductSalesHistorySchema = {
+  tags: ["Products"],
+  summary: "Get product sales history",
+  security: [{ bearerAuth: [] }],
+  params: { $ref: "IdParams#" },
+  response: {
+    200: successPaginatedEnvelope(SalesHistoryItemSchema, "Sales history"),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ── Internal route schemas ─────────────────────────────────────────
+
+const getProductByIdSchema = {
+  tags: ["Products"],
+  params: { $ref: "IdParams#" },
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: successEnvelope(ProductSchema, "Product"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const createProductSchema = {
+  tags: ["Products"],
+  security: [{ bearerAuth: [] }],
+  body: CreateProductBodySchema,
+  response: {
+    200: successEnvelope(ProductSchema, "Created product"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const updateProductSchema = {
+  tags: ["Products"],
+  params: { $ref: "IdParams#" },
+  security: [{ bearerAuth: [] }],
+  body: UpdateProductBodySchema,
+  response: {
+    200: successEnvelope(ProductSchema, "Updated product"),
+    ...ErrorResponses,
+  },
+} as const;
+
+const deleteProductSchema = {
+  tags: ["Products"],
+  params: { $ref: "IdParams#" },
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: SuccessNullResponse,
+    ...ErrorResponses,
+  },
+} as const;
+
+const adjustStockSchema = {
+  tags: ["Products"],
+  params: { $ref: "IdParams#" },
+  security: [{ bearerAuth: [] }],
+  body: AdjustStockBodySchema,
+  response: {
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Stock adjustment",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+const reconcileStockSchema = {
+  tags: ["Products"],
+  params: { $ref: "IdParams#" },
+  security: [{ bearerAuth: [] }],
+  response: {
+    200: successEnvelope(
+      { type: "object" as const, additionalProperties: true },
+      "Reconciliation result",
+    ),
+    ...ErrorResponses,
+  },
+} as const;
+
+// ── Plugin ─────────────────────────────────────────────────────────
 
 const products: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
@@ -23,7 +286,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
     {
-      schema: {},
+      schema: getProductsSchema,
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -62,7 +325,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: {},
+      schema: getProductByIdSchema,
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -77,7 +340,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     "/",
     {
-      schema: {},
+      schema: createProductSchema,
       preHandler: requirePermission("products:create"),
     },
     async (request) => {
@@ -104,7 +367,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.put<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: {},
+      schema: updateProductSchema,
       preHandler: requirePermission("products:update"),
     },
     async (request) => {
@@ -132,7 +395,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.delete<{ Params: { id: string } }>(
     "/:id",
     {
-      schema: {},
+      schema: deleteProductSchema,
       preHandler: requirePermission("products:delete"),
     },
     async (request) => {
@@ -153,7 +416,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/adjust-stock",
     {
-      schema: {},
+      schema: adjustStockSchema,
       preHandler: requirePermission("inventory:update"),
     },
     async (request) => {
@@ -188,7 +451,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   fastify.post<{ Params: { id: string } }>(
     "/:id/reconcile",
     {
-      schema: {},
+      schema: reconcileStockSchema,
       preHandler: requirePermission("inventory:reconcile"),
     },
     async (request) => {
@@ -334,7 +597,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   }>(
     "/:id/sales-history",
     {
-      schema: {},
+      schema: getProductSalesHistorySchema,
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
@@ -359,7 +622,7 @@ const products: FastifyPluginAsync = async (fastify) => {
   }>(
     "/:id/purchase-history",
     {
-      schema: {},
+      schema: getProductPurchaseHistorySchema,
       preHandler: requirePermission("products:read"),
     },
     async (request) => {
