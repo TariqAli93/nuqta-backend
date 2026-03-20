@@ -426,7 +426,6 @@ const accounting: FastifyPluginAsync = async (fastify) => {
         0,
       );
       const entry = await fastify.repos.accounting.createJournalEntry({
-        entryNumber: "",
         entryDate: body.entryDate,
         description: body.description,
         notes: body.notes ?? null,

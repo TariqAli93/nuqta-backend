@@ -41,7 +41,15 @@ export const JournalEntrySchema = z.object({
   entryDate: z.union([z.string(), z.date()]),
   description: z.string().min(1),
   sourceType: z
-    .enum(["sale", "purchase", "payment", "adjustment", "manual", "sale_cancellation", "sale_refund"])
+    .enum([
+      "sale",
+      "purchase",
+      "payment",
+      "adjustment",
+      "manual",
+      "sale_cancellation",
+      "sale_refund",
+    ])
     .optional(),
   sourceId: z.number().optional(),
   isPosted: z.boolean().default(false),
@@ -60,3 +68,12 @@ export const JournalEntrySchema = z.object({
 export type Account = z.infer<typeof AccountSchema>;
 export type JournalLine = z.infer<typeof JournalLineSchema>;
 export type JournalEntry = z.infer<typeof JournalEntrySchema>;
+
+/**
+ * Input type for creating a journal entry.
+ * `entryNumber` is optional — when omitted the repository auto-generates a
+ * concurrency-safe, sequential number based on the DB-assigned primary key.
+ */
+export type CreateJournalEntryInput = Omit<JournalEntry, "entryNumber"> & {
+  entryNumber?: string;
+};

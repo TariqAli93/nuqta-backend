@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import type { TxOrDb } from "../../db/transaction.js";
@@ -7,6 +8,7 @@ import {
   Account,
   JournalEntry,
   JournalLine,
+  CreateJournalEntryInput,
 } from "../../../domain/index.js";
 import type {
   ReversalEntryParams,
@@ -22,56 +24,80 @@ export class AccountingRepository implements IAccountingRepository {
   }
 
   private async insertJournalEntry(
-    entry: JournalEntry,
+    entry: CreateJournalEntryInput,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
-    const client = this.c(tx);
-    const { lines, ...entryData } = entry;
+    const needsAutoNumber = !entry.entryNumber;
 
-    const [created] = await client
-      .insert(journalEntries)
-      .values(entryData as any)
-      .returning();
+    const perform = async (client: TxOrDb): Promise<JournalEntry> => {
+      const { lines, ...entryData } = entry;
 
-    if (lines && lines.length > 0) {
-      const lineValues = lines.map((line) => {
-        const balance = (line.debit || 0) - (line.credit || 0);
-        return {
-          journalEntryId: created.id,
-          accountId: line.accountId,
-          partnerId: line.partnerId ?? null,
-          debit: line.debit ?? 0,
-          credit: line.credit ?? 0,
-          balance,
-          description: line.description ?? null,
-          reconciled: false,
-          reconciliationId: null,
-        };
-      });
-      await client.insert(journalLines).values(lineValues as any);
+      // When no entryNumber is provided, use a unique placeholder for the
+      // NOT NULL + UNIQUE insert, then replace it with an ID-based number.
+      const insertData = needsAutoNumber
+        ? { ...entryData, entryNumber: `_pending_${randomUUID()}` }
+        : entryData;
 
-      // Update account balances
-      for (const line of lines) {
-        const netAmount = (line.debit || 0) - (line.credit || 0);
+      const [created] = await client
+        .insert(journalEntries)
+        .values(insertData as any)
+        .returning();
+
+      if (needsAutoNumber) {
+        const prefix = entryData.sourceType?.toUpperCase() ?? "MAN";
         await client
-          .update(accounts)
-          .set({ balance: sql`${accounts.balance} + ${netAmount}` } as any)
-          .where(eq(accounts.id, line.accountId));
+          .update(journalEntries)
+          .set({ entryNumber: `JE-${prefix}-${created.id}` })
+          .where(eq(journalEntries.id, created.id));
       }
-    }
 
-    return this.getEntryById(created.id, tx) as Promise<JournalEntry>;
+      if (lines && lines.length > 0) {
+        const lineValues = lines.map((line) => {
+          const balance = (line.debit || 0) - (line.credit || 0);
+          return {
+            journalEntryId: created.id,
+            accountId: line.accountId,
+            partnerId: line.partnerId ?? null,
+            debit: line.debit ?? 0,
+            credit: line.credit ?? 0,
+            balance,
+            description: line.description ?? null,
+            reconciled: false,
+            reconciliationId: null,
+          };
+        });
+        await client.insert(journalLines).values(lineValues as any);
+
+        // Update account balances
+        for (const line of lines) {
+          const netAmount = (line.debit || 0) - (line.credit || 0);
+          await client
+            .update(accounts)
+            .set({ balance: sql`${accounts.balance} + ${netAmount}` } as any)
+            .where(eq(accounts.id, line.accountId));
+        }
+      }
+
+      return this.getEntryById(created.id, client) as Promise<JournalEntry>;
+    };
+
+    // Auto-generated entry numbers require insert + update; wrap in a
+    // transaction for atomicity when the caller didn't provide one.
+    if (needsAutoNumber && !tx) {
+      return this.db.transaction(perform);
+    }
+    return perform(this.c(tx));
   }
 
   async createJournalEntry(
-    entry: JournalEntry,
+    entry: CreateJournalEntryInput,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
     return this.insertJournalEntry(entry, tx);
   }
 
   async createJournalEntrySync(
-    entry: JournalEntry,
+    entry: CreateJournalEntryInput,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
     return this.insertJournalEntry(entry, tx);
@@ -395,7 +421,8 @@ export class AccountingRepository implements IAccountingRepository {
     }
 
     const entry: JournalEntry = {
-      entryNumber: params.entryNumber || `JE-PREV-${params.saleId}-${Date.now()}`,
+      entryNumber:
+        params.entryNumber || `JE-PREV-${params.saleId}-${Date.now()}`,
       totalAmount: params.amount,
       currency: params.currency || "IQD",
       description: params.description,

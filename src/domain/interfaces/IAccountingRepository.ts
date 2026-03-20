@@ -1,4 +1,8 @@
-import { Account, JournalEntry } from "../entities/Accounting.js";
+import {
+  Account,
+  JournalEntry,
+  CreateJournalEntryInput,
+} from "../entities/Accounting.js";
 import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface ReversalEntryParams {
@@ -44,9 +48,12 @@ export interface PaymentReversalEntryParams {
 }
 
 export interface IAccountingRepository {
-  createJournalEntry(entry: JournalEntry, tx?: TxOrDb): Promise<JournalEntry>;
+  createJournalEntry(
+    entry: CreateJournalEntryInput,
+    tx?: TxOrDb,
+  ): Promise<JournalEntry>;
   createJournalEntrySync(
-    entry: JournalEntry,
+    entry: CreateJournalEntryInput,
     tx?: TxOrDb,
   ): Promise<JournalEntry>;
   createAccountSync(
