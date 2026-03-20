@@ -75,6 +75,26 @@ export class RefundSaleUseCase extends WriteUseCase<
     const accountingEnabled = await settingsAccessor.isAccountingEnabled();
     const ledgersEnabled = await settingsAccessor.isLedgersEnabled();
 
+    // Resolve account codes from settings so the correct chart-of-accounts
+    // entries are used when building the credit note journal lines.
+    const [
+      ACCT_CASH,
+      ACCT_AR,
+      ACCT_REVENUE,
+      ACCT_COGS,
+      ACCT_INVENTORY,
+      ACCT_VAT_OUTPUT,
+    ] = accountingEnabled
+      ? await Promise.all([
+          settingsAccessor.getCashAccountCode(),
+          settingsAccessor.getArAccountCode(),
+          settingsAccessor.getSalesRevenueAccountCode(),
+          settingsAccessor.getCogsAccountCode(),
+          settingsAccessor.getInventoryAccountCode(),
+          settingsAccessor.getVatOutputAccountCode(),
+        ])
+      : [null, null, null, null, null, null];
+
     return withTransaction(this.db, async (tx) => {
       // 1. Validate
       const sale = await this.saleRepo.findById(input.saleId, tx);
@@ -189,6 +209,47 @@ export class RefundSaleUseCase extends WriteUseCase<
 
       // 5. Credit note journal entry
       if (accountingEnabled) {
+        // Resolve account IDs from the configured codes so the entry uses
+        // the correct chart-of-accounts rows (avoids hardcoded fallback mismatches).
+        const [cashAcc, arAcc, revenueAcc, cogsAcc, inventoryAcc, vatOutputAcc] =
+          await Promise.all([
+            ACCT_CASH
+              ? this.accountingRepo.findAccountByCode(ACCT_CASH, tx)
+              : Promise.resolve(null),
+            ACCT_AR
+              ? this.accountingRepo.findAccountByCode(ACCT_AR, tx)
+              : Promise.resolve(null),
+            ACCT_REVENUE
+              ? this.accountingRepo.findAccountByCode(ACCT_REVENUE, tx)
+              : Promise.resolve(null),
+            ACCT_COGS
+              ? this.accountingRepo.findAccountByCode(ACCT_COGS, tx)
+              : Promise.resolve(null),
+            ACCT_INVENTORY
+              ? this.accountingRepo.findAccountByCode(ACCT_INVENTORY, tx)
+              : Promise.resolve(null),
+            ACCT_VAT_OUTPUT
+              ? this.accountingRepo.findAccountByCode(ACCT_VAT_OUTPUT, tx)
+              : Promise.resolve(null),
+          ]);
+
+        // Select the counter-account (Cash or AR) based on the sale's payment type.
+        // Credit sales reduce the AR balance; cash/mixed sales refund actual cash.
+        const isCreditSale = sale.paymentType === "credit";
+        let cashAccountId: number | undefined;
+        let arAccountId: number | undefined;
+
+        if (isCreditSale) {
+          // Credit sale: reduce the AR balance (fall back to cash if AR is not configured).
+          arAccountId = arAcc?.id ?? cashAcc?.id ?? undefined;
+        } else if (cashAcc?.id != null) {
+          // Cash or mixed sale: return the cash that was collected.
+          cashAccountId = cashAcc.id;
+        } else {
+          // Cash not configured — fall back to AR so at least one side is posted.
+          arAccountId = arAcc?.id ?? undefined;
+        }
+
         await this.accountingRepo.createCreditNoteEntry(
           {
             saleId: sale.id!,
@@ -196,6 +257,13 @@ export class RefundSaleUseCase extends WriteUseCase<
             cogsReversal,
             description: `استرداد - فاتورة #${sale.invoiceNumber}`,
             createdBy: numUserId,
+            currency: sale.currency ?? "IQD",
+            revenueAccountId: revenueAcc?.id ?? undefined,
+            cashAccountId,
+            arAccountId,
+            cogsAccountId: cogsAcc?.id ?? undefined,
+            inventoryAccountId: inventoryAcc?.id ?? undefined,
+            vatOutputAccountId: vatOutputAcc?.id ?? undefined,
           },
           tx,
         );

@@ -21,7 +21,7 @@ export class AccountingRepository implements IAccountingRepository {
     return tx ?? this.db;
   }
 
-  private async insertJournalEntry(
+  protected async insertJournalEntry(
     entry: JournalEntry,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
@@ -265,27 +265,28 @@ export class AccountingRepository implements IAccountingRepository {
     const vatAmount = params.vatAmount ?? 0;
     const cogsReversal = params.cogsReversal ?? 0;
 
-    // Resolve account IDs — fall back to looking up by standard codes
+    // Resolve account IDs — fall back to looking up by standard chart-of-accounts codes.
+    // Fallback codes are aligned with DEFAULT_ACCOUNTING_CODES in InitializeAccountingUseCase.
     const [revenueAcc, cashAcc, vatAcc, cogsAcc, inventoryAcc, arAcc] =
       await Promise.all([
         params.revenueAccountId
           ? Promise.resolve({ id: params.revenueAccountId })
-          : this.findAccountByCode("4000", tx),
+          : this.findAccountByCode("4001", tx),
         params.cashAccountId
           ? Promise.resolve({ id: params.cashAccountId })
-          : this.findAccountByCode("1100", tx),
+          : this.findAccountByCode("1001", tx),
         params.vatOutputAccountId
           ? Promise.resolve({ id: params.vatOutputAccountId })
           : this.findAccountByCode("2200", tx),
         params.cogsAccountId
           ? Promise.resolve({ id: params.cogsAccountId })
-          : this.findAccountByCode("5000", tx),
+          : this.findAccountByCode("5001", tx),
         params.inventoryAccountId
           ? Promise.resolve({ id: params.inventoryAccountId })
           : this.findAccountByCode("1200", tx),
         params.arAccountId
           ? Promise.resolve({ id: params.arAccountId })
-          : this.findAccountByCode("1300", tx),
+          : this.findAccountByCode("1100", tx),
       ]);
 
     const lines: Partial<JournalLine>[] = [];
@@ -310,11 +311,21 @@ export class AccountingRepository implements IAccountingRepository {
       });
     }
 
-    // CR Cash / AR
-    const cashOrArId = cashAcc?.id ?? arAcc?.id;
-    if (cashOrArId) {
+    // CR Cash or AR — caller determines which account to credit via params.
+    // For cash/mixed sales credit Cash; for credit sales credit AR.
+    // cashAccountId takes priority when provided; arAccountId is the fallback for credit sales.
+    let counterAccountId: number | undefined;
+    if (params.cashAccountId != null) {
+      counterAccountId = cashAcc?.id;
+    } else if (params.arAccountId != null) {
+      counterAccountId = arAcc?.id;
+    } else {
+      counterAccountId = cashAcc?.id ?? arAcc?.id;
+    }
+
+    if (counterAccountId) {
       lines.push({
-        accountId: cashOrArId,
+        accountId: counterAccountId,
         debit: 0,
         credit: params.amount,
         description: "Credit note — cash/AR refund",
@@ -341,6 +352,17 @@ export class AccountingRepository implements IAccountingRepository {
       }
     }
 
+    // Guard: reject unbalanced entries before they reach the database.
+    const totalDebit = lines.reduce((sum, l) => sum + (l.debit || 0), 0);
+    const totalCredit = lines.reduce((sum, l) => sum + (l.credit || 0), 0);
+    if (lines.length === 0 || Math.abs(totalDebit - totalCredit) > 0.005) {
+      throw new Error(
+        `Cannot persist unbalanced credit note entry for sale ${params.saleId}: ` +
+          `debit=${totalDebit}, credit=${totalCredit}. ` +
+          `Ensure revenue, cash/AR accounts are configured in the chart of accounts.`,
+      );
+    }
+
     const entryNumber = `JE-CN-${params.saleId}-${Date.now()}`;
     const entry: JournalEntry = {
       entryNumber,
@@ -349,7 +371,7 @@ export class AccountingRepository implements IAccountingRepository {
       sourceType: "sale_refund" as any,
       sourceId: params.saleId,
       totalAmount: params.amount,
-      currency: params.currency,
+      currency: params.currency ?? "IQD",
       isPosted: true,
       isReversed: false,
       createdBy: params.createdBy,
