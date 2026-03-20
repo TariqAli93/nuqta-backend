@@ -119,6 +119,11 @@ export class RefundSaleUseCase extends WriteUseCase<
             if (this.productRepo) {
               const product = await this.productRepo.findById(productId, tx);
               productStockMap.set(productId, product?.stock ?? 0);
+              if (!product) {
+                console.warn(
+                  `[RefundSaleUseCase] Product ${productId} not found during refund stock lookup, using 0`,
+                );
+              }
             } else {
               productStockMap.set(productId, 0);
             }

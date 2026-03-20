@@ -102,6 +102,11 @@ export class CancelSaleUseCase extends WriteUseCase<
           if (this.productRepo) {
             const product = await this.productRepo.findById(dep.productId, tx);
             productStockMap.set(dep.productId, product?.stock ?? 0);
+            if (!product) {
+              console.warn(
+                `[CancelSaleUseCase] Product ${dep.productId} not found during cancel stock lookup, using 0`,
+              );
+            }
           } else {
             productStockMap.set(dep.productId, 0);
           }
