@@ -239,7 +239,7 @@ export class AccountingRepository implements IAccountingRepository {
       entryDate: params.reversalDate.toISOString(),
       sourceType: params.sourceType as any,
       sourceId: params.sourceId,
-      isPosted: true,
+      isPosted: params.isPosted ?? true,
       isReversed: false,
       reversalOfId: params.originalEntryId,
       createdBy: params.createdBy,
@@ -270,22 +270,22 @@ export class AccountingRepository implements IAccountingRepository {
       await Promise.all([
         params.revenueAccountId
           ? Promise.resolve({ id: params.revenueAccountId })
-          : this.findAccountByCode("4000", tx),
+          : this.findAccountByCode("4001", tx),
         params.cashAccountId
           ? Promise.resolve({ id: params.cashAccountId })
-          : this.findAccountByCode("1100", tx),
+          : this.findAccountByCode("1001", tx),
         params.vatOutputAccountId
           ? Promise.resolve({ id: params.vatOutputAccountId })
           : this.findAccountByCode("2200", tx),
         params.cogsAccountId
           ? Promise.resolve({ id: params.cogsAccountId })
-          : this.findAccountByCode("5000", tx),
+          : this.findAccountByCode("5001", tx),
         params.inventoryAccountId
           ? Promise.resolve({ id: params.inventoryAccountId })
           : this.findAccountByCode("1200", tx),
         params.arAccountId
           ? Promise.resolve({ id: params.arAccountId })
-          : this.findAccountByCode("1300", tx),
+          : this.findAccountByCode("1100", tx),
       ]);
 
     const lines: Partial<JournalLine>[] = [];
@@ -366,10 +366,10 @@ export class AccountingRepository implements IAccountingRepository {
     const [cashAcc, arAcc] = await Promise.all([
       params.cashAccountId
         ? Promise.resolve({ id: params.cashAccountId })
-        : this.findAccountByCode("1100", tx),
+        : this.findAccountByCode("1001", tx),
       params.arAccountId
         ? Promise.resolve({ id: params.arAccountId })
-        : this.findAccountByCode("1300", tx),
+        : this.findAccountByCode("1100", tx),
     ]);
 
     const lines: Partial<JournalLine>[] = [];
@@ -395,14 +395,14 @@ export class AccountingRepository implements IAccountingRepository {
     }
 
     const entry: JournalEntry = {
-      entryNumber: params.entryNumber,
+      entryNumber: params.entryNumber || `JE-PREV-${params.saleId}-${Date.now()}`,
       totalAmount: params.amount,
-      currency: params.currency,
+      currency: params.currency || "IQD",
       description: params.description,
       entryDate: new Date().toISOString(),
       sourceType: "sale_cancellation" as any,
       sourceId: params.saleId,
-      isPosted: true,
+      isPosted: params.isPosted ?? true,
       isReversed: false,
       createdBy: params.createdBy,
       lines: lines as JournalLine[],

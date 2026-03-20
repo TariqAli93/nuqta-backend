@@ -11,6 +11,7 @@
  * All steps run inside a single database transaction.
  */
 import { ISaleRepository } from "../../interfaces/ISaleRepository.js";
+import { IProductRepository } from "../../interfaces/IProductRepository.js";
 import { IInventoryRepository } from "../../interfaces/IInventoryRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ICustomerLedgerRepository } from "../../interfaces/ICustomerLedgerRepository.js";
@@ -60,6 +61,7 @@ export class RefundSaleUseCase extends WriteUseCase<
     private customerLedgerRepo: ICustomerLedgerRepository,
     private settingsRepo: ISettingsRepository,
     private auditRepo?: IAuditRepository,
+    private productRepo?: IProductRepository,
   ) {
     super();
   }
@@ -98,6 +100,9 @@ export class RefundSaleUseCase extends WriteUseCase<
           tx,
         );
 
+        // Track running stock per product for accurate before/after snapshots
+        const productStockMap = new Map<number, number>();
+
         for (const ri of input.returnItems) {
           const itemDepletions = depletions.filter(
             (d) => d.saleItemId === ri.saleItemId,
@@ -108,17 +113,26 @@ export class RefundSaleUseCase extends WriteUseCase<
           const unitFactor = saleItem.unitFactor ?? 1;
           let qtyToReturn = ri.quantity * unitFactor;
 
+          // Fetch current stock once per product
+          const productId = saleItem.productId!;
+          if (!productStockMap.has(productId)) {
+            if (this.productRepo) {
+              const product = await this.productRepo.findById(productId, tx);
+              productStockMap.set(productId, product?.stock ?? 0);
+            } else {
+              productStockMap.set(productId, 0);
+            }
+          }
+
           // Restore batches in reverse depletion order (LIFO on depletions)
           for (const dep of [...itemDepletions].reverse()) {
             if (qtyToReturn <= 0) break;
             const returnQty = Math.min(qtyToReturn, dep.quantityBase);
             cogsReversal += returnQty * dep.costPerUnit;
 
-            // Compute stockBefore/stockAfter for the inventory movement.
-            // We are constrained to this use-case layer, so we conservatively
-            // derive stockAfter as stockBefore + returnQty.
-            const stockBefore = 0;
+            const stockBefore = productStockMap.get(productId)!;
             const stockAfter = stockBefore + returnQty;
+            productStockMap.set(productId, stockAfter);
 
             await this.inventoryRepo.restoreBatchQty(
               dep.batchId,
@@ -127,7 +141,7 @@ export class RefundSaleUseCase extends WriteUseCase<
             );
             await this.inventoryRepo.createMovement(
               {
-                productId: saleItem.productId!,
+                productId,
                 batchId: dep.batchId,
                 movementType: "in",
                 reason: "refund",

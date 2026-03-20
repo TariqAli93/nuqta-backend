@@ -8,6 +8,7 @@ export interface ReversalEntryParams {
   sourceType: string;
   sourceId: number;
   createdBy: number;
+  isPosted?: boolean;
 }
 
 export interface CreditNoteEntryParams {
@@ -37,6 +38,7 @@ export interface PaymentReversalEntryParams {
   createdBy: number;
   entryNumber?: string;
   currency?: string;
+  isPosted?: boolean;
   cashAccountId?: number;
   arAccountId?: number;
 }

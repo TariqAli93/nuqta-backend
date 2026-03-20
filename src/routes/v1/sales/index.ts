@@ -435,6 +435,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.payment,
         fastify.repos.settings,
         fastify.repos.audit,
+        fastify.repos.product,
       );
       await uc.execute({ saleId }, userId);
 
@@ -465,6 +466,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.customerLedger,
         fastify.repos.settings,
         fastify.repos.audit,
+        fastify.repos.product,
       );
       const data = await uc.execute(
         {
