@@ -14,6 +14,7 @@ export class ProductRepository implements IProductRepository {
 
   async findAll(params?: {
     search?: string;
+    barcode?: string;
     limit?: number;
     offset?: number;
     categoryId?: number;
@@ -27,6 +28,9 @@ export class ProductRepository implements IProductRepository {
       conditions.push(
         sql`(${like(products.name, `%${params.search}%`)} OR ${like(products.sku, `%${params.search}%`)} OR ${like(products.barcode, `%${params.search}%`)})`,
       );
+    }
+    if (params?.barcode) {
+      conditions.push(eq(products.barcode, params.barcode));
     }
     if (params?.categoryId)
       conditions.push(eq(products.categoryId, params.categoryId));

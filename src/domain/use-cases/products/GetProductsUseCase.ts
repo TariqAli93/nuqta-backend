@@ -4,6 +4,7 @@ import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
 export class GetProductsUseCase extends ReadUseCase<{
   search?: string;
+  barcode?: string;
   page?: number;
   limit?: number;
   categoryId?: number;
@@ -19,6 +20,7 @@ export class GetProductsUseCase extends ReadUseCase<{
   async execute(
     params: {
       search?: string;
+      barcode?: string;
       page?: number;
       limit?: number;
       categoryId?: number;
@@ -34,6 +36,7 @@ export class GetProductsUseCase extends ReadUseCase<{
 
     return this.productRepo.findAll({
       search: params.search,
+      barcode: params.barcode,
       categoryId: params.categoryId,
       supplierId: params.supplierId,
       status: params.status,

@@ -6,6 +6,7 @@ import type { TxOrDb } from "../../data/db/transaction.js";
 export interface IProductRepository {
   findAll(params?: {
     search?: string;
+    barcode?: string;
     limit?: number;
     offset?: number;
     categoryId?: number;

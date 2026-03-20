@@ -92,10 +92,10 @@ const registerSchema = {
   tags: ["Auth"],
   summary: "Register first user",
   description:
-    "Register the initial admin user. Only works when no users exist.",
+    "Register the initial admin user. Only works when no users exist. Returns full login response (tokens + user + permissions) so the caller can authenticate immediately.",
   body: RegisterBodySchema,
   response: {
-    200: successEnvelope(UserSafeSchema, "User created"),
+    200: successEnvelope(LoginDataSchema, "User created and logged in"),
     ...ErrorResponses,
   },
 } as const;
@@ -293,7 +293,23 @@ const auth: FastifyPluginAsync = async (fastify) => {
         },
         "anonymous",
       );
-      return { ok: true, data: user };
+
+      // Issue tokens immediately so the caller can authenticate without a separate login.
+      const permissions: string[] = ["*"]; // admin gets all permissions
+      const payload = buildTokenPayload(user, permissions);
+      const accessToken = fastify.jwt.signAccess(payload);
+      const refreshToken = fastify.jwt.signRefresh(payload);
+
+      return {
+        ok: true,
+        data: {
+          accessToken,
+          refreshToken,
+          token: accessToken,
+          user,
+          permissions,
+        },
+      };
     },
   );
 

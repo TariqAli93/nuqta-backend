@@ -220,7 +220,7 @@ export class InventoryRepository implements IInventoryRepository {
 
   /* ── Expiry alerts ──────────────────────────────────────────── */
 
-  async getExpiryAlerts(): Promise<
+  async getExpiryAlerts(daysAhead = 30): Promise<
     {
       batchId: number;
       productId: number;
@@ -242,7 +242,7 @@ export class InventoryRepository implements IInventoryRepository {
       })
       .from(productBatches)
       .innerJoin(products, eq(products.id, productBatches.productId))
-      .where(expiringBatchesCondition())
+      .where(expiringBatchesCondition(daysAhead))
       .orderBy(productBatches.expiryDate);
 
     return rows.map((r) => ({
