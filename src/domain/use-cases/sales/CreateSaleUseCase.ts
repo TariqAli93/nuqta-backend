@@ -468,6 +468,7 @@ export class CreateSaleUseCase extends WriteUseCase<
           exchangeRate: 1,
           paymentType: input.paymentType,
           paidAmount,
+          refundedAmount: 0,
           remainingAmount,
           status: remainingAmount <= 0 ? "completed" : "pending",
           notes: input.notes,
