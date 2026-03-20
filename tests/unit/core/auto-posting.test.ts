@@ -248,7 +248,10 @@ describe("AddPurchasePaymentUseCase auto-posting", () => {
 
   test("creates journal entry with isPosted=true when autoPosting is enabled", async () => {
     const deps = buildDeps(true);
+    // Mock db with transaction that just executes the callback directly
+    const mockDb = { transaction: (fn: any) => fn(mockDb) } as any;
     const uc = new AddPurchasePaymentUseCase(
+      mockDb,
       deps.purchaseRepo as any,
       deps.paymentRepo as any,
       deps.supplierLedgerRepo as any,
@@ -269,12 +272,15 @@ describe("AddPurchasePaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: true }),
+      expect.anything(),
     );
   });
 
   test("creates journal entry with isPosted=false when autoPosting is disabled", async () => {
     const deps = buildDeps(false);
+    const mockDb = { transaction: (fn: any) => fn(mockDb) } as any;
     const uc = new AddPurchasePaymentUseCase(
+      mockDb,
       deps.purchaseRepo as any,
       deps.paymentRepo as any,
       deps.supplierLedgerRepo as any,
@@ -295,6 +301,7 @@ describe("AddPurchasePaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: false }),
+      expect.anything(),
     );
   });
 });
