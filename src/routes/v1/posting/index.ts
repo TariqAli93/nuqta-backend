@@ -113,6 +113,9 @@ const BatchListQuerySchema = {
   type: "object" as const,
   properties: {
     status: { type: "string", enum: ["draft", "posted", "locked"] },
+    periodType: { type: "string", enum: ["day", "month", "year"] },
+    dateFrom: { type: "string", format: "date", description: "Filter batches with periodStart >= this date" },
+    dateTo: { type: "string", format: "date", description: "Filter batches with periodEnd <= this date" },
     limit: { type: "string", pattern: "^\\d+$" },
     offset: { type: "string", pattern: "^\\d+$" },
   },
@@ -266,15 +269,60 @@ const posting: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const query = request.query as {
         status?: string;
+        periodType?: string;
+        dateFrom?: string;
+        dateTo?: string;
         limit?: string;
         offset?: string;
       };
       const data = await fastify.repos.posting.getBatches({
         status: query.status,
+        periodType: query.periodType,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });
       return { ok: true, data };
+    },
+  );
+
+  // GET /posting/batches/:id/locked
+  fastify.get<{ Params: { id: string } }>(
+    "/batches/:id/locked",
+    {
+      schema: {
+        tags: ["Posting"],
+        summary: "Check if a posting batch is locked",
+        security: [{ bearerAuth: [] }],
+        params: { $ref: "IdParams#" },
+        response: {
+          200: successEnvelope(
+            {
+              type: "object" as const,
+              properties: { locked: { type: "boolean" } },
+            },
+            "Batch locked status",
+          ),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: requirePermission("posting:read"),
+    },
+    async (request) => {
+      const batchId = parseInt(request.params.id, 10);
+      const batches = await fastify.repos.posting.getBatches({ limit: 1, offset: 0 });
+      // getBatches doesn't filter by id, so fetch directly
+      const { postingBatches } = await import("../../../data/schema/schema.js");
+      const { eq } = await import("drizzle-orm");
+      const [batch] = await fastify.db
+        .select({ status: postingBatches.status })
+        .from(postingBatches)
+        .where(eq(postingBatches.id, batchId));
+      if (!batch) {
+        return { ok: true, data: { locked: false } };
+      }
+      return { ok: true, data: { locked: batch.status === "locked" } };
     },
   );
 

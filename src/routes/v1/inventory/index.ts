@@ -98,6 +98,16 @@ const getExpiryAlertsSchema = {
   summary: "Get expiry alerts",
   description: "Products nearing or past expiry date.",
   security: [{ bearerAuth: [] }],
+  querystring: {
+    type: "object" as const,
+    properties: {
+      daysAhead: {
+        type: "string",
+        pattern: "^\\d+$",
+        description: "Number of days ahead to check for expiry (default: 30)",
+      },
+    },
+  } as const,
   response: {
     200: successArrayEnvelope(
       { type: "object" as const, additionalProperties: true },
@@ -228,8 +238,10 @@ const inventory: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("inventory:read"),
     },
     async (request) => {
+      const query = request.query as { daysAhead?: string };
+      const daysAhead = query.daysAhead ? parseInt(query.daysAhead, 10) : undefined;
       const uc = new GetExpiryAlertsUseCase(fastify.repos.inventory);
-      const data = await uc.execute();
+      const data = await uc.execute({ daysAhead });
       return { ok: true, data };
     },
   );

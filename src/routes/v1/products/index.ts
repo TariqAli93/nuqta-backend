@@ -31,6 +31,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         search?: string;
         page?: string;
         limit?: string;
+        barcode?: string;
         categoryId?: string;
         supplierId?: string;
         status?: string;
@@ -42,6 +43,7 @@ const products: FastifyPluginAsync = async (fastify) => {
       const uc = new GetProductsUseCase(fastify.repos.product);
       const data = await uc.execute({
         search: query.search,
+        barcode: query.barcode,
         page,
         limit,
         categoryId: query.categoryId

@@ -40,7 +40,7 @@ export interface IInventoryRepository {
     expiryAlertCount: number;
     topMovingProducts: any[];
   }>;
-  getExpiryAlerts(): Promise<any[]>;
+  getExpiryAlerts(daysAhead?: number): Promise<any[]>;
 
   /**
    * Compare products.stock (cached) against SUM of inventory_movements

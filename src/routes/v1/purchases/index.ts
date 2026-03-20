@@ -67,10 +67,13 @@ const PurchaseListQuerySchema = {
   type: "object" as const,
   properties: {
     search: { type: "string", description: "Search by invoice number" },
+    supplierId: { type: "string", pattern: "^\\d+$", description: "Filter by supplier ID" },
     status: {
       type: "string",
       enum: ["pending", "completed", "cancelled", "received", "partial"],
     },
+    dateFrom: { type: "string", format: "date", description: "Filter from date (inclusive)" },
+    dateTo: { type: "string", format: "date", description: "Filter to date (inclusive)" },
     limit: { type: "string", pattern: "^\\d+$" },
     offset: { type: "string", pattern: "^\\d+$" },
   },
@@ -198,13 +201,19 @@ const purchases: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const query = request.query as {
         search?: string;
+        supplierId?: string;
         status?: string;
+        dateFrom?: string;
+        dateTo?: string;
         limit?: string;
         offset?: string;
       };
       const data = await fastify.repos.purchase.findAll({
         search: query.search,
+        supplierId: query.supplierId ? parseInt(query.supplierId, 10) : undefined,
         status: query.status,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });

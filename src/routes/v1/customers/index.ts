@@ -67,6 +67,11 @@ const CustomerListQuerySchema = {
       description: "Page number (1-based)",
     },
     limit: { type: "string", pattern: "^\\d+$", description: "Items per page" },
+    offset: {
+      type: "string",
+      pattern: "^\\d+$",
+      description: "Item offset (alternative to page; takes precedence if both provided)",
+    },
   },
 } as const;
 
@@ -152,14 +157,20 @@ const customers: FastifyPluginAsync = async (fastify) => {
         search?: string;
         page?: string;
         limit?: string;
+        offset?: string;
       };
+      const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      let offset: number | undefined;
+      if (query.offset !== undefined) {
+        // Direct offset takes precedence over page
+        offset = parseInt(query.offset, 10);
+      } else if (query.page) {
+        offset = (parseInt(query.page, 10) - 1) * limit;
+      }
       const data = await fastify.repos.customer.findAll({
         search: query.search,
-        limit: query.limit ? parseInt(query.limit, 10) : undefined,
-        offset: query.page
-          ? (parseInt(query.page, 10) - 1) *
-            (query.limit ? parseInt(query.limit, 10) : 20)
-          : undefined,
+        limit,
+        offset,
       });
       return { ok: true, data };
     },

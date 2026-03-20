@@ -486,6 +486,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         refundedAmount: data.refundedAmount,
         totalRefunded: data.totalRefunded,
         newPaidAmount: data.newPaidAmount,
+
         newRemainingAmount: data.newRemainingAmount,
         status: data.status,
       });

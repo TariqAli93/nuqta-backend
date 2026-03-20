@@ -365,6 +365,89 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // POST /accounting/journal-entries
+  fastify.post(
+    "/journal-entries",
+    {
+      schema: {
+        tags: ["Accounting"],
+        summary: "Create a manual journal entry",
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: "object" as const,
+          required: ["entryDate", "description", "lines"],
+          properties: {
+            entryDate: { type: "string", format: "date" },
+            description: { type: "string", minLength: 1 },
+            notes: { type: "string", nullable: true },
+            currency: { type: "string" },
+            lines: {
+              type: "array",
+              minItems: 2,
+              items: {
+                type: "object" as const,
+                required: ["accountId"],
+                properties: {
+                  accountId: { type: "integer", minimum: 1 },
+                  partnerId: { type: "integer", nullable: true },
+                  debit: { type: "integer", minimum: 0 },
+                  credit: { type: "integer", minimum: 0 },
+                  description: { type: "string", nullable: true },
+                },
+                additionalProperties: false,
+              },
+            },
+          },
+          additionalProperties: false,
+        },
+        response: {
+          200: successEnvelope(JournalEntrySchema, "Created journal entry"),
+          ...ErrorResponses,
+        },
+      },
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
+    },
+    async (request) => {
+      const body = request.body as {
+        entryDate: string;
+        description: string;
+        notes?: string;
+        currency?: string;
+        lines: {
+          accountId: number;
+          partnerId?: number | null;
+          debit?: number;
+          credit?: number;
+          description?: string | null;
+        }[];
+      };
+      const totalAmount = body.lines.reduce(
+        (sum, l) => sum + (l.debit ?? 0),
+        0,
+      );
+      const entry = await fastify.repos.accounting.createJournalEntry({
+        entryDate: body.entryDate,
+        description: body.description,
+        notes: body.notes ?? null,
+        currency: body.currency ?? "IQD",
+        sourceType: "manual",
+        isPosted: false,
+        isReversed: false,
+        totalAmount,
+        lines: body.lines.map((l) => ({
+          accountId: l.accountId,
+          partnerId: l.partnerId ?? null,
+          debit: l.debit ?? 0,
+          credit: l.credit ?? 0,
+          balance: (l.debit ?? 0) - (l.credit ?? 0),
+          description: l.description ?? null,
+          reconciled: false,
+        })),
+      });
+      return { ok: true, data: entry };
+    },
+  );
+
   // GET /accounting/journal-entries/:id
   fastify.get<{ Params: { id: string } }>(
     "/journal-entries/:id",
