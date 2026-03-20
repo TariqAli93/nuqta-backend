@@ -11180,8 +11180,10 @@ export interface components {
         inline_response_200_72_data: {
             saleId?: number;
             refundedAmount?: number;
+            totalRefunded?: number;
             newPaidAmount?: number;
             newRemainingAmount?: number;
+            status?: string;
         };
         inline_response_200_74_data: {
             name?: string;

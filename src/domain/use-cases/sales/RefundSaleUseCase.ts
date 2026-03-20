@@ -43,8 +43,10 @@ export interface RefundInput {
 type TEntity = {
   saleId: number;
   refundedAmount: number;
+  totalRefunded: number;
   newPaidAmount: number;
   newRemainingAmount: number;
+  status: string;
 };
 
 export class RefundSaleUseCase extends WriteUseCase<
@@ -87,9 +89,11 @@ export class RefundSaleUseCase extends WriteUseCase<
         throw new InvalidStateError("تم استرداد هذه الفاتورة بالكامل بالفعل");
       if (input.amount <= 0)
         throw new ValidationError("مبلغ الاسترداد يجب أن يكون أكبر من صفر");
-      if ((sale.paidAmount ?? 0) <= 0)
+      const refundableBalance =
+        (sale.paidAmount ?? 0) - (sale.refundedAmount ?? 0);
+      if (refundableBalance <= 0)
         throw new InvalidStateError("لا يوجد مبلغ مدفوع لاسترداده");
-      if (input.amount > (sale.paidAmount ?? 0))
+      if (input.amount > refundableBalance)
         throw new ValidationError("مبلغ الاسترداد أكبر من المبلغ المدفوع");
 
       // 2. Restore inventory for returned items
@@ -186,17 +190,25 @@ export class RefundSaleUseCase extends WriteUseCase<
       );
 
       // 4. Update sale amounts and status
-      const newPaidAmount = (sale.paidAmount ?? 0) - input.amount;
-      const newRemainingAmount = (sale.total ?? 0) - newPaidAmount;
+      // paidAmount stays unchanged — it tracks historical gross payments.
+      // refundedAmount is cumulative: previous refunds + this refund.
+      // remainingAmount = collectible balance = max(0, total - paidAmount - refundedAmount).
+      const newRefundedAmount = (sale.refundedAmount ?? 0) + input.amount;
+      const newRemainingAmount = Math.max(
+        0,
+        (sale.total ?? 0) - (sale.paidAmount ?? 0) - newRefundedAmount,
+      );
 
       // Determine new invoice status based on refund outcome
       const newStatus =
-        newPaidAmount === 0 ? "refunded" : "partial_refund";
+        newRefundedAmount >= (sale.paidAmount ?? 0)
+          ? "refunded"
+          : "partial_refund";
 
       await this.saleRepo.update(
         input.saleId,
         {
-          paidAmount: newPaidAmount,
+          refundedAmount: newRefundedAmount,
           remainingAmount: newRemainingAmount,
           status: newStatus,
           notes: sale.notes
@@ -243,8 +255,10 @@ export class RefundSaleUseCase extends WriteUseCase<
       return {
         saleId: input.saleId,
         refundedAmount: input.amount,
-        newPaidAmount,
+        totalRefunded: newRefundedAmount,
+        newPaidAmount: sale.paidAmount ?? 0,
         newRemainingAmount,
+        status: newStatus,
       };
     });
   }

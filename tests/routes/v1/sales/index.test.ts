@@ -407,15 +407,19 @@ describe("/api/v1/sales", () => {
   const refundResult = {
     saleId: 11,
     refundedAmount: 20000,
-    newPaidAmount: 0,
-    newRemainingAmount: 20000,
+    totalRefunded: 20000,
+    newPaidAmount: 20000,
+    newRemainingAmount: 0,
+    status: "refunded",
   };
 
   const partialRefundResult = {
     saleId: 11,
     refundedAmount: 10000,
-    newPaidAmount: 10000,
-    newRemainingAmount: 10000,
+    totalRefunded: 10000,
+    newPaidAmount: 20000,
+    newRemainingAmount: 0,
+    status: "partial_refund",
   };
 
   test("POST /:id/refund succeeds with full refund", async () => {
@@ -433,8 +437,9 @@ describe("/api/v1/sales", () => {
     const data = expectOk(response) as typeof refundResult;
     expect(data.saleId).toBe(11);
     expect(data.refundedAmount).toBe(20000);
-    expect(data.newPaidAmount).toBe(0);
-    expect(data.newRemainingAmount).toBe(20000);
+    expect(data.newPaidAmount).toBe(20000);
+    expect(data.newRemainingAmount).toBe(0);
+    expect(data.status).toBe("refunded");
   });
 
   test("POST /:id/refund succeeds with partial refund and returnItems", async () => {
@@ -455,7 +460,8 @@ describe("/api/v1/sales", () => {
 
     const data = expectOk(response) as typeof partialRefundResult;
     expect(data.refundedAmount).toBe(10000);
-    expect(data.newPaidAmount).toBe(10000);
+    expect(data.newPaidAmount).toBe(20000);
+    expect(data.status).toBe("partial_refund");
   });
 
   test("POST /:id/refund returns 401 when unauthenticated", async () => {

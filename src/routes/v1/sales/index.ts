@@ -56,6 +56,7 @@ const SaleSchema = {
     interestAmount: { type: "integer" },
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
     paidAmount: { type: "integer" },
+    refundedAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
     status: {
       type: "string",
@@ -296,8 +297,10 @@ const refundSaleSchema = {
         properties: {
           saleId: { type: "integer" },
           refundedAmount: { type: "integer" },
+          totalRefunded: { type: "integer" },
           newPaidAmount: { type: "integer" },
           newRemainingAmount: { type: "integer" },
+          status: { type: "string" },
         },
       },
       "Refund result",
@@ -481,6 +484,10 @@ const sales: FastifyPluginAsync = async (fastify) => {
       fastify.emitDomainEvent("sale:refunded", {
         id: saleId,
         refundedAmount: data.refundedAmount,
+        totalRefunded: data.totalRefunded,
+        newPaidAmount: data.newPaidAmount,
+        newRemainingAmount: data.newRemainingAmount,
+        status: data.status,
       });
 
       return { ok: true, data };

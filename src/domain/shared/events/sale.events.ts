@@ -25,7 +25,10 @@ export interface SaleCancelledPayload {
 export interface SaleRefundedPayload {
   saleId: number;
   refundedAmount: number;
+  totalRefunded: number;
   newPaidAmount: number;
+  newRemainingAmount: number;
+  status: string;
 }
 
 export interface SalePaymentAddedPayload {

@@ -1,0 +1,1 @@
+ALTER TABLE "sales" ADD COLUMN "refunded_amount" integer DEFAULT 0;
