@@ -1,15 +1,3 @@
-/**
- * RefundSaleUseCase
- *
- * Records a partial or full refund on a sale with full financial integrity:
- *  1. Optionally restores inventory for returned items
- *  2. Creates a negative payment record (refund)
- *  3. Updates sale paidAmount / remainingAmount
- *  4. Creates a credit note journal entry (accounting)
- *  5. Creates a refund entry in the customer ledger
- *
- * All steps run inside a single database transaction.
- */
 import { ISaleRepository } from "../../interfaces/ISaleRepository.js";
 import { IProductRepository } from "../../interfaces/IProductRepository.js";
 import { IInventoryRepository } from "../../interfaces/IInventoryRepository.js";
@@ -29,15 +17,18 @@ import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
 import { withTransaction } from "../../../data/db/transaction.js";
 
+export interface RefundReturnItem {
+  saleItemId: number;
+  quantity: number; // in sale unit
+  returnToStock: boolean;
+}
+
 export interface RefundInput {
   saleId: number;
   amount: number;
   reason?: string;
-  /** Items to return to inventory (optional) */
-  returnItems?: {
-    saleItemId: number;
-    quantity: number; // in sale unit
-  }[];
+  /** Per-line return control. If omitted or empty → refundOnly (no inventory). */
+  returnItems?: RefundReturnItem[];
 }
 
 type TEntity = {
@@ -74,13 +65,13 @@ export class RefundSaleUseCase extends WriteUseCase<
   ): Promise<TEntity> {
     const numUserId = Number(userId) || 0;
 
-    // Pre-fetch settings outside tx
+    // Pre-fetch settings outside tx (read-only)
     const settingsAccessor = new SettingsAccessor(this.settingsRepo);
     const accountingEnabled = await settingsAccessor.isAccountingEnabled();
     const ledgersEnabled = await settingsAccessor.isLedgersEnabled();
 
     return withTransaction(this.db, async (tx) => {
-      // 1. Validate
+      // ── 1. Validate sale state ───────────────────────────────────
       const sale = await this.saleRepo.findById(input.saleId, tx);
       if (!sale) throw new NotFoundError("الفاتورة غير موجودة");
       if (sale.status === "cancelled")
@@ -89,6 +80,7 @@ export class RefundSaleUseCase extends WriteUseCase<
         throw new InvalidStateError("تم استرداد هذه الفاتورة بالكامل بالفعل");
       if (input.amount <= 0)
         throw new ValidationError("مبلغ الاسترداد يجب أن يكون أكبر من صفر");
+
       const refundableBalance =
         (sale.paidAmount ?? 0) - (sale.refundedAmount ?? 0);
       if (refundableBalance <= 0)
@@ -96,9 +88,44 @@ export class RefundSaleUseCase extends WriteUseCase<
       if (input.amount > refundableBalance)
         throw new ValidationError("مبلغ الاسترداد أكبر من المبلغ المدفوع");
 
-      // 2. Restore inventory for returned items
+      // ── 2. Validate returnItems (if any) ─────────────────────────
+      const returnItems = input.returnItems ?? [];
+      const hasStockReturns = returnItems.some((ri) => ri.returnToStock);
+
+      if (returnItems.length > 0) {
+        // Check for duplicate saleItemIds
+        const seenIds = new Set<number>();
+        for (const ri of returnItems) {
+          if (seenIds.has(ri.saleItemId))
+            throw new ValidationError(
+              `عنصر مكرر في قائمة الإرجاع: saleItemId ${ri.saleItemId}`,
+            );
+          seenIds.add(ri.saleItemId);
+
+          if (ri.quantity <= 0)
+            throw new ValidationError(
+              `الكمية يجب أن تكون أكبر من صفر للعنصر ${ri.saleItemId}`,
+            );
+
+          // Validate saleItemId exists on this sale
+          const saleItem = sale.items?.find((i) => i.id === ri.saleItemId);
+          if (!saleItem)
+            throw new ValidationError(
+              `عنصر الفاتورة ${ri.saleItemId} غير موجود في هذه الفاتورة`,
+            );
+
+          // Validate return quantity does not exceed sold quantity
+          if (ri.quantity > (saleItem.quantity ?? 0))
+            throw new ValidationError(
+              `كمية الإرجاع (${ri.quantity}) أكبر من الكمية المباعة (${saleItem.quantity}) للعنصر ${ri.saleItemId}`,
+            );
+        }
+      }
+
+      // ── 3. Inventory restoration (only for returnToStock=true lines) ─
       let cogsReversal = 0;
-      if (input.returnItems?.length) {
+
+      if (hasStockReturns) {
         const depletions = await this.saleRepo.getItemDepletionsBySaleId(
           input.saleId,
           tx,
@@ -107,18 +134,24 @@ export class RefundSaleUseCase extends WriteUseCase<
         // Track running stock per product for accurate before/after snapshots
         const productStockMap = new Map<number, number>();
 
-        for (const ri of input.returnItems) {
-          const itemDepletions = depletions.filter(
-            (d) => d.saleItemId === ri.saleItemId,
-          );
-          const saleItem = sale.items?.find((i) => i.id === ri.saleItemId);
-          if (!saleItem) continue;
+        for (const ri of returnItems) {
+          // Skip lines that are refund-only (no stock return)
+          if (!ri.returnToStock) continue;
 
+          const saleItem = sale.items!.find((i) => i.id === ri.saleItemId)!;
+          const productId = saleItem.productId!;
           const unitFactor = saleItem.unitFactor ?? 1;
           let qtyToReturn = ri.quantity * unitFactor;
 
+          const itemDepletions = depletions.filter(
+            (d) => d.saleItemId === ri.saleItemId,
+          );
+          if (itemDepletions.length === 0)
+            throw new ValidationError(
+              `لا توجد سجلات استنفاد مخزوني للعنصر ${ri.saleItemId} — لا يمكن إرجاع المخزون`,
+            );
+
           // Fetch current stock once per product
-          const productId = saleItem.productId!;
           if (!productStockMap.has(productId)) {
             if (this.productRepo) {
               const product = await this.productRepo.findById(productId, tx);
@@ -161,7 +194,7 @@ export class RefundSaleUseCase extends WriteUseCase<
                 totalCost: returnQty * dep.costPerUnit,
                 sourceType: "sale_refund",
                 sourceId: sale.id!,
-                notes: `استرداد فاتورة #${sale.invoiceNumber}`,
+                notes: `إرجاع مخزون - استرداد فاتورة #${sale.invoiceNumber}`,
                 createdBy: numUserId,
                 stockBefore,
                 stockAfter,
@@ -173,7 +206,7 @@ export class RefundSaleUseCase extends WriteUseCase<
         }
       }
 
-      // 3. Create negative payment record
+      // ── 4. Negative payment record ──────────────────────────────
       await this.paymentRepo.createSync(
         {
           saleId: sale.id!,
@@ -189,17 +222,11 @@ export class RefundSaleUseCase extends WriteUseCase<
         tx,
       );
 
-      // 4. Update sale amounts and status
-      // paidAmount stays unchanged — it tracks historical gross payments.
-      // refundedAmount is cumulative: previous refunds + this refund.
-      // remainingAmount = collectible balance = max(0, total - paidAmount - refundedAmount).
       const newRefundedAmount = (sale.refundedAmount ?? 0) + input.amount;
-      const newRemainingAmount = Math.max(
-        0,
-        (sale.total ?? 0) - (sale.paidAmount ?? 0) - newRefundedAmount,
-      );
 
-      // Determine new invoice status based on refund outcome
+      const existingRemaining = sale.remainingAmount ?? 0;
+
+      // Determine new invoice status
       const newStatus =
         newRefundedAmount >= (sale.paidAmount ?? 0)
           ? "refunded"
@@ -209,30 +236,35 @@ export class RefundSaleUseCase extends WriteUseCase<
         input.saleId,
         {
           refundedAmount: newRefundedAmount,
-          remainingAmount: newRemainingAmount,
+          remainingAmount: existingRemaining,
           status: newStatus,
           notes: sale.notes
-            ? `${sale.notes}\nاسترداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}`
-            : `استرداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}`,
+            ? `${sale.notes}\nاسترداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}${hasStockReturns ? " (مع إرجاع مخزون)" : " (استرداد مالي فقط)"}`
+            : `استرداد: ${input.amount}${input.reason ? ` - ${input.reason}` : ""}${hasStockReturns ? " (مع إرجاع مخزون)" : " (استرداد مالي فقط)"}`,
         },
         tx,
       );
 
-      // 5. Credit note journal entry
+      // ── 6. Credit note journal entry (balanced) ─────────────────
+      // Always creates the monetary side (revenue debit / cash credit).
+      // cogsReversal > 0 only when goods are physically returned (returnToStock=true).
+      // This keeps the entry balanced regardless of refund mode.
       if (accountingEnabled) {
         await this.accountingRepo.createCreditNoteEntry(
           {
             saleId: sale.id!,
             amount: input.amount,
             cogsReversal,
-            description: `استرداد - فاتورة #${sale.invoiceNumber}`,
+            description: hasStockReturns
+              ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
+              : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
             createdBy: numUserId,
           },
           tx,
         );
       }
 
-      // 6. Customer ledger refund entry
+      // ── 7. Customer ledger refund entry ─────────────────────────
       if (ledgersEnabled && sale.customerId) {
         const currentBalance = await this.customerLedgerRepo.getLastBalanceSync(
           sale.customerId,
@@ -257,7 +289,7 @@ export class RefundSaleUseCase extends WriteUseCase<
         refundedAmount: input.amount,
         totalRefunded: newRefundedAmount,
         newPaidAmount: sale.paidAmount ?? 0,
-        newRemainingAmount,
+        newRemainingAmount: existingRemaining,
         status: newStatus,
       };
     });

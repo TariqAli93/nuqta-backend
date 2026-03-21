@@ -158,13 +158,19 @@ const RefundSaleBodySchema = {
     reason: { type: "string" },
     returnItems: {
       type: "array",
-      description: "Items being physically returned to inventory",
+      description:
+        "Items involved in the refund. Each line controls whether stock is restored via returnToStock.",
       items: {
         type: "object",
-        required: ["saleItemId", "quantity"],
+        required: ["saleItemId", "quantity", "returnToStock"],
         properties: {
           saleItemId: { type: "integer", minimum: 1 },
           quantity: { type: "integer", minimum: 1 },
+          returnToStock: {
+            type: "boolean",
+            description:
+              "If true, inventory is restored for this line. If false, only accounting is affected.",
+          },
         },
         additionalProperties: false,
       },
@@ -457,7 +463,11 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const body = request.body as {
         amount: number;
         reason?: string;
-        returnItems?: { saleItemId: number; quantity: number }[];
+        returnItems?: {
+          saleItemId: number;
+          quantity: number;
+          returnToStock: boolean;
+        }[];
       };
       const userId = String(request.user?.sub ?? "system");
       const uc = new RefundSaleUseCase(
