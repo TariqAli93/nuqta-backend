@@ -279,15 +279,17 @@ export class RefundSaleUseCase extends WriteUseCase<
       );
 
       // ── 6. Credit note journal entry (balanced) ─────────────────
-      // Always creates the monetary side (revenue debit / cash credit).
+      // Always creates the monetary side (revenue debit / cash or AR credit).
       // cogsReversal > 0 only when goods are physically returned (returnToStock=true).
       //
-      // Tax split: when the original sale had VAT, the refund amount must be
-      // split proportionally into net-revenue reversal + VAT-output reversal so
-      // the VAT liability on the books is reduced by the correct amount.
+      // Tax split: when the original sale had VAT, the refund amount is split
+      // proportionally into net-revenue reversal + VAT-output reversal:
       //   vatReversal  = round(refundAmount × (saleTax / saleTotal))
       //   netRevenue   = refundAmount - vatReversal
       // If sale has no tax (or total=0), vatReversal=0 and netRevenue=amount.
+      //
+      // Cash vs AR: credit-type sales must reduce AR (not Cash) on refund since
+      // no cash was ever received for the credited portion.
       if (accountingEnabled) {
         const saleTax = sale.tax ?? 0;
         const saleTotal = sale.total ?? 0;
@@ -297,20 +299,79 @@ export class RefundSaleUseCase extends WriteUseCase<
             : 0;
         const netRevenue = input.amount - vatReversal;
 
-        await this.accountingRepo.createCreditNoteEntry(
-          {
-            saleId: sale.id!,
-            amount: input.amount,
-            netRevenue,
-            vatAmount: vatReversal,
-            cogsReversal,
-            description: hasStockReturns
-              ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
-              : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
-            createdBy: numUserId,
-          },
-          tx,
-        );
+        // Resolve account codes from settings (honours custom chart-of-accounts).
+        const [cashCode, arCode, revenueCode, vatCode, cogsCode, inventoryCode] =
+          await Promise.all([
+            settingsAccessor.getCashAccountCode(),
+            settingsAccessor.getArAccountCode(),
+            settingsAccessor.getSalesRevenueAccountCode(),
+            settingsAccessor.getVatOutputAccountCode(),
+            settingsAccessor.getCogsAccountCode(),
+            settingsAccessor.getInventoryAccountCode(),
+          ]);
+
+        // Credit sales → reduce AR; cash/mixed → reduce Cash.
+        const refundToAr = sale.paymentType === "credit";
+
+        const [cashAcc, arAcc, revenueAcc, vatAcc, cogsAcc, inventoryAcc] =
+          await Promise.all([
+            !refundToAr
+              ? this.accountingRepo.findAccountByCode(cashCode, tx)
+              : Promise.resolve(null),
+            refundToAr
+              ? this.accountingRepo.findAccountByCode(arCode, tx)
+              : Promise.resolve(null),
+            this.accountingRepo.findAccountByCode(revenueCode, tx),
+            vatReversal > 0
+              ? this.accountingRepo.findAccountByCode(vatCode, tx)
+              : Promise.resolve(null),
+            cogsReversal > 0
+              ? this.accountingRepo.findAccountByCode(cogsCode, tx)
+              : Promise.resolve(null),
+            cogsReversal > 0
+              ? this.accountingRepo.findAccountByCode(inventoryCode, tx)
+              : Promise.resolve(null),
+          ]);
+
+        // Guard: skip journal entry if any required account is missing.
+        // Logs a warning rather than creating an unbalanced entry.
+        const missingAccounts: string[] = [];
+        if (!revenueAcc?.id) missingAccounts.push(revenueCode);
+        if (refundToAr && !arAcc?.id) missingAccounts.push(arCode);
+        if (!refundToAr && !cashAcc?.id) missingAccounts.push(cashCode);
+        if (vatReversal > 0 && !vatAcc?.id) missingAccounts.push(vatCode);
+        if (cogsReversal > 0 && !cogsAcc?.id) missingAccounts.push(cogsCode);
+        if (cogsReversal > 0 && !inventoryAcc?.id)
+          missingAccounts.push(inventoryCode);
+
+        if (missingAccounts.length > 0) {
+          console.warn(
+            `[RefundSaleUseCase] Missing chart accounts (${missingAccounts.join(", ")}), skipping credit note journal for sale ${sale.id}`,
+          );
+        } else {
+          await this.accountingRepo.createCreditNoteEntry(
+            {
+              saleId: sale.id!,
+              amount: input.amount,
+              netRevenue,
+              vatAmount: vatReversal,
+              cogsReversal,
+              description: hasStockReturns
+                ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
+                : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
+              createdBy: numUserId,
+              // Pass explicit account IDs so the repo never falls back to
+              // hardcoded codes and so it knows which side (cash vs AR) to credit.
+              revenueAccountId: revenueAcc!.id!,
+              cashAccountId: !refundToAr ? (cashAcc?.id ?? undefined) : undefined,
+              arAccountId: refundToAr ? (arAcc?.id ?? undefined) : undefined,
+              vatOutputAccountId: vatAcc?.id ?? undefined,
+              cogsAccountId: cogsAcc?.id ?? undefined,
+              inventoryAccountId: inventoryAcc?.id ?? undefined,
+            },
+            tx,
+          );
+        }
       }
 
       // ── 7. Customer ledger refund entry ─────────────────────────

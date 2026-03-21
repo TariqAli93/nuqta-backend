@@ -337,7 +337,18 @@ export class AccountingRepository implements IAccountingRepository {
     }
 
     // CR Cash / AR
-    const cashOrArId = cashAcc?.id ?? arAcc?.id;
+    // Respect what the caller explicitly passed:
+    //   - cashAccountId passed (and arAccountId not) → cash refund (cash sale)
+    //   - arAccountId passed (and cashAccountId not) → AR reduction (credit sale)
+    //   - neither passed → legacy fallback: prefer cash then AR
+    let cashOrArId: number | undefined;
+    if (params.cashAccountId != null) {
+      cashOrArId = cashAcc?.id;
+    } else if (params.arAccountId != null) {
+      cashOrArId = arAcc?.id;
+    } else {
+      cashOrArId = cashAcc?.id ?? arAcc?.id;
+    }
     if (cashOrArId) {
       lines.push({
         accountId: cashOrArId,
@@ -365,6 +376,17 @@ export class AccountingRepository implements IAccountingRepository {
           description: "Credit note — inventory restored",
         });
       }
+    }
+
+    // Safety: verify the entry is balanced before inserting.
+    // An unbalanced entry here means a required account ID was missing or
+    // the caller computed netRevenue + vatAmount ≠ amount — both are bugs.
+    const totalDebit = lines.reduce((s, l) => s + (l.debit ?? 0), 0);
+    const totalCredit = lines.reduce((s, l) => s + (l.credit ?? 0), 0);
+    if (totalDebit !== totalCredit) {
+      throw new Error(
+        `[AccountingRepository] Credit note journal is unbalanced for sale ${params.saleId}: DR=${totalDebit} CR=${totalCredit}`,
+      );
     }
 
     const entryNumber = `JE-CN-${params.saleId}-${Date.now()}`;
