@@ -222,6 +222,32 @@ export class PostingRepository implements IPostingRepository {
     return row?.status === "locked";
   }
 
+  /**
+   * Returns true when the given calendar date (YYYY-MM-DD) falls within the
+   * period of at least one locked posting batch.
+   *
+   * A date is "inside" a batch when:
+   *   batch.periodStart  <=  date  <=  batch.periodEnd
+   *
+   * This is used as the backend-authoritative guard that prevents any new
+   * journal entry — manual, credit-note, or payment-reversal — from being
+   * created inside a closed/locked accounting period.
+   */
+  async isDateInLockedBatch(date: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: postingBatches.id })
+      .from(postingBatches)
+      .where(
+        and(
+          eq(postingBatches.status, "locked"),
+          lte(postingBatches.periodStart, date),
+          gte(postingBatches.periodEnd, date),
+        ),
+      )
+      .limit(1);
+    return !!row;
+  }
+
   // ── Private helpers ───────────────────────────────────────────
 
   private async getEntryWithLines(id: number): Promise<JournalEntry | null> {

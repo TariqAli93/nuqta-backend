@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import type { TxOrDb } from "../../db/transaction.js";
-import { accounts, journalEntries, journalLines } from "../../schema/schema.js";
+import {
+  accounts,
+  journalEntries,
+  journalLines,
+  postingBatches,
+} from "../../schema/schema.js";
 import {
   IAccountingRepository,
   Account,
@@ -15,6 +20,7 @@ import type {
   CreditNoteEntryParams,
   PaymentReversalEntryParams,
 } from "../../../domain/interfaces/IAccountingRepository.js";
+import { InvalidStateError } from "../../../domain/shared/errors/DomainErrors.js";
 
 export class AccountingRepository implements IAccountingRepository {
   constructor(private db: DbConnection) {}
@@ -227,6 +233,66 @@ export class AccountingRepository implements IAccountingRepository {
     return this.getEntryById(row.id, tx);
   }
 
+  /**
+   * Block-level guard: reject the operation when the given calendar date
+   * (YYYY-MM-DD or ISO string) falls inside any locked posting batch.
+   *
+   * This is the lowest-level, backend-authoritative check.  All entry-creation
+   * paths (reversal, credit-note, payment-reversal, manual) must call this so
+   * that business flows cannot silently bypass period locks.
+   */
+  private async assertDateNotInLockedBatch(
+    dateInput: string | Date,
+    client: TxOrDb,
+  ): Promise<void> {
+    const dateStr =
+      dateInput instanceof Date
+        ? dateInput.toISOString().slice(0, 10)
+        : String(dateInput).slice(0, 10);
+
+    const [locked] = await client
+      .select({ id: postingBatches.id, periodStart: postingBatches.periodStart, periodEnd: postingBatches.periodEnd })
+      .from(postingBatches)
+      .where(
+        and(
+          eq(postingBatches.status, "locked"),
+          lte(postingBatches.periodStart, dateStr),
+          gte(postingBatches.periodEnd, dateStr),
+        ),
+      )
+      .limit(1);
+
+    if (locked) {
+      throw new InvalidStateError(
+        `لا يمكن تسجيل قيد محاسبي في فترة مقفلة (${locked.periodStart} — ${locked.periodEnd}). أعد فتح الدفعة أولاً أو استخدم تاريخاً في فترة مفتوحة.`,
+      );
+    }
+  }
+
+  /**
+   * Guard: reject reversal when the original entry belongs to a locked
+   * posting batch.  This prevents business flows (cancel-sale, etc.) from
+   * mutating entries in closed accounting periods by marking them isReversed.
+   */
+  private async assertEntryNotInLockedBatch(
+    originalEntry: JournalEntry,
+    client: TxOrDb,
+  ): Promise<void> {
+    if (!originalEntry.postingBatchId) return; // not assigned to any batch → safe
+
+    const [batch] = await client
+      .select({ status: postingBatches.status, id: postingBatches.id })
+      .from(postingBatches)
+      .where(eq(postingBatches.id, originalEntry.postingBatchId))
+      .limit(1);
+
+    if (batch?.status === "locked") {
+      throw new InvalidStateError(
+        `لا يمكن عكس قيد محاسبي موجود في دفعة ترحيل مقفلة (دفعة رقم ${batch.id}). أعد فتح الدفعة أولاً أو أنشئ قيد تسوية يدوي في فترة مفتوحة.`,
+      );
+    }
+  }
+
   async createReversalEntry(
     params: ReversalEntryParams,
     tx?: TxOrDb,
@@ -240,6 +306,15 @@ export class AccountingRepository implements IAccountingRepository {
         `Journal entry ${params.originalEntryId} not found for reversal`,
       );
     }
+
+    // ── POSTING-LOCK GUARD ──────────────────────────────────────────────────
+    // Block reversal if the original entry is assigned to a locked batch.
+    // This is the backend-authoritative check that all callers go through,
+    // including business flows (CancelSaleUseCase) that bypass ReverseEntryUseCase.
+    await this.assertEntryNotInLockedBatch(original, client);
+
+    // Also block if the reversal's own target date falls in a locked period.
+    await this.assertDateNotInLockedBatch(params.reversalDate, client);
 
     // Mirror lines (swap debit/credit)
     const reversedLines = (original.lines ?? []).map((line: JournalLine) => ({
@@ -287,6 +362,13 @@ export class AccountingRepository implements IAccountingRepository {
     params: CreditNoteEntryParams,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
+    const client = this.c(tx);
+
+    // ── POSTING-LOCK GUARD ──────────────────────────────────────────────────
+    // Credit notes are posted with entryDate = today.  Block if today falls
+    // inside a locked posting batch period.
+    await this.assertDateNotInLockedBatch(new Date(), client);
+
     const netRevenue = params.netRevenue ?? params.amount;
     const vatAmount = params.vatAmount ?? 0;
     const cogsReversal = params.cogsReversal ?? 0;
@@ -411,6 +493,13 @@ export class AccountingRepository implements IAccountingRepository {
     params: PaymentReversalEntryParams,
     tx?: TxOrDb,
   ): Promise<JournalEntry> {
+    const client = this.c(tx);
+
+    // ── POSTING-LOCK GUARD ──────────────────────────────────────────────────
+    // Payment reversals are posted with entryDate = today.  Block if today
+    // falls inside a locked posting batch period.
+    await this.assertDateNotInLockedBatch(new Date(), client);
+
     const [cashAcc, arAcc] = await Promise.all([
       params.cashAccountId
         ? Promise.resolve({ id: params.cashAccountId })

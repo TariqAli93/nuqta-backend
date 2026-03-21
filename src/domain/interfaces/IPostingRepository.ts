@@ -55,4 +55,12 @@ export interface IPostingRepository {
 
   /** Check whether a batch is locked */
   isBatchLocked(batchId: number): Promise<boolean>;
+
+  /**
+   * Check whether a given calendar date (YYYY-MM-DD) falls inside the period
+   * of any locked posting batch.  Used to block new journal entries — including
+   * manual entries, credit notes and payment reversals — from being created
+   * inside a closed/locked accounting period.
+   */
+  isDateInLockedBatch(date: string): Promise<boolean>;
 }

@@ -456,6 +456,20 @@ const accounting: FastifyPluginAsync = async (fastify) => {
           `قيد يومي غير متوازن — المدين: ${totalDebit}، الدائن: ${totalCredit}`,
         );
       }
+
+      // ── POSTING-LOCK GUARD ────────────────────────────────────────────────
+      // Reject manual entries targeting a date that falls inside a locked
+      // posting batch.  The backend is authoritative for this rule — the UI
+      // must not be the only protection.
+      const isDateLocked = await fastify.repos.posting.isDateInLockedBatch(
+        body.entryDate,
+      );
+      if (isDateLocked) {
+        throw new InvalidStateError(
+          `لا يمكن إنشاء قيد يومي في فترة محاسبية مقفلة — التاريخ: ${body.entryDate}. أعد فتح دفعة الترحيل أولاً أو اختر تاريخاً في فترة مفتوحة.`,
+        );
+      }
+
       const totalAmount = totalDebit;
       const entry = await fastify.repos.accounting.createJournalEntry({
         entryDate: body.entryDate,
