@@ -19,6 +19,22 @@ import {
 import { requirePermission } from "../../../middleware/rbac.js";
 import { SaleReceiptSchema } from "../../../schemas/sale-receipt.js";
 
+const SaleItemDepletionSchema = {
+  type: "object" as const,
+  properties: {
+    id:          { type: "integer" },
+    saleItemId:  { type: "integer" },
+    productId:   { type: "integer" },
+    batchId:     { type: "integer", nullable: true },
+    quantityBase:{ type: "integer" },
+    costPerUnit: { type: "integer" },
+    totalCost:   { type: "integer" },
+    batchNumber: { type: "string", nullable: true },
+    expiryDate:  { type: "string", nullable: true },
+    createdAt:   { type: "string", format: "date-time" },
+  },
+};
+
 const SaleItemSchema = {
   type: "object" as const,
   properties: {
@@ -37,6 +53,7 @@ const SaleItemSchema = {
     cogs: { type: "integer", nullable: true },
     weightedAverageCost: { type: "integer", nullable: true },
     createdAt: { type: "string", format: "date-time" },
+    depletions: { type: "array", items: SaleItemDepletionSchema },
   },
 };
 

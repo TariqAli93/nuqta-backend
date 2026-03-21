@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import {
   InitializeAccountingUseCase,
   CreateAccountUseCase,
+  InvalidStateError,
 } from "../../../domain/index.js";
 import {
   ReconcileJournalLinesUseCase,
@@ -438,10 +439,14 @@ const accounting: FastifyPluginAsync = async (fastify) => {
           description?: string | null;
         }[];
       };
-      const totalAmount = body.lines.reduce(
-        (sum, l) => sum + (l.debit ?? 0),
-        0,
-      );
+      const totalDebit = body.lines.reduce((sum, l) => sum + (l.debit ?? 0), 0);
+      const totalCredit = body.lines.reduce((sum, l) => sum + (l.credit ?? 0), 0);
+      if (totalDebit !== totalCredit) {
+        throw new InvalidStateError(
+          `قيد يومي غير متوازن — المدين: ${totalDebit}، الدائن: ${totalCredit}`,
+        );
+      }
+      const totalAmount = totalDebit;
       const entry = await fastify.repos.accounting.createJournalEntry({
         entryDate: body.entryDate,
         description: body.description,
