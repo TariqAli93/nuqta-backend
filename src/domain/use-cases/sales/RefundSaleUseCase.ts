@@ -114,11 +114,24 @@ export class RefundSaleUseCase extends WriteUseCase<
               `عنصر الفاتورة ${ri.saleItemId} غير موجود في هذه الفاتورة`,
             );
 
-          // Validate return quantity does not exceed sold quantity
+          // Validate return quantity (in sale units) does not exceed sold quantity
           if (ri.quantity > (saleItem.quantity ?? 0))
             throw new ValidationError(
               `كمية الإرجاع (${ri.quantity}) أكبر من الكمية المباعة (${saleItem.quantity}) للعنصر ${ri.saleItemId}`,
             );
+
+          // Validate cumulative returned quantity (in base units) does not exceed sold base quantity.
+          // This prevents over-return across multiple partial refunds on the same sale item.
+          if (ri.returnToStock) {
+            const unitFactor = saleItem.unitFactor ?? 1;
+            const requestedBaseQty = ri.quantity * unitFactor;
+            const soldBaseQty = saleItem.quantityBase ?? (saleItem.quantity * unitFactor);
+            const alreadyReturnedBase = saleItem.returnedQuantityBase ?? 0;
+            if (alreadyReturnedBase + requestedBaseQty > soldBaseQty)
+              throw new ValidationError(
+                `كمية الإرجاع المتراكمة (${alreadyReturnedBase + requestedBaseQty}) تتجاوز الكمية الأساسية المباعة (${soldBaseQty}) للعنصر ${ri.saleItemId}`,
+              );
+          }
         }
       }
 
@@ -167,6 +180,9 @@ export class RefundSaleUseCase extends WriteUseCase<
           }
 
           // Restore batches in reverse depletion order (LIFO on depletions)
+          // Track how many base-units we actually restored for this item so we
+          // can update the sale_items.returned_quantity_base counter atomically.
+          let actuallyRestoredBase = 0;
           for (const dep of [...itemDepletions].reverse()) {
             if (qtyToReturn <= 0) break;
             const returnQty = Math.min(qtyToReturn, dep.quantityBase);
@@ -202,6 +218,23 @@ export class RefundSaleUseCase extends WriteUseCase<
               tx,
             );
             qtyToReturn -= returnQty;
+            actuallyRestoredBase += returnQty;
+          }
+
+          // Persist the cumulative returned counter so subsequent refunds on
+          // the same item can detect over-return before touching inventory.
+          if (actuallyRestoredBase > 0) {
+            await this.saleRepo.incrementItemReturnedQty(
+              ri.saleItemId,
+              actuallyRestoredBase,
+              tx,
+            );
+
+            // Update products.stock cached counter so future stock checks
+            // (CreateSaleUseCase fallback path, reconciliation) stay accurate.
+            if (this.productRepo) {
+              await this.productRepo.updateStock(productId, actuallyRestoredBase, tx);
+            }
           }
         }
       }

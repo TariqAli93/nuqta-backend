@@ -15,6 +15,8 @@ export const SaleItemSchema = z.object({
   subtotal: z.number().int().min(0),
   cogs: z.number().int().optional(),
   weightedAverageCost: z.number().int().optional(),
+  // Cumulative base-units already returned to stock across partial refunds.
+  returnedQuantityBase: z.number().int().default(0),
   createdAt: z.union([z.string(), z.date()]).optional(),
 });
 

@@ -211,6 +211,9 @@ export const saleItems = pgTable("sale_items", {
   unitPrice: integer("unit_price").notNull(),
   discount: integer("discount").default(0),
   subtotal: integer("subtotal").notNull(),
+  // Cumulative base-unit quantity already returned to stock across all partial refunds.
+  // Prevents over-return when multiple refunds are applied to the same sale item.
+  returnedQuantityBase: integer("returned_quantity_base").default(0).notNull(),
   createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
 });
 

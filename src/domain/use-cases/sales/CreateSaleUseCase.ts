@@ -487,6 +487,7 @@ export class CreateSaleUseCase extends WriteUseCase<
             unitPrice: si.unitPrice,
             discount: si.discount,
             subtotal: si.subtotal,
+            returnedQuantityBase: 0,
           })),
           createdAt: new Date(),
         };

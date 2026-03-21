@@ -52,6 +52,7 @@ const SaleItemSchema = {
     subtotal: { type: "integer" },
     cogs: { type: "integer", nullable: true },
     weightedAverageCost: { type: "integer", nullable: true },
+    returnedQuantityBase: { type: "integer" },
     createdAt: { type: "string", format: "date-time" },
     depletions: { type: "array", items: SaleItemDepletionSchema },
   },

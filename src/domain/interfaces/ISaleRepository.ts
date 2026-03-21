@@ -25,6 +25,12 @@ export interface ISaleRepository {
     tx?: TxOrDb,
   ): Promise<void>;
   getItemDepletionsBySaleId(saleId: number, tx?: TxOrDb): Promise<SaleItemDepletion[]>;
+  /**
+   * Atomically adds `addedQtyBase` to `sale_items.returned_quantity_base` for a single
+   * line item. Called inside the refund transaction to prevent over-return across
+   * multiple partial refunds.
+   */
+  incrementItemReturnedQty(saleItemId: number, addedQtyBase: number, tx?: TxOrDb): Promise<void>;
   getDailySummary(date: Date): Promise<{
     revenue: number;
     count: number;

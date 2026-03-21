@@ -143,6 +143,29 @@ export class CancelSaleUseCase extends WriteUseCase<
         );
       }
 
+      // 2b. Update products.stock cached counter for each restored product.
+      // restoreBatchQty already incremented productBatches.quantityOnHand;
+      // we also need to increment products.stock so the FIFO stock check and
+      // stock reconciliation reflect the correct available quantity.
+      if (this.productRepo) {
+        // productStockMap keys are all productIds that had depletions restored.
+        // The net restored amount per product = (final running stock) - (initial stock).
+        // We can compute it by re-running the initial values vs final values. Since
+        // productStockMap was updated incrementally (+dep.quantityBase each time),
+        // the delta per product = final value in map - initial value before any restores.
+        // Simpler: track total restored per product separately.
+        const restoredByProduct = new Map<number, number>();
+        for (const dep of depletions) {
+          restoredByProduct.set(
+            dep.productId,
+            (restoredByProduct.get(dep.productId) ?? 0) + dep.quantityBase,
+          );
+        }
+        for (const [productId, totalRestored] of restoredByProduct) {
+          await this.productRepo.updateStock(productId, totalRestored, tx);
+        }
+      }
+
       // 3. Reversal journal entries
       if (accountingEnabled) {
         const originalEntry = await this.accountingRepo.findEntryBySource(

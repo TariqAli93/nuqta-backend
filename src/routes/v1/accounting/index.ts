@@ -439,8 +439,18 @@ const accounting: FastifyPluginAsync = async (fastify) => {
           description?: string | null;
         }[];
       };
+      // Minimum 2 lines required for a valid double-entry journal.
+      if (!body.lines || body.lines.length < 2) {
+        throw new InvalidStateError("القيد اليومي يتطلب سطرين على الأقل");
+      }
       const totalDebit = body.lines.reduce((sum, l) => sum + (l.debit ?? 0), 0);
       const totalCredit = body.lines.reduce((sum, l) => sum + (l.credit ?? 0), 0);
+      // Must have non-zero amounts on both sides.
+      if (totalDebit === 0 || totalCredit === 0) {
+        throw new InvalidStateError(
+          "يجب أن يحتوي القيد اليومي على مبالغ في المدين والدائن",
+        );
+      }
       if (totalDebit !== totalCredit) {
         throw new InvalidStateError(
           `قيد يومي غير متوازن — المدين: ${totalDebit}، الدائن: ${totalCredit}`,
