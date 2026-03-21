@@ -453,7 +453,7 @@ describe("/api/v1/sales", () => {
       payload: {
         amount: 10000,
         reason: "Partial return",
-        returnItems: [{ saleItemId: 1, quantity: 1 }],
+        returnItems: [{ saleItemId: 1, quantity: 1, returnToStock: true }],
       },
       headers: ctx.authHeaders(),
     });

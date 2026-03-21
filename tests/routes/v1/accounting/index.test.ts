@@ -111,7 +111,7 @@ describe("/api/v1/accounting", () => {
           getStatus: accountingStatus,
         }),
       assert: (data: typeof accountingStatus) => {
-        expect(data.isInitialized).toBe(true);
+        expect(data.seeded).toBe(true);
       },
     },
   ])("$title", async ({ method, url, payload, setup, assert }) => {
@@ -242,7 +242,7 @@ describe("/api/v1/accounting", () => {
       expect(data).toMatchObject({ updated: true });
       expect(
         getUseCaseMock("InitializeAccountingUseCase", "execute"),
-      ).toHaveBeenCalledWith({});
+      ).toHaveBeenCalledWith({}, expect.any(String));
     } finally {
       await branchCtx.close();
     }

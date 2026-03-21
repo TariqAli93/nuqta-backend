@@ -196,21 +196,38 @@ const initializeAccountingSchema = {
   },
 } as const;
 
+const AccountingSetupStatusSchema = {
+  type: "object" as const,
+  properties: {
+    enabled: { type: "boolean", nullable: true },
+    seeded: { type: "boolean" },
+    missingCodes: { type: "array", items: { type: "string" } },
+    selectedCodes: {
+      type: "object" as const,
+      properties: {
+        cashAccountCode: { type: "string" },
+        inventoryAccountCode: { type: "string" },
+        arAccountCode: { type: "string" },
+        apAccountCode: { type: "string" },
+        salesRevenueAccountCode: { type: "string" },
+        cogsAccountCode: { type: "string" },
+        salaryExpenseAccountCode: { type: "string" },
+        deductionsLiabilityAccountCode: { type: "string" },
+        vatInputAccountCode: { type: "string" },
+        vatOutputAccountCode: { type: "string" },
+      },
+    },
+    baseCurrency: { type: "string", nullable: true },
+    warnings: { type: "array", items: { type: "string" } },
+  },
+};
+
 const getAccountingStatusSchema = {
   tags: ["Accounting"],
   summary: "Get accounting system status",
   security: [{ bearerAuth: [] }],
   response: {
-    200: successEnvelope(
-      {
-        type: "object" as const,
-        properties: {
-          isInitialized: { type: "boolean" },
-          accountCount: { type: "integer" },
-        },
-      },
-      "Accounting status",
-    ),
+    200: successEnvelope(AccountingSetupStatusSchema, "Accounting setup status"),
     ...ErrorResponses,
   },
 } as const;
@@ -527,7 +544,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     "/initialize",
     {
       schema: initializeAccountingSchema,
-      preHandler: [],
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
     },
     async (request) => {
       const body = request.body as any;

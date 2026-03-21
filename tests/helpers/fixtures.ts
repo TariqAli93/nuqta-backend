@@ -220,11 +220,28 @@ export const currencySettings = {
 };
 
 export const moduleSettings = {
-  accountingEnabled: true,
-  purchasesEnabled: true,
-  ledgersEnabled: true,
-  unitsEnabled: true,
-  paymentsOnInvoicesEnabled: true,
+  modules: {
+    accountingEnabled: true,
+    purchasesEnabled: true,
+    ledgersEnabled: true,
+    unitsEnabled: true,
+    paymentsOnInvoicesEnabled: true,
+  },
+  notifications: {
+    lowStockThreshold: 5,
+    expiryDays: 30,
+    debtReminderCount: 3,
+    debtReminderIntervalDays: 7,
+  },
+  invoice: {
+    templateActiveId: "default",
+    prefix: "INV-",
+    paperSize: "A4",
+    footerNotes: "",
+    layoutDirection: "ltr",
+    showQr: false,
+  },
+  wizardCompleted: false,
 };
 
 export const dashboardStats = {
@@ -384,8 +401,23 @@ export const trialBalanceRow = {
 };
 
 export const accountingStatus = {
-  isInitialized: true,
-  accountCount: 12,
+  enabled: true,
+  seeded: true,
+  missingCodes: [],
+  selectedCodes: {
+    cashAccountCode: "1001",
+    inventoryAccountCode: "1100",
+    arAccountCode: "1200",
+    apAccountCode: "2100",
+    salesRevenueAccountCode: "4001",
+    cogsAccountCode: "5001",
+    salaryExpenseAccountCode: "5002",
+    deductionsLiabilityAccountCode: "2101",
+    vatInputAccountCode: "1300",
+    vatOutputAccountCode: "2200",
+  },
+  baseCurrency: "IQD",
+  warnings: [],
 };
 
 export const payrollRun = {
