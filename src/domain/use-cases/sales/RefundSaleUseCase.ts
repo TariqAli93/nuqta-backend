@@ -281,12 +281,28 @@ export class RefundSaleUseCase extends WriteUseCase<
       // ── 6. Credit note journal entry (balanced) ─────────────────
       // Always creates the monetary side (revenue debit / cash credit).
       // cogsReversal > 0 only when goods are physically returned (returnToStock=true).
-      // This keeps the entry balanced regardless of refund mode.
+      //
+      // Tax split: when the original sale had VAT, the refund amount must be
+      // split proportionally into net-revenue reversal + VAT-output reversal so
+      // the VAT liability on the books is reduced by the correct amount.
+      //   vatReversal  = round(refundAmount × (saleTax / saleTotal))
+      //   netRevenue   = refundAmount - vatReversal
+      // If sale has no tax (or total=0), vatReversal=0 and netRevenue=amount.
       if (accountingEnabled) {
+        const saleTax = sale.tax ?? 0;
+        const saleTotal = sale.total ?? 0;
+        const vatReversal =
+          saleTax > 0 && saleTotal > 0
+            ? Math.round(input.amount * (saleTax / saleTotal))
+            : 0;
+        const netRevenue = input.amount - vatReversal;
+
         await this.accountingRepo.createCreditNoteEntry(
           {
             saleId: sale.id!,
             amount: input.amount,
+            netRevenue,
+            vatAmount: vatReversal,
             cogsReversal,
             description: hasStockReturns
               ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
