@@ -434,6 +434,11 @@ export class AccountingRepository implements IAccountingRepository {
     if (cashOrArId) {
       lines.push({
         accountId: cashOrArId,
+        // Stamp the partner so the refund credit appears in the customer's AR
+        // ledger.  Without partnerId the line is invisible to _buildPartnerLedger
+        // (which filters jl.partner_id = customerId), causing the outstanding AR
+        // balance to look inflated after a credit-sale refund.
+        partnerId: params.partnerId ?? null,
         debit: 0,
         credit: params.amount,
         description: "Credit note — cash/AR refund",

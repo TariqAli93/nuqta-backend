@@ -360,6 +360,10 @@ export class RefundSaleUseCase extends WriteUseCase<
                 ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
                 : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
               createdBy: numUserId,
+              // partnerId ensures the AR/Cash credit line is stamped with the
+              // customer so the refund appears in the customer's AR ledger
+              // (_buildPartnerLedger filters by jl.partner_id).
+              partnerId: sale.customerId ?? undefined,
               // Pass explicit account IDs so the repo never falls back to
               // hardcoded codes and so it knows which side (cash vs AR) to credit.
               revenueAccountId: revenueAcc!.id!,
