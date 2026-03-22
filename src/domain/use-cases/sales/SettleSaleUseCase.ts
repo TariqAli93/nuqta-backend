@@ -22,9 +22,6 @@ import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
 import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
-const ACCT_CASH = "1001";
-const ACCT_AR = "1100";
-
 export interface SettleSaleInput {
   saleId: number;
   paymentMethod?: PaymentMethod;
@@ -225,8 +222,18 @@ export class SettleSaleUseCase extends WriteUseCase<
     customerId?: number,
     tx?: TxOrDb,
   ): Promise<void> {
-    const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH, tx);
-    const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR, tx);
+    // Use SettingsAccessor to resolve account codes instead of hardcoded strings,
+    // so customised chart-of-accounts configurations are respected.
+    // Fall back to canonical defaults ("1001", "1100") when settingsRepo is unavailable.
+    let cashCode = "1001";
+    let arCode = "1100";
+    if (this.settingsRepo) {
+      const settings = new SettingsAccessor(this.settingsRepo);
+      cashCode = await settings.getCashAccountCode();
+      arCode = await settings.getArAccountCode();
+    }
+    const cashAcct = await this.accountingRepo.findAccountByCode(cashCode, tx);
+    const arAcct = await this.accountingRepo.findAccountByCode(arCode, tx);
 
     if (!cashAcct?.id || !arAcct?.id) {
       console.warn(

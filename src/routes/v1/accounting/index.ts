@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import {
   InitializeAccountingUseCase,
   CreateAccountUseCase,
+  InvalidStateError,
 } from "../../../domain/index.js";
 import {
   ReconcileJournalLinesUseCase,
@@ -196,21 +197,38 @@ const initializeAccountingSchema = {
   },
 } as const;
 
+const AccountingSetupStatusSchema = {
+  type: "object" as const,
+  properties: {
+    enabled: { type: "boolean", nullable: true },
+    seeded: { type: "boolean" },
+    missingCodes: { type: "array", items: { type: "string" } },
+    selectedCodes: {
+      type: "object" as const,
+      properties: {
+        cashAccountCode: { type: "string" },
+        inventoryAccountCode: { type: "string" },
+        arAccountCode: { type: "string" },
+        apAccountCode: { type: "string" },
+        salesRevenueAccountCode: { type: "string" },
+        cogsAccountCode: { type: "string" },
+        salaryExpenseAccountCode: { type: "string" },
+        deductionsLiabilityAccountCode: { type: "string" },
+        vatInputAccountCode: { type: "string" },
+        vatOutputAccountCode: { type: "string" },
+      },
+    },
+    baseCurrency: { type: "string", nullable: true },
+    warnings: { type: "array", items: { type: "string" } },
+  },
+};
+
 const getAccountingStatusSchema = {
   tags: ["Accounting"],
   summary: "Get accounting system status",
   security: [{ bearerAuth: [] }],
   response: {
-    200: successEnvelope(
-      {
-        type: "object" as const,
-        properties: {
-          isInitialized: { type: "boolean" },
-          accountCount: { type: "integer" },
-        },
-      },
-      "Accounting status",
-    ),
+    200: successEnvelope(AccountingSetupStatusSchema, "Accounting setup status"),
     ...ErrorResponses,
   },
 } as const;
@@ -421,10 +439,38 @@ const accounting: FastifyPluginAsync = async (fastify) => {
           description?: string | null;
         }[];
       };
-      const totalAmount = body.lines.reduce(
-        (sum, l) => sum + (l.debit ?? 0),
-        0,
+      // Minimum 2 lines required for a valid double-entry journal.
+      if (!body.lines || body.lines.length < 2) {
+        throw new InvalidStateError("القيد اليومي يتطلب سطرين على الأقل");
+      }
+      const totalDebit = body.lines.reduce((sum, l) => sum + (l.debit ?? 0), 0);
+      const totalCredit = body.lines.reduce((sum, l) => sum + (l.credit ?? 0), 0);
+      // Must have non-zero amounts on both sides.
+      if (totalDebit === 0 || totalCredit === 0) {
+        throw new InvalidStateError(
+          "يجب أن يحتوي القيد اليومي على مبالغ في المدين والدائن",
+        );
+      }
+      if (totalDebit !== totalCredit) {
+        throw new InvalidStateError(
+          `قيد يومي غير متوازن — المدين: ${totalDebit}، الدائن: ${totalCredit}`,
+        );
+      }
+
+      // ── POSTING-LOCK GUARD ────────────────────────────────────────────────
+      // Reject manual entries targeting a date that falls inside a locked
+      // posting batch.  The backend is authoritative for this rule — the UI
+      // must not be the only protection.
+      const isDateLocked = await fastify.repos.posting.isDateInLockedBatch(
+        body.entryDate,
       );
+      if (isDateLocked) {
+        throw new InvalidStateError(
+          `لا يمكن إنشاء قيد يومي في فترة محاسبية مقفلة — التاريخ: ${body.entryDate}. أعد فتح دفعة الترحيل أولاً أو اختر تاريخاً في فترة مفتوحة.`,
+        );
+      }
+
+      const totalAmount = totalDebit;
       const entry = await fastify.repos.accounting.createJournalEntry({
         entryDate: body.entryDate,
         description: body.description,
@@ -527,7 +573,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
     "/initialize",
     {
       schema: initializeAccountingSchema,
-      preHandler: [],
+      preHandler: [fastify.authenticate, requirePermission("accounting:write")],
     },
     async (request) => {
       const body = request.body as any;

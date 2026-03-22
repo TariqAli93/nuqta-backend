@@ -38,6 +38,14 @@ type TEntity = {
   newPaidAmount: number;
   newRemainingAmount: number;
   status: string;
+  // Audit context — stripped by Fastify serializer, not in API response
+  _audit?: {
+    reason?: string;
+    hasStockReturns: boolean;
+    returnedItemsCount: number;
+    paymentType?: string;
+    invoiceNumber?: string;
+  };
 };
 
 export class RefundSaleUseCase extends WriteUseCase<
@@ -114,11 +122,24 @@ export class RefundSaleUseCase extends WriteUseCase<
               `عنصر الفاتورة ${ri.saleItemId} غير موجود في هذه الفاتورة`,
             );
 
-          // Validate return quantity does not exceed sold quantity
+          // Validate return quantity (in sale units) does not exceed sold quantity
           if (ri.quantity > (saleItem.quantity ?? 0))
             throw new ValidationError(
               `كمية الإرجاع (${ri.quantity}) أكبر من الكمية المباعة (${saleItem.quantity}) للعنصر ${ri.saleItemId}`,
             );
+
+          // Validate cumulative returned quantity (in base units) does not exceed sold base quantity.
+          // This prevents over-return across multiple partial refunds on the same sale item.
+          if (ri.returnToStock) {
+            const unitFactor = saleItem.unitFactor ?? 1;
+            const requestedBaseQty = ri.quantity * unitFactor;
+            const soldBaseQty = saleItem.quantityBase ?? (saleItem.quantity * unitFactor);
+            const alreadyReturnedBase = saleItem.returnedQuantityBase ?? 0;
+            if (alreadyReturnedBase + requestedBaseQty > soldBaseQty)
+              throw new ValidationError(
+                `كمية الإرجاع المتراكمة (${alreadyReturnedBase + requestedBaseQty}) تتجاوز الكمية الأساسية المباعة (${soldBaseQty}) للعنصر ${ri.saleItemId}`,
+              );
+          }
         }
       }
 
@@ -167,6 +188,9 @@ export class RefundSaleUseCase extends WriteUseCase<
           }
 
           // Restore batches in reverse depletion order (LIFO on depletions)
+          // Track how many base-units we actually restored for this item so we
+          // can update the sale_items.returned_quantity_base counter atomically.
+          let actuallyRestoredBase = 0;
           for (const dep of [...itemDepletions].reverse()) {
             if (qtyToReturn <= 0) break;
             const returnQty = Math.min(qtyToReturn, dep.quantityBase);
@@ -202,6 +226,23 @@ export class RefundSaleUseCase extends WriteUseCase<
               tx,
             );
             qtyToReturn -= returnQty;
+            actuallyRestoredBase += returnQty;
+          }
+
+          // Persist the cumulative returned counter so subsequent refunds on
+          // the same item can detect over-return before touching inventory.
+          if (actuallyRestoredBase > 0) {
+            await this.saleRepo.incrementItemReturnedQty(
+              ri.saleItemId,
+              actuallyRestoredBase,
+              tx,
+            );
+
+            // Update products.stock cached counter so future stock checks
+            // (CreateSaleUseCase fallback path, reconciliation) stay accurate.
+            if (this.productRepo) {
+              await this.productRepo.updateStock(productId, actuallyRestoredBase, tx);
+            }
           }
         }
       }
@@ -246,22 +287,103 @@ export class RefundSaleUseCase extends WriteUseCase<
       );
 
       // ── 6. Credit note journal entry (balanced) ─────────────────
-      // Always creates the monetary side (revenue debit / cash credit).
+      // Always creates the monetary side (revenue debit / cash or AR credit).
       // cogsReversal > 0 only when goods are physically returned (returnToStock=true).
-      // This keeps the entry balanced regardless of refund mode.
+      //
+      // Tax split: when the original sale had VAT, the refund amount is split
+      // proportionally into net-revenue reversal + VAT-output reversal:
+      //   vatReversal  = round(refundAmount × (saleTax / saleTotal))
+      //   netRevenue   = refundAmount - vatReversal
+      // If sale has no tax (or total=0), vatReversal=0 and netRevenue=amount.
+      //
+      // Cash vs AR: credit-type sales must reduce AR (not Cash) on refund since
+      // no cash was ever received for the credited portion.
       if (accountingEnabled) {
-        await this.accountingRepo.createCreditNoteEntry(
-          {
-            saleId: sale.id!,
-            amount: input.amount,
-            cogsReversal,
-            description: hasStockReturns
-              ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
-              : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
-            createdBy: numUserId,
-          },
-          tx,
-        );
+        const saleTax = sale.tax ?? 0;
+        const saleTotal = sale.total ?? 0;
+        const vatReversal =
+          saleTax > 0 && saleTotal > 0
+            ? Math.round(input.amount * (saleTax / saleTotal))
+            : 0;
+        const netRevenue = input.amount - vatReversal;
+
+        // Resolve account codes from settings (honours custom chart-of-accounts).
+        const [cashCode, arCode, revenueCode, vatCode, cogsCode, inventoryCode] =
+          await Promise.all([
+            settingsAccessor.getCashAccountCode(),
+            settingsAccessor.getArAccountCode(),
+            settingsAccessor.getSalesRevenueAccountCode(),
+            settingsAccessor.getVatOutputAccountCode(),
+            settingsAccessor.getCogsAccountCode(),
+            settingsAccessor.getInventoryAccountCode(),
+          ]);
+
+        // Credit sales → reduce AR; cash/mixed → reduce Cash.
+        const refundToAr = sale.paymentType === "credit";
+
+        const [cashAcc, arAcc, revenueAcc, vatAcc, cogsAcc, inventoryAcc] =
+          await Promise.all([
+            !refundToAr
+              ? this.accountingRepo.findAccountByCode(cashCode, tx)
+              : Promise.resolve(null),
+            refundToAr
+              ? this.accountingRepo.findAccountByCode(arCode, tx)
+              : Promise.resolve(null),
+            this.accountingRepo.findAccountByCode(revenueCode, tx),
+            vatReversal > 0
+              ? this.accountingRepo.findAccountByCode(vatCode, tx)
+              : Promise.resolve(null),
+            cogsReversal > 0
+              ? this.accountingRepo.findAccountByCode(cogsCode, tx)
+              : Promise.resolve(null),
+            cogsReversal > 0
+              ? this.accountingRepo.findAccountByCode(inventoryCode, tx)
+              : Promise.resolve(null),
+          ]);
+
+        // Guard: skip journal entry if any required account is missing.
+        // Logs a warning rather than creating an unbalanced entry.
+        const missingAccounts: string[] = [];
+        if (!revenueAcc?.id) missingAccounts.push(revenueCode);
+        if (refundToAr && !arAcc?.id) missingAccounts.push(arCode);
+        if (!refundToAr && !cashAcc?.id) missingAccounts.push(cashCode);
+        if (vatReversal > 0 && !vatAcc?.id) missingAccounts.push(vatCode);
+        if (cogsReversal > 0 && !cogsAcc?.id) missingAccounts.push(cogsCode);
+        if (cogsReversal > 0 && !inventoryAcc?.id)
+          missingAccounts.push(inventoryCode);
+
+        if (missingAccounts.length > 0) {
+          console.warn(
+            `[RefundSaleUseCase] Missing chart accounts (${missingAccounts.join(", ")}), skipping credit note journal for sale ${sale.id}`,
+          );
+        } else {
+          await this.accountingRepo.createCreditNoteEntry(
+            {
+              saleId: sale.id!,
+              amount: input.amount,
+              netRevenue,
+              vatAmount: vatReversal,
+              cogsReversal,
+              description: hasStockReturns
+                ? `استرداد مع إرجاع مخزون - فاتورة #${sale.invoiceNumber}`
+                : `استرداد مالي - فاتورة #${sale.invoiceNumber}`,
+              createdBy: numUserId,
+              // partnerId ensures the AR/Cash credit line is stamped with the
+              // customer so the refund appears in the customer's AR ledger
+              // (_buildPartnerLedger filters by jl.partner_id).
+              partnerId: sale.customerId ?? undefined,
+              // Pass explicit account IDs so the repo never falls back to
+              // hardcoded codes and so it knows which side (cash vs AR) to credit.
+              revenueAccountId: revenueAcc!.id!,
+              cashAccountId: !refundToAr ? (cashAcc?.id ?? undefined) : undefined,
+              arAccountId: refundToAr ? (arAcc?.id ?? undefined) : undefined,
+              vatOutputAccountId: vatAcc?.id ?? undefined,
+              cogsAccountId: cogsAcc?.id ?? undefined,
+              inventoryAccountId: inventoryAcc?.id ?? undefined,
+            },
+            tx,
+          );
+        }
       }
 
       // ── 7. Customer ledger refund entry ─────────────────────────
@@ -291,6 +413,13 @@ export class RefundSaleUseCase extends WriteUseCase<
         newPaidAmount: sale.paidAmount ?? 0,
         newRemainingAmount: existingRemaining,
         status: newStatus,
+        _audit: {
+          reason: input.reason,
+          hasStockReturns,
+          returnedItemsCount: returnItems.filter((ri) => ri.returnToStock).length,
+          paymentType: sale.paymentType ?? undefined,
+          invoiceNumber: sale.invoiceNumber ?? undefined,
+        },
       };
     });
   }
@@ -304,11 +433,22 @@ export class RefundSaleUseCase extends WriteUseCase<
       await this.auditRepo.create(
         new AuditEvent({
           userId: Number(userId),
-          action: "refund",
+          action: "sale:refund",
           entityType: "Sale",
           entityId: result.saleId,
           timestamp: new Date().toISOString(),
-          changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result.saleId}`,
+          changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result._audit?.invoiceNumber ?? result.saleId}${result._audit?.hasStockReturns ? " (مع إرجاع مخزون)" : ""}`,
+          metadata: {
+            saleId: result.saleId,
+            invoiceNumber: result._audit?.invoiceNumber,
+            refundedAmount: result.refundedAmount,
+            totalRefunded: result.totalRefunded,
+            newStatus: result.status,
+            reason: result._audit?.reason ?? null,
+            hasStockReturns: result._audit?.hasStockReturns ?? false,
+            returnedItemsCount: result._audit?.returnedItemsCount ?? 0,
+            paymentType: result._audit?.paymentType ?? null,
+          },
         }),
       );
     } catch {

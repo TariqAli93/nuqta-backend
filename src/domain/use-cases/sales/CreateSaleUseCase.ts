@@ -487,6 +487,7 @@ export class CreateSaleUseCase extends WriteUseCase<
             unitPrice: si.unitPrice,
             discount: si.discount,
             subtotal: si.subtotal,
+            returnedQuantityBase: 0,
           })),
           createdAt: new Date(),
         };
@@ -690,7 +691,7 @@ export class CreateSaleUseCase extends WriteUseCase<
           await this.customerLedgerRepo.createSync(
             {
               customerId: input.customerId,
-              transactionType: "invoice",
+              transactionType: "sale",
               amount: remainingAmount,
               balanceAfter: newBalance,
               saleId: createdSale.id,

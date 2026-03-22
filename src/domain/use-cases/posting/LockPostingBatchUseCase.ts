@@ -3,14 +3,19 @@
  * Locks a posting batch to prevent modifications.
  */
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
+import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 type TInput = { batchId: number };
-type TEntity = { batchId: number; status: string };
+type TEntity = { batchId: number; status: string; periodStart?: string; periodEnd?: string };
 
 export class LockPostingBatchUseCase extends WriteUseCase<TInput, TEntity, TEntity> {
-  constructor(private postingRepo: IPostingRepository) {
+  constructor(
+    private postingRepo: IPostingRepository,
+    private auditRepo?: IAuditRepository,
+  ) {
     super();
   }
 
@@ -26,11 +31,35 @@ export class LockPostingBatchUseCase extends WriteUseCase<TInput, TEntity, TEnti
     }
 
     await this.postingRepo.lockBatch(input.batchId);
-    return { batchId: input.batchId, status: "locked" };
+    return {
+      batchId: input.batchId,
+      status: "locked",
+      periodStart: (batch as any).periodStart,
+      periodEnd: (batch as any).periodEnd,
+    };
   }
 
-  executeSideEffectsPhase(_result: TEntity, _userId: string): Promise<void> {
-    return Promise.resolve();
+  async executeSideEffectsPhase(result: TEntity, userId: string): Promise<void> {
+    if (!this.auditRepo) return;
+    try {
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "posting:batch:lock",
+          entityType: "PostingBatch",
+          entityId: result.batchId,
+          timestamp: new Date().toISOString(),
+          changeDescription: `قفل دفعة الترحيل رقم ${result.batchId}`,
+          metadata: {
+            batchId: result.batchId,
+            periodStart: result.periodStart,
+            periodEnd: result.periodEnd,
+          },
+        }),
+      );
+    } catch {
+      // Audit must not break committed lock.
+    }
   }
 
   toEntity(result: TEntity): TEntity {

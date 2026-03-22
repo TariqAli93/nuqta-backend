@@ -17,7 +17,7 @@ const SupplierLedgerEntrySchema = {
     supplierId: { type: "integer" },
     transactionType: {
       type: "string",
-      enum: ["invoice", "payment", "return", "adjustment", "opening"],
+      enum: ["purchase", "payment", "opening_balance", "adjustment", "cancellation", "refund", "payment_reversal"],
     },
     amount: { type: "integer" },
     balanceAfter: { type: "integer" },

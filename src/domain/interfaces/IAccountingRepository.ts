@@ -21,6 +21,14 @@ export interface CreditNoteEntryParams {
   description: string;
   createdBy: number;
   currency?: string;
+  /**
+   * Customer (or supplier) ID to stamp on the AR/Cash credit line so that
+   * the refund appears correctly in the partner's AR ledger
+   * (`_buildPartnerLedger` filters by `jl.partner_id`).
+   * Without this, a credit-sale refund credit to AR is invisible to the
+   * customer ledger and the outstanding balance appears inflated.
+   */
+  partnerId?: number;
   /** Pre-tax revenue amount to reverse (defaults to amount if not supplied) */
   netRevenue?: number;
   /** VAT amount to reverse (0 if none) */

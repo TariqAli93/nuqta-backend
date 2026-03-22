@@ -106,7 +106,7 @@ export class SaleRepository implements ISaleRepository {
 
   async updateStatus(
     id: number,
-    status: "completed" | "cancelled",
+    status: "completed" | "cancelled" | "refunded" | "partial_refund",
     tx?: TxOrDb,
   ): Promise<void> {
     await this.c(tx)
@@ -132,6 +132,19 @@ export class SaleRepository implements ISaleRepository {
   ): Promise<void> {
     if (depletions.length === 0) return;
     await this.c(tx).insert(saleItemDepletions).values(depletions as any);
+  }
+
+  async incrementItemReturnedQty(
+    saleItemId: number,
+    addedQtyBase: number,
+    tx?: TxOrDb,
+  ): Promise<void> {
+    await this.c(tx)
+      .update(saleItems)
+      .set({
+        returnedQuantityBase: sql`${saleItems.returnedQuantityBase} + ${addedQtyBase}`,
+      } as any)
+      .where(eq(saleItems.id, saleItemId));
   }
 
   async getItemDepletionsBySaleId(

@@ -55,7 +55,7 @@ export class ReconciliationRepository implements IReconciliationRepository {
         GROUP BY journal_entry_line_id
       ) rl_sum ON rl_sum.journal_entry_line_id = jl.id
       WHERE jl.id = ANY(${ids}::int[])
-        AND je.is_reversed = false
+        AND COALESCE(je.is_reversed, false) = false
     `);
     return this._mapLines(Array.isArray(rows) ? rows : []);
   }
@@ -94,7 +94,7 @@ export class ReconciliationRepository implements IReconciliationRepository {
       WHERE jl.partner_id = ${params.partnerId}
         AND a.code = ${params.accountCode}
         AND jl.reconciled = false
-        AND je.is_reversed = false
+        AND COALESCE(je.is_reversed, false) = false
       ORDER BY je.entry_date, jl.id
     `);
     return this._mapLines(Array.isArray(rows) ? rows : []);
@@ -132,7 +132,7 @@ export class ReconciliationRepository implements IReconciliationRepository {
       ) rl_sum ON rl_sum.journal_entry_line_id = jl.id
       WHERE a.code = ${params.accountCode}
         AND jl.reconciled = false
-        AND je.is_reversed = false
+        AND COALESCE(je.is_reversed, false) = false
       ORDER BY je.entry_date, jl.id
     `);
     return this._mapLines(Array.isArray(rows) ? rows : []);
@@ -298,7 +298,7 @@ export class ReconciliationRepository implements IReconciliationRepository {
       JOIN accounts a ON a.id = jl.account_id
       WHERE jl.partner_id = ${partnerId}
         AND a.code = ${accountCode}
-        AND je.is_reversed = false
+        AND COALESCE(je.is_reversed, false) = false
       ORDER BY je.entry_date, jl.id
     `);
 

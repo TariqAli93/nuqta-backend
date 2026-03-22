@@ -69,11 +69,37 @@ const CurrencySettingsSchema = {
 const ModuleSettingsDataSchema = {
   type: "object" as const,
   properties: {
-    accountingEnabled: { type: "boolean" },
-    purchasesEnabled: { type: "boolean" },
-    ledgersEnabled: { type: "boolean" },
-    unitsEnabled: { type: "boolean" },
-    paymentsOnInvoicesEnabled: { type: "boolean" },
+    modules: {
+      type: "object" as const,
+      properties: {
+        accountingEnabled: { type: "boolean" },
+        purchasesEnabled: { type: "boolean" },
+        ledgersEnabled: { type: "boolean" },
+        unitsEnabled: { type: "boolean" },
+        paymentsOnInvoicesEnabled: { type: "boolean" },
+      },
+    },
+    notifications: {
+      type: "object" as const,
+      properties: {
+        lowStockThreshold: { type: "integer" },
+        expiryDays: { type: "integer" },
+        debtReminderCount: { type: "integer" },
+        debtReminderIntervalDays: { type: "integer" },
+      },
+    },
+    invoice: {
+      type: "object" as const,
+      properties: {
+        templateActiveId: { type: "string" },
+        prefix: { type: "string" },
+        paperSize: { type: "string" },
+        footerNotes: { type: "string" },
+        layoutDirection: { type: "string" },
+        showQr: { type: "boolean" },
+      },
+    },
+    wizardCompleted: { type: "boolean" },
   },
 };
 
@@ -459,7 +485,7 @@ const settings: FastifyPluginAsync = async (fastify) => {
   // GET /settings/modules
   fastify.get(
     "/modules",
-    { schema: getModuleSettingsSchema },
+    { schema: getModuleSettingsSchema, preHandler: [fastify.authenticate] },
     async (request) => {
       const uc = new GetModuleSettingsUseCase(fastify.repos.settings);
       const data = await uc.execute();

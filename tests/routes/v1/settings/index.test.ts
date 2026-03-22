@@ -68,7 +68,7 @@ describe("/api/v1/settings", () => {
       setup: () =>
         mockUseCase("GetModuleSettingsUseCase", { execute: moduleSettings }),
       assert: (data: typeof moduleSettings) => {
-        expect(data.accountingEnabled).toBe(true);
+        expect(data.modules.accountingEnabled).toBe(true);
       },
     },
     {

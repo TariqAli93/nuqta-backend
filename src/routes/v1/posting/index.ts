@@ -193,6 +193,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const uc = new PostPeriodUseCase(
         fastify.repos.posting,
         fastify.repos.settings,
+        fastify.repos.audit,
       );
       const data = await uc.execute(body, userId);
       return { ok: true, data };
@@ -212,6 +213,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const uc = new ReverseEntryUseCase(
         fastify.repos.posting,
         fastify.repos.accounting,
+        fastify.repos.audit,
       );
       const data = await uc.execute(id, userId);
       return { ok: true, data };
@@ -232,6 +234,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const uc = new PostIndividualEntryUseCase(
         fastify.repos.posting,
         fastify.repos.accounting,
+        fastify.repos.audit,
       );
       const data = await uc.execute({ entryId: id }, userId);
       return { ok: true, data };
@@ -251,6 +254,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
       const uc = new UnpostIndividualEntryUseCase(
         fastify.repos.posting,
         fastify.repos.accounting,
+        fastify.repos.audit,
       );
       const data = await uc.execute({ entryId: id }, userId);
       return { ok: true, data };
@@ -333,7 +337,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const batchId = parseInt(request.params.id, 10);
       const userId = String(request.user?.sub ?? "system");
-      const uc = new LockPostingBatchUseCase(fastify.repos.posting);
+      const uc = new LockPostingBatchUseCase(fastify.repos.posting, fastify.repos.audit);
       const data = await uc.execute({ batchId }, userId);
       return { ok: true, data };
     },
@@ -349,7 +353,7 @@ const posting: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const batchId = parseInt(request.params.id, 10);
       const userId = String(request.user?.sub ?? "system");
-      const uc = new UnlockPostingBatchUseCase(fastify.repos.posting);
+      const uc = new UnlockPostingBatchUseCase(fastify.repos.posting, fastify.repos.audit);
       const data = await uc.execute({ batchId }, userId);
       return { ok: true, data };
     },
