@@ -1,6 +1,8 @@
 import { IProductRepository } from "../../interfaces/IProductRepository.js";
 import { IInventoryRepository } from "../../interfaces/IInventoryRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
+import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
+import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { InventoryMovement } from "../../entities/InventoryMovement.js";
@@ -10,6 +12,7 @@ import {
   InsufficientStockError,
 } from "../../shared/errors/DomainErrors.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
+import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 
 const ACCT_INVENTORY = "1200";
 const ACCT_COGS = "5001";
@@ -43,9 +46,18 @@ export class AdjustProductStockUseCase extends WriteUseCase<
     private inventoryRepo: IInventoryRepository,
     private accountingRepo?: IAccountingRepository,
     auditRepo?: IAuditRepository,
+    private settingsRepo?: ISettingsRepository,
+    private accountingSettingsRepo?: IAccountingSettingsRepository,
   ) {
     super();
     this.auditService = new AuditService(auditRepo as IAuditRepository);
+  }
+
+  private async resolveAutoPosting(): Promise<boolean> {
+    return SettingsAccessor.resolveAutoPosting(
+      this.settingsRepo,
+      this.accountingSettingsRepo,
+    );
   }
 
   async executeCommitPhase(
@@ -232,6 +244,8 @@ export class AdjustProductStockUseCase extends WriteUseCase<
 
     if (!inventoryAcct?.id) return;
 
+    const autoPost = await this.resolveAutoPosting();
+
     if (quantityChange < 0 && cogsAcct?.id) {
       await this.accountingRepo.createJournalEntrySync({
         entryNumber: `JE-ADJ-${movementId || Date.now()}`,
@@ -239,7 +253,7 @@ export class AdjustProductStockUseCase extends WriteUseCase<
         description: "Inventory shrinkage adjustment",
         sourceType: "adjustment",
         sourceId: movementId,
-        isPosted: false,
+        isPosted: autoPost,
         isReversed: false,
         totalAmount: amount,
         currency: "IQD",
@@ -270,7 +284,7 @@ export class AdjustProductStockUseCase extends WriteUseCase<
         description: "Inventory gain adjustment",
         sourceType: "adjustment",
         sourceId: movementId,
-        isPosted: false,
+        isPosted: autoPost,
         isReversed: false,
         totalAmount: amount,
         currency: "IQD",

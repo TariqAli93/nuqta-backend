@@ -98,7 +98,12 @@ export interface IAccountingRepository {
     totalExpenses: number;
     netIncome: number;
   }>;
-  getBalanceSheet(params?: { fromDate?: string; toDate?: string }): Promise<{
+  getBalanceSheet(params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    /** @deprecated use dateFrom */ fromDate?: string;
+    /** @deprecated use dateTo */ toDate?: string;
+  }): Promise<{
     assets: { accountId: number; name: string; balance: number }[];
     liabilities: { accountId: number; name: string; balance: number }[];
     equity: { accountId: number; name: string; balance: number }[];

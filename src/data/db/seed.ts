@@ -267,6 +267,8 @@ async function initializeDatabase(): Promise<void> {
     inventoryRepo,
     accountingRepo,
     auditRepo,
+    settingsRepo,
+    accountingSettingsRepo,
   );
   const initializeAccountingUseCase = new InitializeAccountingUseCase(
     settingsRepo,
@@ -1034,7 +1036,7 @@ async function initializeDatabase(): Promise<void> {
       defaultTaxRate: 0,
       fiscalYearStartMonth: 1,
       fiscalYearStartDay: 1,
-      autoPosting: false,
+      autoPosting: true,
       costMethod: "fifo",
       currencyCode: "IQD",
       usdExchangeRate: 1480,

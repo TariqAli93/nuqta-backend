@@ -103,6 +103,8 @@ const DateRangeQuerySchema = {
 const BalanceSheetDateRangeSchema = {
   type: "object" as const,
   properties: {
+    dateFrom: { type: "string", format: "date" },
+    dateTo: { type: "string", format: "date" },
     fromDate: { type: "string", format: "date" },
     toDate: { type: "string", format: "date" },
   },
@@ -562,8 +564,16 @@ const accounting: FastifyPluginAsync = async (fastify) => {
       preHandler: [fastify.authenticate, requirePermission("accounting:read")],
     },
     async (request) => {
-      const query = request.query as { fromDate?: string; toDate?: string };
-      const data = await fastify.repos.accounting.getBalanceSheet(query || {});
+      const query = request.query as {
+        dateFrom?: string;
+        dateTo?: string;
+        fromDate?: string;
+        toDate?: string;
+      };
+      const data = await fastify.repos.accounting.getBalanceSheet({
+        dateFrom: query.dateFrom ?? query.fromDate,
+        dateTo: query.dateTo ?? query.toDate,
+      });
       return { ok: true, data };
     },
   );

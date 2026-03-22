@@ -676,8 +676,10 @@ export class AccountingRepository implements IAccountingRepository {
   }
 
   async getBalanceSheet(params?: {
-    fromDate?: string;
-    toDate?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    /** @deprecated use dateFrom */ fromDate?: string;
+    /** @deprecated use dateTo */ toDate?: string;
   }): Promise<{
     assets: { accountId: number; name: string; balance: number }[];
     liabilities: { accountId: number; name: string; balance: number }[];
@@ -691,8 +693,8 @@ export class AccountingRepository implements IAccountingRepository {
     totalEquity: number;
     difference: number;
   }> {
-    const fromDate = params?.fromDate ?? null;
-    const toDate = params?.toDate ?? null;
+    const fromDate = params?.dateFrom ?? params?.fromDate ?? null;
+    const toDate = params?.dateTo ?? params?.toDate ?? null;
 
     const rows = await this.db.execute(sql`
       SELECT
