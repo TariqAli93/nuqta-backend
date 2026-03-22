@@ -18,7 +18,7 @@ const CustomerLedgerEntrySchema = {
     customerId: { type: "integer" },
     transactionType: {
       type: "string",
-      enum: ["invoice", "payment", "return", "adjustment", "opening"],
+      enum: ["sale", "payment", "opening_balance", "adjustment", "cancellation", "refund", "payment_reversal"],
     },
     amount: { type: "integer" },
     balanceAfter: { type: "integer" },

@@ -253,7 +253,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
         await this.supplierLedgerRepository.createSync(
           {
             supplierId: createdPurchase.supplierId,
-            transactionType: "invoice",
+            transactionType: "purchase",
             amount: remainingAmount,
             balanceAfter: balanceBefore + remainingAmount,
             purchaseId: createdPurchase.id,

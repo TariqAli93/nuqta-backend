@@ -691,7 +691,7 @@ export class CreateSaleUseCase extends WriteUseCase<
           await this.customerLedgerRepo.createSync(
             {
               customerId: input.customerId,
-              transactionType: "invoice",
+              transactionType: "sale",
               amount: remainingAmount,
               balanceAfter: newBalance,
               saleId: createdSale.id,
