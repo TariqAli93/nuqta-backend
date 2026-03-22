@@ -174,6 +174,8 @@ const products: FastifyPluginAsync = async (fastify) => {
         fastify.repos.inventory,
         fastify.repos.accounting,
         fastify.repos.audit,
+        fastify.repos.settings,
+        fastify.repos.accountingSettings,
       );
       const data = await uc.execute({ productId: id, ...body }, userId);
 

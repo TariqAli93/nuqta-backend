@@ -251,7 +251,11 @@ export class AccountingRepository implements IAccountingRepository {
         : String(dateInput).slice(0, 10);
 
     const [locked] = await client
-      .select({ id: postingBatches.id, periodStart: postingBatches.periodStart, periodEnd: postingBatches.periodEnd })
+      .select({
+        id: postingBatches.id,
+        periodStart: postingBatches.periodStart,
+        periodEnd: postingBatches.periodEnd,
+      })
       .from(postingBatches)
       .where(
         and(
@@ -571,7 +575,7 @@ export class AccountingRepository implements IAccountingRepository {
     const dateFrom = params?.dateFrom ?? null;
     const dateTo = params?.dateTo ?? null;
 
-    const rows = await this.db.execute(sql`
+    const result = await this.db.execute(sql`
       SELECT
         a.id AS "accountId",
         a.code AS "accountCode",
@@ -591,7 +595,7 @@ export class AccountingRepository implements IAccountingRepository {
       ORDER BY a.code
     `);
 
-    const data = Array.isArray(rows) ? rows : [];
+    const data = result.rows ?? [];
 
     return data.map((r: any) => ({
       accountId: Number(r.accountId),
@@ -617,7 +621,7 @@ export class AccountingRepository implements IAccountingRepository {
     const dateFrom = params?.dateFrom ?? null;
     const dateTo = params?.dateTo ?? null;
 
-    const rows = await this.db.execute(sql`
+    const result = await this.db.execute(sql`
       SELECT
         a.id AS "accountId",
         a.name,
@@ -640,7 +644,7 @@ export class AccountingRepository implements IAccountingRepository {
     let totalRevenue = 0;
     let totalExpenses = 0;
 
-    const data = Array.isArray(rows) ? rows : [];
+    const data = result.rows ?? [];
     for (const row of data as any[]) {
       if (row.accountType === "revenue") {
         const amount = Number(row.netAmount);
@@ -676,8 +680,10 @@ export class AccountingRepository implements IAccountingRepository {
   }
 
   async getBalanceSheet(params?: {
-    fromDate?: string;
-    toDate?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    /** @deprecated use dateFrom */ fromDate?: string;
+    /** @deprecated use dateTo */ toDate?: string;
   }): Promise<{
     assets: { accountId: number; name: string; balance: number }[];
     liabilities: { accountId: number; name: string; balance: number }[];
@@ -691,10 +697,10 @@ export class AccountingRepository implements IAccountingRepository {
     totalEquity: number;
     difference: number;
   }> {
-    const fromDate = params?.fromDate ?? null;
-    const toDate = params?.toDate ?? null;
+    const fromDate = params?.dateFrom ?? params?.fromDate ?? null;
+    const toDate = params?.dateTo ?? params?.toDate ?? null;
 
-    const rows = await this.db.execute(sql`
+    const result = await this.db.execute(sql`
       SELECT
         a.id AS "accountId",
         a.name,
@@ -726,7 +732,7 @@ export class AccountingRepository implements IAccountingRepository {
     let revenueNet = 0;
     let expenseNet = 0;
 
-    const data = Array.isArray(rows) ? rows : [];
+    const data = result.rows ?? [];
     for (const row of data as any[]) {
       const balance = Number(row.balance);
       switch (row.accountType) {
