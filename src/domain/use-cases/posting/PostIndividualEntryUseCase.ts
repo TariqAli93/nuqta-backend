@@ -1,7 +1,9 @@
 import { IPostingRepository } from '../../interfaces/IPostingRepository.js';
 import { IAccountingRepository } from '../../interfaces/IAccountingRepository.js';
+import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { JournalEntry } from '../../entities/Accounting.js';
 import { NotFoundError, InvalidStateError } from '../../shared/errors/DomainErrors.js';
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 type TInput = { entryId: number };
@@ -9,7 +11,8 @@ type TInput = { entryId: number };
 export class PostIndividualEntryUseCase extends WriteUseCase<TInput, JournalEntry, JournalEntry> {
   constructor(
     private postingRepo: IPostingRepository,
-    private accountingRepo: IAccountingRepository
+    private accountingRepo: IAccountingRepository,
+    private auditRepo?: IAuditRepository,
   ) {
     super();
   }
@@ -52,8 +55,29 @@ export class PostIndividualEntryUseCase extends WriteUseCase<TInput, JournalEntr
     return updatedEntry!;
   }
 
-  executeSideEffectsPhase(_result: JournalEntry, _userId: string): Promise<void> {
-    return Promise.resolve();
+  async executeSideEffectsPhase(result: JournalEntry, userId: string): Promise<void> {
+    if (!this.auditRepo) return;
+    try {
+      const totalAmount = (result.lines ?? []).reduce((sum, l) => sum + (l.debit || 0), 0);
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "posting:entry:post",
+          entityType: "JournalEntry",
+          entityId: result.id!,
+          timestamp: new Date().toISOString(),
+          changeDescription: `ترحيل قيد يومي رقم ${result.entryNumber ?? result.id}`,
+          metadata: {
+            entryId: result.id,
+            entryNumber: result.entryNumber,
+            entryDate: result.entryDate,
+            totalAmount,
+          },
+        }),
+      );
+    } catch {
+      // Audit must not break committed post.
+    }
   }
 
   toEntity(result: JournalEntry): JournalEntry {

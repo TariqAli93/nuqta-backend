@@ -1,7 +1,9 @@
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
+import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { JournalEntry } from "../../entities/Accounting.js";
 import { NotFoundError, InvalidStateError } from "../../shared/errors/DomainErrors.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
 /**
@@ -17,6 +19,7 @@ export class ReverseEntryUseCase extends WriteUseCase<number, JournalEntry, Jour
   constructor(
     private postingRepo: IPostingRepository,
     private accountingRepo: IAccountingRepository,
+    private auditRepo?: IAuditRepository,
   ) {
     super();
   }
@@ -94,8 +97,28 @@ export class ReverseEntryUseCase extends WriteUseCase<number, JournalEntry, Jour
     return await this.postingRepo.createReversalEntry(originalEntry.id, Number(_userId) || 0);
   }
 
-  executeSideEffectsPhase(_result: JournalEntry, _userId: string): Promise<void> {
-    return Promise.resolve();
+  async executeSideEffectsPhase(result: JournalEntry, userId: string): Promise<void> {
+    if (!this.auditRepo) return;
+    try {
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "posting:entry:reverse",
+          entityType: "JournalEntry",
+          entityId: result.id!,
+          timestamp: new Date().toISOString(),
+          changeDescription: `عكس قيد يومي رقم ${result.entryNumber ?? result.id}`,
+          metadata: {
+            reversalEntryId: result.id,
+            reversalEntryNumber: result.entryNumber,
+            originalEntryId: result.reversalOfId ?? null,
+            wasPosted: result.isPosted,
+          },
+        }),
+      );
+    } catch {
+      // Audit must not break committed reversal.
+    }
   }
 
   toEntity(result: JournalEntry): JournalEntry {

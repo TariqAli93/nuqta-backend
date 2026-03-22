@@ -38,6 +38,14 @@ type TEntity = {
   newPaidAmount: number;
   newRemainingAmount: number;
   status: string;
+  // Audit context — stripped by Fastify serializer, not in API response
+  _audit?: {
+    reason?: string;
+    hasStockReturns: boolean;
+    returnedItemsCount: number;
+    paymentType?: string;
+    invoiceNumber?: string;
+  };
 };
 
 export class RefundSaleUseCase extends WriteUseCase<
@@ -405,6 +413,13 @@ export class RefundSaleUseCase extends WriteUseCase<
         newPaidAmount: sale.paidAmount ?? 0,
         newRemainingAmount: existingRemaining,
         status: newStatus,
+        _audit: {
+          reason: input.reason,
+          hasStockReturns,
+          returnedItemsCount: returnItems.filter((ri) => ri.returnToStock).length,
+          paymentType: sale.paymentType ?? undefined,
+          invoiceNumber: sale.invoiceNumber ?? undefined,
+        },
       };
     });
   }
@@ -418,11 +433,22 @@ export class RefundSaleUseCase extends WriteUseCase<
       await this.auditRepo.create(
         new AuditEvent({
           userId: Number(userId),
-          action: "refund",
+          action: "sale:refund",
           entityType: "Sale",
           entityId: result.saleId,
           timestamp: new Date().toISOString(),
-          changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result.saleId}`,
+          changeDescription: `استرداد ${result.refundedAmount} من فاتورة #${result._audit?.invoiceNumber ?? result.saleId}${result._audit?.hasStockReturns ? " (مع إرجاع مخزون)" : ""}`,
+          metadata: {
+            saleId: result.saleId,
+            invoiceNumber: result._audit?.invoiceNumber,
+            refundedAmount: result.refundedAmount,
+            totalRefunded: result.totalRefunded,
+            newStatus: result.status,
+            reason: result._audit?.reason ?? null,
+            hasStockReturns: result._audit?.hasStockReturns ?? false,
+            returnedItemsCount: result._audit?.returnedItemsCount ?? 0,
+            paymentType: result._audit?.paymentType ?? null,
+          },
         }),
       );
     } catch {

@@ -287,11 +287,22 @@ export class CancelSaleUseCase extends WriteUseCase<
       await this.auditRepo.create(
         new AuditEvent({
           userId: Number(userId),
-          action: "cancel",
+          action: "sale:cancel",
           entityType: "Sale",
           entityId: result.sale.id!,
           timestamp: new Date().toISOString(),
-          changeDescription: `إلغاء فاتورة #${result.sale.invoiceNumber} (${result.depletionsRestored} batch depletions restored)`,
+          changeDescription: `إلغاء فاتورة #${result.sale.invoiceNumber} (استرجاع ${result.depletionsRestored} دفعة مخزون)`,
+          metadata: {
+            saleId: result.sale.id,
+            invoiceNumber: result.sale.invoiceNumber,
+            total: result.sale.total,
+            paidAmount: result.sale.paidAmount,
+            paymentType: result.sale.paymentType,
+            customerId: result.sale.customerId ?? null,
+            depletionsRestored: result.depletionsRestored,
+            previousStatus: result.sale.status,
+            newStatus: "cancelled",
+          },
         }),
       );
     } catch {

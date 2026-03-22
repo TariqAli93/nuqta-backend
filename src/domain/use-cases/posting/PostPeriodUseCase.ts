@@ -1,10 +1,12 @@
 import { IPostingRepository } from "../../interfaces/IPostingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
+import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { PostingBatch } from "../../entities/PostingBatch.js";
 import {
   InvalidStateError,
   ValidationError,
 } from "../../shared/errors/DomainErrors.js";
+import { AuditEvent } from "../../entities/AuditEvent.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 
@@ -29,6 +31,7 @@ export class PostPeriodUseCase extends WriteUseCase<PostPeriodInput, PostingBatc
   constructor(
     private postingRepo: IPostingRepository,
     private settingsRepo: ISettingsRepository,
+    private auditRepo?: IAuditRepository,
   ) {
     super();
   }
@@ -116,8 +119,30 @@ export class PostPeriodUseCase extends WriteUseCase<PostPeriodInput, PostingBatc
     return batch;
   }
 
-  executeSideEffectsPhase(_result: PostingBatch, _userId: string): Promise<void> {
-    return Promise.resolve();
+  async executeSideEffectsPhase(result: PostingBatch, userId: string): Promise<void> {
+    if (!this.auditRepo) return;
+    try {
+      await this.auditRepo.create(
+        new AuditEvent({
+          userId: Number(userId),
+          action: "posting:period:post",
+          entityType: "PostingBatch",
+          entityId: result.id!,
+          timestamp: new Date().toISOString(),
+          changeDescription: `ترحيل فترة ${result.periodType}: ${result.periodStart} → ${result.periodEnd} (${result.entriesCount} قيد، إجمالي ${result.totalAmount})`,
+          metadata: {
+            batchId: result.id,
+            periodType: result.periodType,
+            periodStart: result.periodStart,
+            periodEnd: result.periodEnd,
+            entriesCount: result.entriesCount,
+            totalAmount: result.totalAmount,
+          },
+        }),
+      );
+    } catch {
+      // Audit must not break committed post.
+    }
   }
 
   toEntity(result: PostingBatch): PostingBatch {
