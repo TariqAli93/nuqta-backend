@@ -13,6 +13,8 @@ import { CustomerLedgerEntry } from "../../entities/Ledger.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
+import type { DbConnection } from "../../../data/db/db.js";
+import { withTransaction } from "../../../data/db/transaction.js";
 
 export interface RecordPaymentInput {
   customerId: number;
@@ -37,6 +39,7 @@ export class RecordCustomerPaymentUseCase extends WriteUseCase<
     auditRepo?: IAuditRepository,
     private settingsRepo?: ISettingsRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
+    private db?: DbConnection,
   ) {
     super();
     if (auditRepo) {
@@ -73,45 +76,55 @@ export class RecordCustomerPaymentUseCase extends WriteUseCase<
     }
 
     const numUserId = Number(userId) || 1;
+    const accountingEnabled = await this.isAccountingEnabled();
 
-    const payment = await this.paymentRepo.createSync({
-      customerId: data.customerId,
-      amount: data.amount,
-      currency: "IQD",
-      exchangeRate: 1,
-      paymentMethod: data.paymentMethod as any,
-      idempotencyKey: data.idempotencyKey,
-      status: "completed",
-      notes: data.notes,
-      paymentDate: new Date(),
-      createdAt: new Date(),
-      createdBy: numUserId,
-    } as any);
+    // Wrap all mutations in a single transaction for atomicity
+    const executeMutations = async (_tx?: unknown) => {
+      const payment = await this.paymentRepo.createSync({
+        customerId: data.customerId,
+        amount: data.amount,
+        currency: "IQD",
+        exchangeRate: 1,
+        paymentMethod: data.paymentMethod as any,
+        idempotencyKey: data.idempotencyKey,
+        status: "completed",
+        notes: data.notes,
+        paymentDate: new Date(),
+        createdAt: new Date(),
+        createdBy: numUserId,
+      } as any);
 
-    const balanceBefore = await this.ledgerRepo.getLastBalanceSync(
-      data.customerId,
-    );
-    const balanceAfter = balanceBefore - data.amount;
+      const balanceBefore = await this.ledgerRepo.getLastBalanceSync(
+        data.customerId,
+      );
+      const balanceAfter = balanceBefore - data.amount;
 
-    const entry = await this.ledgerRepo.createSync({
-      customerId: data.customerId,
-      transactionType: "payment",
-      amount: -data.amount,
-      balanceAfter,
-      paymentId: payment.id,
-      notes: data.notes,
-      createdBy: numUserId,
-    });
+      const entry = await this.ledgerRepo.createSync({
+        customerId: data.customerId,
+        transactionType: "payment",
+        amount: -data.amount,
+        balanceAfter,
+        paymentId: payment.id,
+        notes: data.notes,
+        createdBy: numUserId,
+      });
 
-    // Update cached totalDebt on customer record
-    await this.customerRepo.updateDebt(data.customerId, balanceAfter);
+      // FIX: updateDebt does an INCREMENT (totalDebt + amountChange),
+      // so we must pass -data.amount (the delta), NOT balanceAfter.
+      await this.customerRepo.updateDebt(data.customerId, -data.amount);
 
-    // Create journal entry only if accounting is enabled
-    if (await this.isAccountingEnabled()) {
-      await this.createJournalEntry(payment.id!, data.amount, numUserId);
+      if (accountingEnabled) {
+        await this.createJournalEntry(payment.id!, data.amount, numUserId);
+      }
+
+      return entry;
+    };
+
+    // Use transaction if db connection is available
+    if (this.db) {
+      return withTransaction(this.db, async (tx) => executeMutations(tx));
     }
-
-    return entry;
+    return executeMutations();
   }
 
   private async isAccountingEnabled(): Promise<boolean> {
@@ -132,7 +145,6 @@ export class RecordCustomerPaymentUseCase extends WriteUseCase<
     amount: number,
     userId: number,
   ): Promise<void> {
-    // Resolve account codes from settings
     const settings = this.settingsRepo
       ? new SettingsAccessor(this.settingsRepo, this.accountingSettingsRepo)
       : null;

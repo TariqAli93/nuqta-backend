@@ -64,6 +64,75 @@ export interface SaleTotals {
 /**
  * Calculate sale totals including discount and tax
  */
+/**
+ * Derive payment status from paid vs total amounts.
+ * Single source of truth for all invoice types (sales & purchases).
+ */
+export type PaymentStatus = 'unpaid' | 'partial' | 'paid';
+
+export function derivePaymentStatus(paidAmount: number, totalAmount: number): PaymentStatus {
+  if (totalAmount <= 0) return 'paid';
+  if (paidAmount <= 0) return 'unpaid';
+  if (paidAmount >= totalAmount) return 'paid';
+  return 'partial';
+}
+
+/**
+ * Standard financial state shape returned by all invoice-related endpoints.
+ * This is the mandatory contract for frontend consumption.
+ */
+export interface InvoiceFinancialState {
+  id: number;
+  invoiceNumber: string;
+  totalAmount: number;
+  paidAmount: number;
+  remainingAmount: number;
+  paymentStatus: PaymentStatus;
+  status: string;
+  customerId?: number;
+  vendorId?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Project an entity (Sale or Purchase) into the InvoiceFinancialState contract.
+ * The entity must have at minimum: id, invoiceNumber, total, paidAmount,
+ * remainingAmount, status, createdAt, updatedAt.
+ */
+export function toInvoiceFinancialState(entity: {
+  id?: number;
+  invoiceNumber: string;
+  total: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: string;
+  customerId?: number | null;
+  supplierId?: number;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
+}): InvoiceFinancialState {
+  const toIso = (v?: string | Date): string => {
+    if (!v) return new Date().toISOString();
+    const d = v instanceof Date ? v : new Date(v);
+    return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  };
+
+  return {
+    id: entity.id!,
+    invoiceNumber: entity.invoiceNumber,
+    totalAmount: entity.total,
+    paidAmount: entity.paidAmount,
+    remainingAmount: entity.remainingAmount,
+    paymentStatus: derivePaymentStatus(entity.paidAmount, entity.total),
+    status: entity.status,
+    ...(entity.customerId != null ? { customerId: entity.customerId } : {}),
+    ...(entity.supplierId != null ? { vendorId: entity.supplierId } : {}),
+    createdAt: toIso(entity.createdAt),
+    updatedAt: toIso(entity.updatedAt),
+  };
+}
+
 export function calculateSaleTotals(
   items: SaleItemInput[],
   discount: number = 0,

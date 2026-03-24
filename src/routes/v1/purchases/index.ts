@@ -46,6 +46,10 @@ const PurchaseSchema = {
     total: { type: "integer" },
     paidAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
+    paymentStatus: {
+      type: "string",
+      enum: ["unpaid", "partial", "paid"],
+    },
     currency: { type: "string" },
     exchangeRate: { type: "number" },
     status: {
@@ -180,10 +184,7 @@ const addPurchasePaymentSchema = {
   params: { $ref: "IdParams#" },
   body: AddPurchasePaymentBodySchema,
   response: {
-    200: successEnvelope(
-      { type: "object" as const, additionalProperties: true },
-      "Payment result",
-    ),
+    200: successEnvelope(PurchaseSchema, "Updated purchase after payment"),
     ...ErrorResponses,
   },
 } as const;

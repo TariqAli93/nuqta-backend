@@ -58,6 +58,7 @@ export const SaleSchema = z.object({
   paidAmount: z.number().int().default(0),
   refundedAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
+  paymentStatus: z.enum(["unpaid", "partial", "paid"]).optional(),
   status: z
     .enum(["pending", "completed", "cancelled", "refunded", "partial_refund"])
     .default("pending"),

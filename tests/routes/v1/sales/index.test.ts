@@ -113,10 +113,11 @@ describe("/api/v1/sales", () => {
       },
       setup: () =>
         mockUseCase("AddPaymentUseCase", {
-          execute: paymentResult,
+          execute: { ...sale, paidAmount: 20000, remainingAmount: 0, paymentStatus: "paid", status: "completed" },
         }),
-      assert: (data: typeof paymentResult) => {
-        expect(data.amount).toBe(paymentResult.amount);
+      assert: (data: typeof sale) => {
+        expect(data.paidAmount).toBe(20000);
+        expect(data.paymentStatus).toBe("paid");
       },
     },
     {

@@ -8,7 +8,7 @@ import {
   inventoryMovements,
   productBatches,
 } from "../../schema/schema.js";
-import { IPurchaseRepository, Purchase } from "../../../domain/index.js";
+import { IPurchaseRepository, Purchase, derivePaymentStatus } from "../../../domain/index.js";
 
 export class PurchaseRepository implements IPurchaseRepository {
   constructor(private db: DbConnection) {}
@@ -186,6 +186,7 @@ export class PurchaseRepository implements IPurchaseRepository {
       items: enrichedItems,
       payments: paymentRows,
       movements: movementRows,
+      paymentStatus: derivePaymentStatus(row.paidAmount ?? 0, row.total ?? 0),
     } as Purchase;
   }
 }
