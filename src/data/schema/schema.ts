@@ -180,6 +180,8 @@ export const sales = pgTable("sales", {
   interestRate: real("interest_rate").default(0),
   interestAmount: integer("interest_amount").default(0),
   paymentType: text("payment_type").notNull(),
+  paymentMethod: text("payment_method").notNull().default("cash"),
+  referenceNumber: text("reference_number"),
   paidAmount: integer("paid_amount").default(0),
   refundedAmount: integer("refunded_amount").default(0),
   remainingAmount: integer("remaining_amount").default(0),

@@ -36,6 +36,20 @@
       "when": 1774141462128,
       "tag": "0004_colorful_phalanx",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774320635223,
+      "tag": "0005_slippery_blue_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774321418364,
+      "tag": "0006_chemical_captain_america",
+      "breakpoints": true
     }
   ]
 }

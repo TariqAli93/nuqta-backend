@@ -131,7 +131,9 @@ export class SaleRepository implements ISaleRepository {
     tx?: TxOrDb,
   ): Promise<void> {
     if (depletions.length === 0) return;
-    await this.c(tx).insert(saleItemDepletions).values(depletions as any);
+    await this.c(tx)
+      .insert(saleItemDepletions)
+      .values(depletions as any);
   }
 
   async incrementItemReturnedQty(
@@ -321,6 +323,48 @@ export class SaleRepository implements ISaleRepository {
     return {
       ...receipt,
       receiptText: this.renderReceiptText(receipt),
+    };
+  }
+
+  async getMonthlySummary(date: string | Date): Promise<{
+    revenue: number;
+    count: number;
+    cash: number;
+    card: number;
+    transfer: number;
+  }> {
+    const dateObj = typeof date === "string" ? new Date(date) : date;
+    const month = dateObj.getMonth() + 1;
+    const year = dateObj.getFullYear();
+    const monthStr = `${year}-${month.toString().padStart(2, "0")}`;
+
+    const rows = await this.db
+      .select()
+      .from(sales)
+      .where(
+        and(
+          sql`to_char(${sales.createdAt}, 'YYYY-MM') = ${monthStr}`,
+          eq(sales.status, "completed"),
+        ),
+      );
+
+    let revenue = 0;
+    let cash = 0;
+    let card = 0;
+    let transfer = 0;
+    for (const row of rows) {
+      revenue += row.total;
+      if (row.paymentType === "cash") cash += row.total;
+      else if (row.paymentType === "credit") card += row.total;
+      else transfer += row.total;
+    }
+
+    return {
+      revenue,
+      count: rows.length,
+      cash,
+      card,
+      transfer,
     };
   }
 

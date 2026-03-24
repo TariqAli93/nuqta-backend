@@ -30,10 +30,7 @@ import {
   roundByCurrency,
 } from "../../shared/utils/helpers.js";
 import type { DbConnection } from "../../../data/db/db.js";
-import {
-  withTransaction,
-  type TxOrDb,
-} from "../../../data/db/transaction.js";
+import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
 function logDevDiagnostics(event: Record<string, unknown>): void {
   if (process.env.NODE_ENV === "production") return;
@@ -244,10 +241,7 @@ export class CreateSaleUseCase extends WriteUseCase<
           },
         );
       }
-      if (
-        item.discount !== undefined &&
-        item.discount > item.unitPrice
-      ) {
+      if (item.discount !== undefined && item.discount > item.unitPrice) {
         throw new ValidationError(
           "Item discount per unit cannot exceed unit price",
           {
@@ -467,6 +461,8 @@ export class CreateSaleUseCase extends WriteUseCase<
           currency,
           exchangeRate: 1,
           paymentType: input.paymentType,
+          paymentMethod: (input.paymentMethod && input.paymentMethod !== "refund" ? input.paymentMethod : "cash") as "cash" | "card" | "bank_transfer" | "credit",
+          referenceNumber: input.referenceNumber,
           paidAmount,
           refundedAmount: 0,
           remainingAmount,
@@ -654,7 +650,10 @@ export class CreateSaleUseCase extends WriteUseCase<
             },
             tx,
           );
-          diagnostics.paymentCreated = { created: true, reason: "paidAmount>0" };
+          diagnostics.paymentCreated = {
+            created: true,
+            reason: "paidAmount>0",
+          };
         } else {
           diagnostics.paymentCreated = {
             created: false,
@@ -772,11 +771,15 @@ export class CreateSaleUseCase extends WriteUseCase<
     // Look up account IDs by code
     const cashAcct = await this.accountingRepo.findAccountByCode(ACCT_CASH, tx);
     const arAcct = await this.accountingRepo.findAccountByCode(ACCT_AR, tx);
-    const revenueAcct =
-      await this.accountingRepo.findAccountByCode(ACCT_REVENUE, tx);
+    const revenueAcct = await this.accountingRepo.findAccountByCode(
+      ACCT_REVENUE,
+      tx,
+    );
     const cogsAcct = await this.accountingRepo.findAccountByCode(ACCT_COGS, tx);
-    const inventoryAcct =
-      await this.accountingRepo.findAccountByCode(ACCT_INVENTORY, tx);
+    const inventoryAcct = await this.accountingRepo.findAccountByCode(
+      ACCT_INVENTORY,
+      tx,
+    );
     const vatOutputAcct =
       sale.tax > 0
         ? await this.accountingRepo.findAccountByCode(ACCT_VAT_OUTPUT, tx)

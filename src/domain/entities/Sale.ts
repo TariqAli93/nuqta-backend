@@ -51,10 +51,16 @@ export const SaleSchema = z.object({
   interestRate: z.number().int().default(0),
   interestAmount: z.number().int().default(0),
   paymentType: z.enum(["cash", "credit", "mixed"]).default("cash"),
+  paymentMethod: z
+    .enum(["cash", "card", "bank_transfer", "credit"])
+    .default("cash"),
+  referenceNumber: z.string().nullable().optional(),
   paidAmount: z.number().int().default(0),
   refundedAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
-  status: z.enum(["pending", "completed", "cancelled", "refunded", "partial_refund"]).default("pending"),
+  status: z
+    .enum(["pending", "completed", "cancelled", "refunded", "partial_refund"])
+    .default("pending"),
   notes: z.string().nullable().optional(),
   idempotencyKey: z.string().nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).optional(),

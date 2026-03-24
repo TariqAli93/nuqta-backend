@@ -1,0 +1,1 @@
+ALTER TABLE "sales" ALTER COLUMN "payment_method" SET DEFAULT 'cash';

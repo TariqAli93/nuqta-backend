@@ -22,16 +22,16 @@ import { SaleReceiptSchema } from "../../../schemas/sale-receipt.js";
 const SaleItemDepletionSchema = {
   type: "object" as const,
   properties: {
-    id:          { type: "integer" },
-    saleItemId:  { type: "integer" },
-    productId:   { type: "integer" },
-    batchId:     { type: "integer", nullable: true },
-    quantityBase:{ type: "integer" },
+    id: { type: "integer" },
+    saleItemId: { type: "integer" },
+    productId: { type: "integer" },
+    batchId: { type: "integer", nullable: true },
+    quantityBase: { type: "integer" },
     costPerUnit: { type: "integer" },
-    totalCost:   { type: "integer" },
+    totalCost: { type: "integer" },
     batchNumber: { type: "string", nullable: true },
-    expiryDate:  { type: "string", nullable: true },
-    createdAt:   { type: "string", format: "date-time" },
+    expiryDate: { type: "string", nullable: true },
+    createdAt: { type: "string", format: "date-time" },
   },
 };
 
@@ -73,6 +73,11 @@ const SaleSchema = {
     interestRate: { type: "integer" },
     interestAmount: { type: "integer" },
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
+    paymentMethod: {
+      type: "string",
+      enum: ["cash", "card", "bank_transfer", "credit"],
+    },
+    referenceNumber: { type: "string" },
     paidAmount: { type: "integer" },
     refundedAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
