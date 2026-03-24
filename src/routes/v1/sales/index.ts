@@ -81,6 +81,10 @@ const SaleSchema = {
     paidAmount: { type: "integer" },
     refundedAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
+    paymentStatus: {
+      type: "string",
+      enum: ["unpaid", "partial", "paid"],
+    },
     status: {
       type: "string",
       enum: ["pending", "completed", "cancelled", "refunded", "partial_refund"],
@@ -259,10 +263,7 @@ const addSalePaymentSchema = {
   params: { $ref: "IdParams#" },
   body: AddSalePaymentBodySchema,
   response: {
-    200: successEnvelope(
-      { type: "object" as const, additionalProperties: true },
-      "Payment result",
-    ),
+    200: successEnvelope(SaleSchema, "Updated sale after payment"),
     ...ErrorResponses,
   },
 } as const;
@@ -307,12 +308,11 @@ const settleSaleSchema = {
       {
         type: "object" as const,
         properties: {
-          saleId: { type: "integer" },
+          sale: SaleSchema,
           settledAmount: { type: "integer" },
-          newStatus: { type: "string" },
         },
       },
-      "Settlement result",
+      "Settlement result with updated sale",
     ),
     ...ErrorResponses,
   },
@@ -590,9 +590,8 @@ const sales: FastifyPluginAsync = async (fastify) => {
       return {
         ok: true,
         data: {
-          saleId: result.sale.id,
+          sale: result.sale,
           settledAmount: result.settledAmount,
-          newStatus: result.sale.status,
         },
       };
     },

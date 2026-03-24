@@ -69,10 +69,11 @@ describe("/api/v1/purchases", () => {
       },
       setup: () =>
         mockUseCase("AddPurchasePaymentUseCase", {
-          execute: paymentResult,
+          execute: { ...purchase, paidAmount: 20000, remainingAmount: 15000, paymentStatus: "partial" },
         }),
-      assert: (data: typeof paymentResult) => {
-        expect(data.amount).toBe(paymentResult.amount);
+      assert: (data: typeof purchase) => {
+        expect(data.paidAmount).toBe(20000);
+        expect(data.paymentStatus).toBe("partial");
       },
     },
   ])("$title", async ({ method, url, payload, setup, assert }) => {

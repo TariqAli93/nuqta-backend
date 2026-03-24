@@ -17,6 +17,7 @@ import {
   Sale,
   SaleItemDepletion,
   SaleReceipt,
+  derivePaymentStatus,
 } from "../../../domain/index.js";
 
 export class SaleRepository implements ISaleRepository {
@@ -585,6 +586,7 @@ export class SaleRepository implements ISaleRepository {
     return {
       ...row,
       items: itemsWithDepletions,
+      paymentStatus: derivePaymentStatus(row.paidAmount ?? 0, row.total ?? 0),
       totalCogs,
       profit,
       marginBps,

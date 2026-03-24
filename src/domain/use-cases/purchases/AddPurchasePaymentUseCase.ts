@@ -191,12 +191,21 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         idempotencyKey: input.idempotencyKey,
       } as any, tx);
 
+      const newStatus = newRemainingAmount <= 0 ? "completed" : "pending";
+
       await this.updatePurchasePaymentSync(
         input.purchaseId,
         newPaidAmount,
         newRemainingAmount,
         tx,
       );
+
+      // Also update purchase status atomically within the same transaction
+      if (typeof this.purchaseRepo.updateStatusSync === "function") {
+        await this.purchaseRepo.updateStatusSync(input.purchaseId, newStatus);
+      } else if (typeof this.purchaseRepo.updateStatus === "function") {
+        await this.purchaseRepo.updateStatus(input.purchaseId, newStatus);
+      }
 
       if (ledgersEnabled && supplierId) {
         const balanceBefore =
