@@ -46,6 +46,14 @@ const PurchaseSchema = {
     total: { type: "integer" },
     paidAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
+    paymentStatus: {
+      type: "string",
+      enum: ["unpaid", "partially_paid", "paid"],
+    },
+    paymentModeAtCreation: {
+      type: "string",
+      enum: ["cash", "credit", "partial"],
+    },
     currency: { type: "string" },
     exchangeRate: { type: "number" },
     status: {
@@ -284,6 +292,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
         fastify.repos.settings,
         fastify.repos.audit,
         fastify.repos.accountingSettings,
+        fastify.repos.purchaseInvoicePayment,
       );
       const result = await uc.execute({ purchaseId, ...body }, userId);
       return { ok: true, data: result };

@@ -29,6 +29,8 @@ import type {
   SupplierRepository,
   SystemSettingsRepository,
   UserRepository,
+  SalesInvoicePaymentRepository,
+  PurchaseInvoicePaymentRepository,
 } from "../data/index.js";
 import type { AppOptions } from "../app.js";
 
@@ -42,6 +44,8 @@ export interface Repositories {
   sale: SaleRepository;
   purchase: PurchaseRepository;
   payment: PaymentRepository;
+  salesInvoicePayment: SalesInvoicePaymentRepository;
+  purchaseInvoicePayment: PurchaseInvoicePaymentRepository;
   inventory: InventoryRepository;
   settings: SettingsRepository;
   systemSettings: SystemSettingsRepository;
@@ -80,6 +84,8 @@ export default fp<AppOptions>(async (fastify, opts) => {
       sale: new data.SaleRepository(connection),
       purchase: new data.PurchaseRepository(connection),
       payment: new data.PaymentRepository(connection),
+      salesInvoicePayment: new data.SalesInvoicePaymentRepository(connection),
+      purchaseInvoicePayment: new data.PurchaseInvoicePaymentRepository(connection),
       inventory: new data.InventoryRepository(connection),
       settings: new data.SettingsRepository(connection),
       systemSettings: new data.SystemSettingsRepository(connection),

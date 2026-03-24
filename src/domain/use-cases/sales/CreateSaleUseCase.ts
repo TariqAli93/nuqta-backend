@@ -467,6 +467,12 @@ export class CreateSaleUseCase extends WriteUseCase<
           refundedAmount: 0,
           remainingAmount,
           status: remainingAmount <= 0 ? "completed" : "pending",
+          paymentStatus:
+            remainingAmount <= 0
+              ? "paid"
+              : paidAmount > 0
+                ? "partially_paid"
+                : "unpaid",
           notes: input.notes,
           interestRate: interestRateBps,
           interestAmount: roundByCurrency(interestAmount, currency),

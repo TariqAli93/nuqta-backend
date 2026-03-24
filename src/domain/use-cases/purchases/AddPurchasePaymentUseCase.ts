@@ -5,6 +5,7 @@ import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
+import { IPurchaseInvoicePaymentRepository } from "../../interfaces/IInvoicePaymentRepository.js";
 import {
   NotFoundError,
   InvalidStateError,
@@ -58,6 +59,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     private settingsRepo?: ISettingsRepository,
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
+    private purchaseInvoicePaymentRepo?: IPurchaseInvoicePaymentRepository,
   ) {
     super();
     if (auditRepo) {
@@ -169,6 +171,13 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
       newRemainingAmount = 0;
     }
 
+    const newPaymentStatus: "unpaid" | "partially_paid" | "paid" =
+      newRemainingAmount <= 0
+        ? "paid"
+        : newPaidAmount > 0
+          ? "partially_paid"
+          : "unpaid";
+
     const supplierId = input.supplierId || purchase.supplierId;
 
     // Pre-fetch settings outside the transaction (read-only, no locks needed)
@@ -195,8 +204,24 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         input.purchaseId,
         newPaidAmount,
         newRemainingAmount,
+        newPaymentStatus,
         tx,
       );
+
+      if (this.purchaseInvoicePaymentRepo) {
+        await this.purchaseInvoicePaymentRepo.create(
+          {
+            invoiceId: input.purchaseId,
+            supplierId: supplierId || undefined,
+            amount,
+            paymentMethod: input.paymentMethod || "cash",
+            reference: input.referenceNumber,
+            notes: input.notes,
+            paymentDate: new Date().toISOString(),
+          },
+          tx,
+        );
+      }
 
       if (ledgersEnabled && supplierId) {
         const balanceBefore =
@@ -363,6 +388,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    paymentStatus?: "unpaid" | "partially_paid" | "paid",
     _tx?: TxOrDb,
   ): Promise<void> {
     if (typeof this.purchaseRepo.updatePaymentSync === "function") {
@@ -370,10 +396,11 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         id,
         paidAmount,
         remainingAmount,
+        paymentStatus,
       );
       return;
     }
     // Backward-compatible fallback for repositories exposing async signatures only.
-    await this.purchaseRepo.updatePayment(id, paidAmount, remainingAmount);
+    await this.purchaseRepo.updatePayment(id, paidAmount, remainingAmount, paymentStatus);
   }
 }

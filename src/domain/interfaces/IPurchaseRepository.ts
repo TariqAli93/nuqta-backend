@@ -22,10 +22,12 @@ export interface IPurchaseRepository {
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    paymentStatus?: "unpaid" | "partially_paid" | "paid",
   ): Promise<void>;
   updatePaymentSync?(
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    paymentStatus?: "unpaid" | "partially_paid" | "paid",
   ): Promise<void>;
 }

@@ -81,6 +81,10 @@ const SaleSchema = {
     paidAmount: { type: "integer" },
     refundedAmount: { type: "integer" },
     remainingAmount: { type: "integer" },
+    paymentStatus: {
+      type: "string",
+      enum: ["unpaid", "partially_paid", "paid"],
+    },
     status: {
       type: "string",
       enum: ["pending", "completed", "cancelled", "refunded", "partial_refund"],
@@ -445,6 +449,7 @@ const sales: FastifyPluginAsync = async (fastify) => {
         fastify.repos.settings,
         fastify.repos.audit,
         fastify.repos.accountingSettings,
+        fastify.repos.salesInvoicePayment,
       );
       const result = await uc.execute({ saleId, ...body }, userId);
       return { ok: true, data: result };

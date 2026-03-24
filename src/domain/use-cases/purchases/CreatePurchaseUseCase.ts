@@ -174,6 +174,18 @@ export class CreatePurchaseUseCase extends WriteUseCase<
       total,
       paidAmount,
       remainingAmount,
+      paymentStatus:
+        remainingAmount <= 0
+          ? "paid"
+          : paidAmount > 0
+            ? "partially_paid"
+            : "unpaid",
+      paymentModeAtCreation:
+        remainingAmount <= 0
+          ? "cash"
+          : paidAmount > 0
+            ? "partial"
+            : "credit",
       currency: input.currency || "IQD",
       exchangeRate: 1,
       status: remainingAmount <= 0 ? "completed" : "pending",

@@ -28,6 +28,12 @@ export const PurchaseSchema = z.object({
   total: z.number().int().min(0),
   paidAmount: z.number().int().default(0),
   remainingAmount: z.number().int().default(0),
+  paymentStatus: z
+    .enum(["unpaid", "partially_paid", "paid"])
+    .default("unpaid"),
+  paymentModeAtCreation: z
+    .enum(["cash", "credit", "partial"])
+    .default("credit"),
   currency: z.string().default("IQD"),
   exchangeRate: z.number().default(1),
   status: z

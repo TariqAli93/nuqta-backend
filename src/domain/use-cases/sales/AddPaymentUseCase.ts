@@ -6,6 +6,7 @@ import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
 import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSettingsRepository.js";
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
+import { ISalesInvoicePaymentRepository } from "../../interfaces/IInvoicePaymentRepository.js";
 import {
   NotFoundError,
   InvalidStateError,
@@ -55,6 +56,7 @@ export class AddPaymentUseCase extends WriteUseCase<
     private settingsRepo?: ISettingsRepository,
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
+    private salesInvoicePaymentRepo?: ISalesInvoicePaymentRepository,
   ) {
     super();
     if (auditRepo) {
@@ -182,16 +184,39 @@ export class AddPaymentUseCase extends WriteUseCase<
 
       const newStatus = newRemainingAmount <= 0 ? "completed" : "pending";
 
+      const newPaymentStatus: "unpaid" | "partially_paid" | "paid" =
+        newRemainingAmount <= 0
+          ? "paid"
+          : newPaidAmount > 0
+            ? "partially_paid"
+            : "unpaid";
+
       await this.saleRepo.update(
         sale.id!,
         {
           paidAmount: newPaidAmount,
           remainingAmount: newRemainingAmount,
           status: newStatus,
+          paymentStatus: newPaymentStatus,
           updatedAt: new Date(),
         },
         tx,
       );
+
+      if (this.salesInvoicePaymentRepo) {
+        await this.salesInvoicePaymentRepo.create(
+          {
+            invoiceId: sale.id!,
+            customerId: sale.customerId || input.customerId || undefined,
+            amount: actualPaymentAmount,
+            paymentMethod: input.paymentMethod || "cash",
+            reference: input.referenceNumber,
+            notes: input.notes,
+            paymentDate: new Date().toISOString(),
+          },
+          tx,
+        );
+      }
 
       if (ledgersEnabled && effectiveCustomerId) {
         const balanceBefore = await this.customerLedgerRepo.getLastBalanceSync(

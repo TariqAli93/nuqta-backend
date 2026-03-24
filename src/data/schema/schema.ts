@@ -185,6 +185,7 @@ export const sales = pgTable("sales", {
   paidAmount: integer("paid_amount").default(0),
   refundedAmount: integer("refunded_amount").default(0),
   remainingAmount: integer("remaining_amount").default(0),
+  paymentStatus: text("payment_status").notNull().default("unpaid"),
   status: text("status").notNull().default("pending"),
   notes: text("notes"),
   idempotencyKey: text("idempotency_key").unique(),
@@ -263,6 +264,8 @@ export const purchases = pgTable(
     total: integer("total").notNull(),
     paidAmount: integer("paid_amount").default(0),
     remainingAmount: integer("remaining_amount").default(0),
+    paymentStatus: text("payment_status").notNull().default("unpaid"),
+    paymentModeAtCreation: text("payment_mode_at_creation").notNull().default("credit"),
     currency: text("currency").notNull().default("IQD"),
     exchangeRate: real("exchange_rate").default(1),
     status: text("status").notNull().default("pending"),
@@ -879,4 +882,50 @@ export const revokedTokens = pgTable(
     }).notNull(),
   },
   (table) => [index("idx_revoked_tokens_expires_at").on(table.expiresAt)],
+);
+
+// ═══════════════════════════════════════════════════════════════
+// SALES INVOICE PAYMENTS (AR — dedicated payment records)
+// ═══════════════════════════════════════════════════════════════
+
+export const salesInvoicePayments = pgTable(
+  "sales_invoice_payments",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id").notNull(),
+    customerId: integer("customer_id"),
+    amount: integer("amount").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    reference: text("reference"),
+    notes: text("notes"),
+    paymentDate: timestamp("payment_date", { mode: "string" }).defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    index("idx_sip_invoice").on(table.invoiceId),
+    index("idx_sip_customer").on(table.customerId),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE INVOICE PAYMENTS (AP — dedicated payment records)
+// ═══════════════════════════════════════════════════════════════
+
+export const purchaseInvoicePayments = pgTable(
+  "purchase_invoice_payments",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id").notNull(),
+    supplierId: integer("supplier_id"),
+    amount: integer("amount").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    reference: text("reference"),
+    notes: text("notes"),
+    paymentDate: timestamp("payment_date", { mode: "string" }).defaultNow(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    index("idx_pip_invoice").on(table.invoiceId),
+    index("idx_pip_supplier").on(table.supplierId),
+  ],
 );

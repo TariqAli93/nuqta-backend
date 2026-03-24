@@ -126,10 +126,20 @@ export class PurchaseRepository implements IPurchaseRepository {
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    paymentStatus?: "unpaid" | "partially_paid" | "paid",
   ): Promise<void> {
+    const updateData: Record<string, unknown> = {
+      paidAmount,
+      remainingAmount,
+      updatedAt: new Date(),
+    };
+    if (paymentStatus !== undefined) {
+      updateData.paymentStatus = paymentStatus;
+      updateData.status = remainingAmount <= 0 ? "completed" : "pending";
+    }
     await this.db
       .update(purchases)
-      .set({ paidAmount, remainingAmount, updatedAt: new Date() } as any)
+      .set(updateData as any)
       .where(eq(purchases.id, id));
   }
 
@@ -137,8 +147,9 @@ export class PurchaseRepository implements IPurchaseRepository {
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    paymentStatus?: "unpaid" | "partially_paid" | "paid",
   ): Promise<void> {
-    return this.updatePayment(id, paidAmount, remainingAmount);
+    return this.updatePayment(id, paidAmount, remainingAmount, paymentStatus);
   }
 
   // ── Helpers ───────────────────────────────────────────────────
