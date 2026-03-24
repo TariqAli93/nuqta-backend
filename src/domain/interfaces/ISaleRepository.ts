@@ -9,6 +9,7 @@ export interface ISaleRepository {
   findAll(params?: {
     page: number;
     limit: number;
+    customerId?: number;
     startDate?: string;
     endDate?: string;
   }): Promise<{

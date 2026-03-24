@@ -65,10 +65,13 @@ export class SaleRepository implements ISaleRepository {
   async findAll(params?: {
     page: number;
     limit: number;
+    customerId?: number;
     startDate?: string;
     endDate?: string;
   }): Promise<{ items: Sale[]; total: number }> {
     const conditions: any[] = [];
+    if (params?.customerId)
+      conditions.push(eq(sales.customerId, params.customerId));
     if (params?.startDate)
       conditions.push(
         gte(sales.createdAt, new Date(params.startDate).toISOString()),

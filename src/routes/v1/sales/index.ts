@@ -103,6 +103,11 @@ const SaleListQuerySchema = {
   properties: {
     page: { type: "string", pattern: "^\\d+$" },
     limit: { type: "string", pattern: "^\\d+$" },
+    customerId: {
+      type: "string",
+      pattern: "^\\d+$",
+      description: "Filter by customer",
+    },
     startDate: {
       type: "string",
       format: "date",
@@ -360,14 +365,19 @@ const sales: FastifyPluginAsync = async (fastify) => {
       const query = request.query as {
         page?: string;
         limit?: string;
+        customerId?: string;
         startDate?: string;
         endDate?: string;
       };
       const page = query.page ? parseInt(query.page, 10) : 1;
       const limit = query.limit ? parseInt(query.limit, 10) : 20;
+      const customerId = query.customerId
+        ? parseInt(query.customerId, 10)
+        : undefined;
       const result = await fastify.repos.sale.findAll({
         page,
         limit,
+        customerId,
         startDate: query.startDate,
         endDate: query.endDate,
       });
