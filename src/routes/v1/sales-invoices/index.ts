@@ -45,10 +45,6 @@ const SalesInvoiceSchema = {
       type: "string",
       enum: ["unpaid", "partially_paid", "paid"],
     },
-    paymentModeAtCreation: {
-      type: "string",
-      enum: ["cash", "credit", "partial"],
-    },
     currency: { type: "string" },
     status: { type: "string" },
     notes: { type: "string", nullable: true },

@@ -11,7 +11,6 @@ import {
 import {
   ErrorResponses,
   successEnvelope,
-  successPaginatedEnvelope,
 } from "../../../shared/schema-helpers.js";
 import { requirePermission } from "../../../middleware/rbac.js";
 
