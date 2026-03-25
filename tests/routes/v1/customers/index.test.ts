@@ -151,7 +151,63 @@ describe("/api/v1/customers", () => {
     expectError(response, 404, "NOT_FOUND");
   });
 
-  // ── Covers L29-32: limit/page/nested-limit ternary fallback branches ──
+  // ── Customer totalDebt ledger consistency ──────────────────────────────────
+  // totalDebt in list and detail must come from the customer ledger, not the
+  // stale customers.total_debt column.
+
+  describe("totalDebt is derived from customer ledger", () => {
+    test("GET /customers list: totalDebt reflects ledger balance (not stale column)", async () => {
+      // Simulate a customer whose stale column value would differ from the ledger
+      const staleCustomer = { ...customer, totalDebt: 9999 };
+      const ledgerBalance = 20000;
+
+      ctx.repos.customer.findAll = async () => ({
+        items: [{ ...staleCustomer, totalDebt: ledgerBalance }],
+        total: 1,
+      });
+
+      const response = await ctx.app.inject({
+        method: "GET",
+        url: "/api/v1/customers",
+        headers: ctx.authHeaders(),
+      });
+
+      const data = expectOk<{ items: typeof customer[]; total: number }>(response);
+      expect(data.items[0].totalDebt).toBe(ledgerBalance);
+    });
+
+    test("GET /customers/:id detail: totalDebt reflects ledger balance (not stale column)", async () => {
+      const ledgerBalance = 35000;
+
+      ctx.repos.customer.findById = async () => ({ ...customer, totalDebt: ledgerBalance });
+
+      const response = await ctx.app.inject({
+        method: "GET",
+        url: `/api/v1/customers/${customer.id}`,
+        headers: ctx.authHeaders(),
+      });
+
+      const data = expectOk<typeof customer>(response);
+      expect(data.totalDebt).toBe(ledgerBalance);
+    });
+
+    test("GET /customers list: totalDebt is 0 when no ledger entries exist", async () => {
+      ctx.repos.customer.findAll = async () => ({
+        items: [{ ...customer, totalDebt: 0 }],
+        total: 1,
+      });
+
+      const response = await ctx.app.inject({
+        method: "GET",
+        url: "/api/v1/customers",
+        headers: ctx.authHeaders(),
+      });
+
+      const data = expectOk<{ items: typeof customer[]; total: number }>(response);
+      expect(data.items[0].totalDebt).toBe(0);
+    });
+  });
+
   test("GET /customers without optional query params hits default fallbacks", async () => {
     ctx.repos.customer.findAll = async () => ({ items: [], total: 0 });
 

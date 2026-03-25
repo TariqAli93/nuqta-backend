@@ -244,7 +244,15 @@ export class CreatePurchaseUseCase extends WriteUseCase<
         );
       }
 
-      if (ledgersEnabled && remainingAmount > 0) {
+      if (ledgersEnabled) {
+        // Event-based ledger: always record the full purchase amount,
+        // then record any upfront payment as a separate event.
+        // This keeps the audit trail clear and the net balance correct:
+        //   net balance change = total - paidAmount = remainingAmount
+        //
+        // Previously this block was guarded by `remainingAmount > 0`, which:
+        //   - broke the audit trail for partial payments (mixed model)
+        //   - skipped ledger entries entirely for fully-paid purchases
         const balanceBefore =
           await this.supplierLedgerRepository.getLastBalanceSync(
             createdPurchase.supplierId,
@@ -254,14 +262,29 @@ export class CreatePurchaseUseCase extends WriteUseCase<
           {
             supplierId: createdPurchase.supplierId,
             transactionType: "purchase",
-            amount: remainingAmount,
-            balanceAfter: balanceBefore + remainingAmount,
+            amount: total,
+            balanceAfter: balanceBefore + total,
             purchaseId: createdPurchase.id,
             notes: `Purchase #${createdPurchase.invoiceNumber}`,
             createdBy: numUserId,
           },
           tx,
         );
+
+        if (paidAmount > 0) {
+          await this.supplierLedgerRepository.createSync(
+            {
+              supplierId: createdPurchase.supplierId,
+              transactionType: "payment",
+              amount: -paidAmount,
+              balanceAfter: balanceBefore + total - paidAmount,
+              purchaseId: createdPurchase.id,
+              notes: `Initial payment for purchase #${createdPurchase.invoiceNumber}`,
+              createdBy: numUserId,
+            },
+            tx,
+          );
+        }
       }
 
       if (accountingEnabled) {
