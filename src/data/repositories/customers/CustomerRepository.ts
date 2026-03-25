@@ -77,10 +77,10 @@ export class CustomerRepository implements ICustomerRepository {
       notes: row.notes,
       totalPurchases: row.totalPurchases ?? 0,
       totalDebt: row.ledgerDebt ?? 0,
-      isActive: row.isActive,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      createdBy: row.createdBy,
+      isActive: row.isActive ?? false,
+      createdAt: row.createdAt ?? undefined,
+      updatedAt: row.updatedAt ?? undefined,
+      createdBy: row.createdBy ?? undefined,
     }));
     return { items, total };
   }
