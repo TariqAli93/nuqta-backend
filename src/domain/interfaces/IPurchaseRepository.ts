@@ -14,18 +14,20 @@ export interface IPurchaseRepository {
     limit?: number;
     offset?: number;
   }): Promise<{ items: Purchase[]; total: number }>;
-  findById(id: number): Promise<Purchase | null>;
-  findByIdSync?(id: number): Promise<Purchase | null>;
-  updateStatus(id: number, status: string): Promise<void>;
-  updateStatusSync?(id: number, status: string): Promise<void>;
+  findById(id: number, tx?: TxOrDb): Promise<Purchase | null>;
+  findByIdSync?(id: number, tx?: TxOrDb): Promise<Purchase | null>;
+  updateStatus(id: number, status: string, tx?: TxOrDb): Promise<void>;
+  updateStatusSync?(id: number, status: string, tx?: TxOrDb): Promise<void>;
   updatePayment(
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    tx?: TxOrDb,
   ): Promise<void>;
   updatePaymentSync?(
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    tx?: TxOrDb,
   ): Promise<void>;
 }

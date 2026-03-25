@@ -200,11 +200,14 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         tx,
       );
 
-      // Also update purchase status atomically within the same transaction
-      if (typeof this.purchaseRepo.updateStatusSync === "function") {
-        await this.purchaseRepo.updateStatusSync(input.purchaseId, newStatus);
-      } else if (typeof this.purchaseRepo.updateStatus === "function") {
-        await this.purchaseRepo.updateStatus(input.purchaseId, newStatus);
+      // Only advance status to "completed" on full payment; never regress a
+      // received/partial purchase back to "pending" on a partial payment.
+      if (newRemainingAmount <= 0) {
+        if (typeof this.purchaseRepo.updateStatusSync === "function") {
+          await this.purchaseRepo.updateStatusSync(input.purchaseId, newStatus, tx);
+        } else if (typeof this.purchaseRepo.updateStatus === "function") {
+          await this.purchaseRepo.updateStatus(input.purchaseId, newStatus, tx);
+        }
       }
 
       if (ledgersEnabled && supplierId) {
@@ -359,30 +362,29 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     );
   }
 
-  private async findPurchaseSync(id: number, _tx?: TxOrDb): Promise<Purchase | null> {
+  private async findPurchaseSync(id: number, tx?: TxOrDb): Promise<Purchase | null> {
     if (typeof this.purchaseRepo.findByIdSync === "function") {
-      return await this.purchaseRepo.findByIdSync(id);
+      return await this.purchaseRepo.findByIdSync(id, tx);
     }
-    throw new InvalidStateError(
-      "Purchase repository must support synchronous findById for transactional payments",
-    );
+    return await this.purchaseRepo.findById(id, tx);
   }
 
   private async updatePurchasePaymentSync(
     id: number,
     paidAmount: number,
     remainingAmount: number,
-    _tx?: TxOrDb,
+    tx?: TxOrDb,
   ): Promise<void> {
     if (typeof this.purchaseRepo.updatePaymentSync === "function") {
       await this.purchaseRepo.updatePaymentSync(
         id,
         paidAmount,
         remainingAmount,
+        tx,
       );
       return;
     }
     // Backward-compatible fallback for repositories exposing async signatures only.
-    await this.purchaseRepo.updatePayment(id, paidAmount, remainingAmount);
+    await this.purchaseRepo.updatePayment(id, paidAmount, remainingAmount, tx);
   }
 }

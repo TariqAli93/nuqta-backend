@@ -98,36 +98,37 @@ export class PurchaseRepository implements IPurchaseRepository {
     return { items, total };
   }
 
-  async findById(id: number): Promise<Purchase | null> {
-    const [row] = await this.db
+  async findById(id: number, tx?: TxOrDb): Promise<Purchase | null> {
+    const [row] = await this.c(tx)
       .select()
       .from(purchases)
       .where(eq(purchases.id, id));
     if (!row) return null;
-    return this.mapPurchaseWithDetails(row);
+    return this.mapPurchaseWithDetails(row, tx);
   }
 
-  async findByIdSync(id: number): Promise<Purchase | null> {
-    return this.findById(id);
+  async findByIdSync(id: number, tx?: TxOrDb): Promise<Purchase | null> {
+    return this.findById(id, tx);
   }
 
-  async updateStatus(id: number, status: string): Promise<void> {
-    await this.db
+  async updateStatus(id: number, status: string, tx?: TxOrDb): Promise<void> {
+    await this.c(tx)
       .update(purchases)
       .set({ status, updatedAt: new Date() } as any)
       .where(eq(purchases.id, id));
   }
 
-  async updateStatusSync(id: number, status: string): Promise<void> {
-    return this.updateStatus(id, status);
+  async updateStatusSync(id: number, status: string, tx?: TxOrDb): Promise<void> {
+    return this.updateStatus(id, status, tx);
   }
 
   async updatePayment(
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    tx?: TxOrDb,
   ): Promise<void> {
-    await this.db
+    await this.c(tx)
       .update(purchases)
       .set({ paidAmount, remainingAmount, updatedAt: new Date() } as any)
       .where(eq(purchases.id, id));
@@ -137,14 +138,16 @@ export class PurchaseRepository implements IPurchaseRepository {
     id: number,
     paidAmount: number,
     remainingAmount: number,
+    tx?: TxOrDb,
   ): Promise<void> {
-    return this.updatePayment(id, paidAmount, remainingAmount);
+    return this.updatePayment(id, paidAmount, remainingAmount, tx);
   }
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private async mapPurchaseWithDetails(row: any): Promise<Purchase> {
-    const items = await this.db
+  private async mapPurchaseWithDetails(row: any, tx?: TxOrDb): Promise<Purchase> {
+    const client = this.c(tx);
+    const items = await client
       .select()
       .from(purchaseItems)
       .where(eq(purchaseItems.purchaseId, row.id));
@@ -153,7 +156,7 @@ export class PurchaseRepository implements IPurchaseRepository {
     const enrichedItems = await Promise.all(
       items.map(async (item) => {
         if (item.batchId) {
-          const [batch] = await this.db
+          const [batch] = await client
             .select()
             .from(productBatches)
             .where(eq(productBatches.id, item.batchId));
@@ -166,12 +169,12 @@ export class PurchaseRepository implements IPurchaseRepository {
       }),
     );
 
-    const paymentRows = await this.db
+    const paymentRows = await client
       .select()
       .from(payments)
       .where(eq(payments.purchaseId, row.id));
 
-    const movementRows = await this.db
+    const movementRows = await client
       .select()
       .from(inventoryMovements)
       .where(
