@@ -51,7 +51,9 @@ export class CustomerRepository implements ICustomerRepository {
         city: customers.city,
         notes: customers.notes,
         totalPurchases: customers.totalPurchases,
-        totalDebt: this.ledgerBalanceExpr,
+        // Use a distinct alias so the ledger-derived balance never collides
+        // with the stale customers.total_debt column.
+        ledgerDebt: this.ledgerBalanceExpr,
         isActive: customers.isActive,
         createdAt: customers.createdAt,
         updatedAt: customers.updatedAt,
@@ -63,12 +65,28 @@ export class CustomerRepository implements ICustomerRepository {
     if (params?.limit) query = query.limit(params.limit);
     if (params?.offset) query = query.offset(params.offset);
 
-    const items = await query;
-    return { items: items as unknown as Customer[], total };
+    const rows = await query;
+    // Explicitly map ledgerDebt → totalDebt so the API never exposes the
+    // stale customers.total_debt field.
+    const items: Customer[] = rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      address: row.address,
+      city: row.city,
+      notes: row.notes,
+      totalPurchases: row.totalPurchases ?? 0,
+      totalDebt: row.ledgerDebt ?? 0,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      createdBy: row.createdBy,
+    }));
+    return { items, total };
   }
 
   async findById(id: number): Promise<Customer | null> {
-    const [item] = await this.db
+    const [row] = await this.db
       .select({
         id: customers.id,
         name: customers.name,
@@ -77,7 +95,7 @@ export class CustomerRepository implements ICustomerRepository {
         city: customers.city,
         notes: customers.notes,
         totalPurchases: customers.totalPurchases,
-        totalDebt: this.ledgerBalanceExpr,
+        ledgerDebt: this.ledgerBalanceExpr,
         isActive: customers.isActive,
         createdAt: customers.createdAt,
         updatedAt: customers.updatedAt,
@@ -85,7 +103,21 @@ export class CustomerRepository implements ICustomerRepository {
       })
       .from(customers)
       .where(eq(customers.id, id));
-    return (item as unknown as Customer) || null;
+    if (!row) return null;
+    return {
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      address: row.address,
+      city: row.city,
+      notes: row.notes,
+      totalPurchases: row.totalPurchases ?? 0,
+      totalDebt: row.ledgerDebt ?? 0,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      createdBy: row.createdBy,
+    } as Customer;
   }
 
   async create(customer: Customer): Promise<Customer> {
