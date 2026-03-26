@@ -1,11 +1,3 @@
-/**
- * Environment configuration validation.
- *
- * Parsed and validated at module load time — before Fastify initialises.
- * If any required variable is missing or invalid the process exits with
- * a clear diagnostic message so deployment failures are caught immediately.
- */
-
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -13,7 +5,7 @@ import { z } from "zod";
 
 // Ensure .env is loaded before validation regardless of import order.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const isProd = process.env.NODE_ENV === "production";
 
