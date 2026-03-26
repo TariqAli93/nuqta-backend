@@ -21,6 +21,7 @@ export * from "./repositories/departments/DepartmentRepository.js";
 export * from "./repositories/employees/EmployeeRepository.js";
 export * from "./repositories/inventory/InventoryRepository.js";
 export * from "./repositories/payments/PaymentRepository.js";
+export * from "./repositories/payments/PaymentAllocationRepository.js";
 export * from "./repositories/payroll/PayrollRepository.js";
 export * from "./repositories/posting/PostingRepository.js";
 export * from "./repositories/products/ProductRepository.js";

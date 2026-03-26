@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, sql, desc, asc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, asc, or, ne } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import type { TxOrDb } from "../../db/transaction.js";
 import {
@@ -61,6 +61,28 @@ export class SaleRepository implements ISaleRepository {
       .where(eq(sales.idempotencyKey, key));
     if (!row) return null;
     return this.mapSaleWithDetails(row);
+  }
+
+  async findOpenByCustomerId(customerId: number, tx?: TxOrDb): Promise<Sale[]> {
+    const client = this.c(tx);
+    const rows = await client
+      .select()
+      .from(sales)
+      .where(
+        and(
+          eq(sales.customerId, customerId),
+          ne(sales.status, "cancelled"),
+          ne(sales.status, "refunded"),
+          sql`${sales.remainingAmount} > 0`,
+        ),
+      )
+      .orderBy(asc(sales.createdAt), asc(sales.id));
+
+    return rows.map((row) => ({
+      ...row,
+      items: [],
+      paymentStatus: derivePaymentStatus(row.paidAmount ?? 0, row.total ?? 0),
+    })) as unknown as Sale[];
   }
 
   async findAll(params?: {

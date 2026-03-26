@@ -14,6 +14,7 @@ import type {
   DepartmentRepository,
   EmployeeRepository,
   InventoryRepository,
+  PaymentAllocationRepository,
   PaymentRepository,
   PayrollRepository,
   PosSettingsRepository,
@@ -42,6 +43,7 @@ export interface Repositories {
   sale: SaleRepository;
   purchase: PurchaseRepository;
   payment: PaymentRepository;
+  paymentAllocation: PaymentAllocationRepository;
   inventory: InventoryRepository;
   settings: SettingsRepository;
   systemSettings: SystemSettingsRepository;
@@ -80,6 +82,7 @@ export default fp<AppOptions>(async (fastify, opts) => {
       sale: new data.SaleRepository(connection),
       purchase: new data.PurchaseRepository(connection),
       payment: new data.PaymentRepository(connection),
+      paymentAllocation: new data.PaymentAllocationRepository(connection),
       inventory: new data.InventoryRepository(connection),
       settings: new data.SettingsRepository(connection),
       systemSettings: new data.SystemSettingsRepository(connection),

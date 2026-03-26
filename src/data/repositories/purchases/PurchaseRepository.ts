@@ -8,7 +8,11 @@ import {
   inventoryMovements,
   productBatches,
 } from "../../schema/schema.js";
-import { IPurchaseRepository, Purchase, derivePaymentStatus } from "../../../domain/index.js";
+import {
+  IPurchaseRepository,
+  Purchase,
+  derivePaymentStatus,
+} from "../../../domain/index.js";
 
 export class PurchaseRepository implements IPurchaseRepository {
   constructor(private db: DbConnection) {}
@@ -118,7 +122,11 @@ export class PurchaseRepository implements IPurchaseRepository {
       .where(eq(purchases.id, id));
   }
 
-  async updateStatusSync(id: number, status: string, tx?: TxOrDb): Promise<void> {
+  async updateStatusSync(
+    id: number,
+    status: string,
+    tx?: TxOrDb,
+  ): Promise<void> {
     return this.updateStatus(id, status, tx);
   }
 
@@ -145,7 +153,10 @@ export class PurchaseRepository implements IPurchaseRepository {
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private async mapPurchaseWithDetails(row: any, tx?: TxOrDb): Promise<Purchase> {
+  private async mapPurchaseWithDetails(
+    row: any,
+    tx?: TxOrDb,
+  ): Promise<Purchase> {
     const client = this.c(tx);
     const items = await client
       .select()

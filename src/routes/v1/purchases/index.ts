@@ -13,6 +13,26 @@ import {
 } from "../../../shared/schema-helpers.js";
 import { requirePermission } from "../../../middleware/rbac.js";
 
+const PaymentSchema = {
+  type: "object" as const,
+  properties: {
+    id: { type: "integer" },
+    purchaseId: { type: "integer", nullable: true },
+    saleId: { type: "integer", nullable: true },
+    customerId: { type: "integer", nullable: true },
+    supplierId: { type: "integer", nullable: true },
+    amount: { type: "integer" },
+    notes: { type: "string", nullable: true },
+    paymentDate: { type: "string", format: "date-time", nullable: true },
+    paymentMethod: { type: "string", nullable: true },
+    referenceNumber: { type: "string", nullable: true },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time", nullable: true },
+    createdBy: { type: "integer", nullable: true },
+  },
+  required: ["id", "amount", "createdAt"],
+} as const;
+
 const PurchaseItemSchema = {
   type: "object" as const,
   properties: {
@@ -91,13 +111,25 @@ const PurchaseListQuerySchema = {
   type: "object" as const,
   properties: {
     search: { type: "string", description: "Search by invoice number" },
-    supplierId: { type: "string", pattern: "^\\d+$", description: "Filter by supplier ID" },
+    supplierId: {
+      type: "string",
+      pattern: "^\\d+$",
+      description: "Filter by supplier ID",
+    },
     status: {
       type: "string",
       enum: ["pending", "completed", "cancelled", "received", "partial"],
     },
-    dateFrom: { type: "string", format: "date", description: "Filter from date (inclusive)" },
-    dateTo: { type: "string", format: "date", description: "Filter to date (inclusive)" },
+    dateFrom: {
+      type: "string",
+      format: "date",
+      description: "Filter from date (inclusive)",
+    },
+    dateTo: {
+      type: "string",
+      format: "date",
+      description: "Filter to date (inclusive)",
+    },
     limit: { type: "string", pattern: "^\\d+$" },
     offset: { type: "string", pattern: "^\\d+$" },
   },
@@ -116,9 +148,9 @@ const CreatePurchaseItemSchema = {
     unitCost: { type: "integer", minimum: 0 },
     lineSubtotal: { type: "integer", minimum: 0 },
     discount: { type: "integer", minimum: 0 },
-    batchId: { type: "integer" },
-    batchNumber: { type: "string" },
-    expiryDate: { type: "string", format: "date-time" },
+    batchId: { type: "integer", nullable: true },
+    batchNumber: { type: "string", nullable: true },
+    expiryDate: { type: "string", nullable: true, format: "date-time" },
   },
 };
 
@@ -231,7 +263,9 @@ const purchases: FastifyPluginAsync = async (fastify) => {
       };
       const data = await fastify.repos.purchase.findAll({
         search: query.search,
-        supplierId: query.supplierId ? parseInt(query.supplierId, 10) : undefined,
+        supplierId: query.supplierId
+          ? parseInt(query.supplierId, 10)
+          : undefined,
         status: query.status,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
