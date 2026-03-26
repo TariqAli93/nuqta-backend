@@ -345,6 +345,25 @@ export const payments = pgTable(
 );
 
 // ═══════════════════════════════════════════════════════════════
+// PAYMENT ALLOCATIONS (Invoice Settlement Tracking)
+// ═══════════════════════════════════════════════════════════════
+
+export const paymentAllocations = pgTable(
+  "payment_allocations",
+  {
+    id: serial("id").primaryKey(),
+    paymentId: integer("payment_id").notNull(),
+    saleId: integer("sale_id").notNull(),
+    amount: integer("amount").notNull(),
+    createdAt: timestamp("created_at", { mode: "string" }).defaultNow(),
+  },
+  (table) => [
+    index("idx_payment_alloc_payment").on(table.paymentId),
+    index("idx_payment_alloc_sale").on(table.saleId),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════════════
 // INVENTORY MOVEMENTS (Stock Ledger)
 // ═══════════════════════════════════════════════════════════════
 

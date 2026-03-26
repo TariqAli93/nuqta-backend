@@ -18,7 +18,15 @@ const CustomerLedgerEntrySchema = {
     customerId: { type: "integer" },
     transactionType: {
       type: "string",
-      enum: ["sale", "payment", "opening_balance", "adjustment", "cancellation", "refund", "payment_reversal"],
+      enum: [
+        "sale",
+        "payment",
+        "opening_balance",
+        "adjustment",
+        "cancellation",
+        "refund",
+        "payment_reversal",
+      ],
     },
     amount: { type: "integer" },
     balanceAfter: { type: "integer" },
@@ -198,6 +206,8 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
         fastify.repos.customerLedger,
         fastify.repos.customer,
         fastify.repos.payment,
+        fastify.repos.sale,
+        fastify.repos.paymentAllocation,
         fastify.repos.accounting,
         fastify.repos.audit,
         fastify.repos.settings,
@@ -238,7 +248,8 @@ const customerLedger: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("ledger:adjust"),
     },
     async (request) => {
-      const { repair: repairQuery } = (request.query as { repair?: string }) || {};
+      const { repair: repairQuery } =
+        (request.query as { repair?: string }) || {};
       const bodyRepair = (request.body as { repair?: boolean } | null)?.repair;
       const repair = repairQuery === "true" || bodyRepair === true;
       const uc = new ReconcileCustomerDebtUseCase(

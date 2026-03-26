@@ -6,6 +6,11 @@ export interface ISaleRepository {
   create(sale: Sale, tx?: TxOrDb): Promise<Sale>;
   findById(id: number, tx?: TxOrDb): Promise<Sale | null>;
   findByIdempotencyKey(key: string): Promise<Sale | null>;
+  /**
+   * Fetch open (unpaid/partial) invoices for a customer, ordered FIFO
+   * (createdAt ASC, id ASC). Used by customer-profile payment settlement.
+   */
+  findOpenByCustomerId(customerId: number, tx?: TxOrDb): Promise<Sale[]>;
   findAll(params?: {
     page: number;
     limit: number;

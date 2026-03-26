@@ -71,6 +71,7 @@ function createMockRepos(): RepoMap {
     },
     purchase: {},
     payment: {},
+    paymentAllocation: {},
     inventory: {},
     settings: {},
     systemSettings: {},

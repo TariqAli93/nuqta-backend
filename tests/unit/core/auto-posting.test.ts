@@ -330,6 +330,24 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
       findByIdempotencyKey: vi.fn(async () => null),
       createSync: vi.fn(async (p: any) => ({ id: 66, ...p })),
     };
+    const saleRepo = {
+      findOpenByCustomerId: vi.fn(async () => [
+        {
+          id: 1,
+          invoiceNumber: "INV-001",
+          total: 50000,
+          paidAmount: 0,
+          remainingAmount: 50000,
+          status: "pending",
+          currency: "IQD",
+        },
+      ]),
+      update: vi.fn(async () => {}),
+    };
+    const paymentAllocationRepo = {
+      create: vi.fn(async (a: any) => ({ id: 1, ...a })),
+      findByPaymentId: vi.fn(async () => []),
+    };
     const accountingRepo = {
       findAccountByCode: vi.fn(async (code: string) => {
         if (code === "1001") return { id: 101, code: "1001" };
@@ -352,13 +370,17 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
       get: vi.fn(async () => ({ autoPosting })),
       update: vi.fn(),
     };
+    const mockDb = { transaction: (fn: any) => fn(mockDb) } as any;
     return {
       customerLedgerRepo,
       customerRepo,
       paymentRepo,
+      saleRepo,
+      paymentAllocationRepo,
       accountingRepo,
       settingsRepo,
       accountingSettingsRepo,
+      mockDb,
     };
   }
 
@@ -368,10 +390,13 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
       deps.customerLedgerRepo as any,
       deps.customerRepo as any,
       deps.paymentRepo as any,
+      deps.saleRepo as any,
+      deps.paymentAllocationRepo as any,
       deps.accountingRepo as any,
       undefined, // auditRepo
       deps.settingsRepo as any,
       deps.accountingSettingsRepo as any,
+      deps.mockDb,
     );
 
     await uc.executeCommitPhase(
@@ -381,6 +406,7 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: true }),
+      expect.anything(),
     );
   });
 
@@ -390,10 +416,13 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
       deps.customerLedgerRepo as any,
       deps.customerRepo as any,
       deps.paymentRepo as any,
+      deps.saleRepo as any,
+      deps.paymentAllocationRepo as any,
       deps.accountingRepo as any,
       undefined,
       deps.settingsRepo as any,
       deps.accountingSettingsRepo as any,
+      deps.mockDb,
     );
 
     await uc.executeCommitPhase(
@@ -403,6 +432,7 @@ describe("RecordCustomerPaymentUseCase auto-posting", () => {
 
     expect(deps.accountingRepo.createJournalEntrySync).toHaveBeenCalledWith(
       expect.objectContaining({ isPosted: false }),
+      expect.anything(),
     );
   });
 });

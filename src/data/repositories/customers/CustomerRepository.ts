@@ -17,11 +17,15 @@ export class CustomerRepository implements ICustomerRepository {
   // limits (≤100 rows), this is acceptable without adding a lateral join.
   private get ledgerBalanceExpr() {
     return sql<number>`COALESCE(
-      (SELECT cl.balance_after FROM customer_ledger cl
-       WHERE cl.customer_id = ${customers.id}
-       ORDER BY cl.id DESC LIMIT 1),
-      0
-    )`;
+    (
+      SELECT cl.balance_after
+      FROM customer_ledger cl
+      WHERE cl.customer_id = ${sql.raw('"customers"."id"')}
+      ORDER BY cl.id DESC
+      LIMIT 1
+    ),
+    0
+  )`;
   }
 
   async findAll(params?: {
@@ -66,8 +70,7 @@ export class CustomerRepository implements ICustomerRepository {
     if (params?.offset) query = query.offset(params.offset);
 
     const rows = await query;
-    // Explicitly map ledgerDebt → totalDebt so the API never exposes the
-    // stale customers.total_debt field.
+
     const items: Customer[] = rows.map((row) => ({
       id: row.id,
       name: row.name,
