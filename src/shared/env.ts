@@ -44,7 +44,7 @@ const envSchema = z.object({
   // RS256 keys — required when JWT_ALGORITHM is RS256
   JWT_PRIVATE_KEY: z.string().optional(),
   JWT_PUBLIC_KEY: z.string().optional(),
-  CORS_ORIGIN: z.string().url().default("http://localhost:5173"),
+  CORS_ORIGIN: z.string().default("*"),
 });
 
 // In the test environment, repos are injected via testOverrides — the
@@ -59,7 +59,7 @@ const result = envSchema.safeParse(
         DATABASE_URL: process.env.DATABASE_URL ?? "postgres://test",
         DB_NAME: process.env.DB_NAME ?? "test",
         JWT_SECRET: process.env.JWT_SECRET ?? "test-secret-for-vitest-only",
-        CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+        CORS_ORIGIN: process.env.CORS_ORIGIN ?? "*",
         ...process.env,
       }
     : process.env,
@@ -101,13 +101,10 @@ if (env.JWT_ALGORITHM === "RS256") {
 }
 
 // Warn if CORS_ORIGIN is set to the default in production.
-if (
-  env.NODE_ENV === "production" &&
-  env.CORS_ORIGIN === "http://localhost:5173"
-) {
+if (env.NODE_ENV === "production" && env.CORS_ORIGIN === "*") {
   console.warn(
     "⚠️   WARNING: CORS_ORIGIN is set to the default development value " +
-      '("http://localhost:5173") in a production environment. ' +
+      '("*") in a production environment. ' +
       "Please update it to the correct origin.",
   );
 }
