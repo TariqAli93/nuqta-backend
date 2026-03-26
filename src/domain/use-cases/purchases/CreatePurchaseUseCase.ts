@@ -11,6 +11,7 @@ import { IAccountingSettingsRepository } from "../../interfaces/IAccountingSetti
 import { IAuditRepository } from "../../interfaces/IAuditRepository.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
+import { syncSupplierBalance } from "../../shared/services/SupplierBalanceService.js";
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
@@ -286,6 +287,18 @@ export class CreatePurchaseUseCase extends WriteUseCase<
           );
         }
       }
+
+      // Synchronize supplier.currentBalance by the remaining (outstanding) amount.
+      // delta = remainingAmount because this is a new purchase with no prior state.
+      // Fully-paid purchases have remainingAmount=0 → no change to supplier balance.
+      // This runs unconditionally (not gated on ledgersEnabled) so the balance field
+      // stays correct even when the ledger audit trail is disabled.
+      await syncSupplierBalance(
+        this.supplierRepository,
+        createdPurchase.supplierId,
+        remainingAmount,
+        tx,
+      );
 
       if (accountingEnabled) {
         await this.createPurchaseJournalEntry(
