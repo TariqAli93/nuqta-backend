@@ -3,8 +3,12 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import { z } from "zod";
 
-// Ensure .env is loaded before validation regardless of import order.
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+console.log("ENV CHECK", {
+  cwd: process.cwd(),
+  NODE_ENV: process.env.NODE_ENV,
+  CORS_ORIGIN: process.env.CORS_ORIGIN,
+});
+
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const isProd = process.env.NODE_ENV === "production";
