@@ -4,7 +4,7 @@ import { env } from "../shared/env.js";
 
 export default fp<FastifyCorsOptions>(async (fastify) => {
   await fastify.register(cors, {
-    origin: process.env.NODE_ENV === "production" ? "*" : "*",
+    origin: env.CORS_ORIGIN,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
