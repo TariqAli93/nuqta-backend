@@ -1,5 +1,6 @@
 ﻿import { IPurchaseRepository } from "../../interfaces/IPurchaseRepository.js";
 import { IPaymentRepository } from "../../interfaces/IPaymentRepository.js";
+import { ISupplierRepository } from "../../interfaces/ISupplierRepository.js";
 import { ISupplierLedgerRepository } from "../../interfaces/ISupplierLedgerRepository.js";
 import { IAccountingRepository } from "../../interfaces/IAccountingRepository.js";
 import { ISettingsRepository } from "../../interfaces/ISettingsRepository.js";
@@ -17,6 +18,7 @@ import type { JournalLine } from "../../entities/Accounting.js";
 import { MODULE_SETTING_KEYS } from "../../entities/ModuleSettings.js";
 import { AuditService } from "../../shared/services/AuditService.js";
 import { SettingsAccessor } from "../../shared/services/SettingsAccessor.js";
+import { syncSupplierBalance } from "../../shared/services/SupplierBalanceService.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
 import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
@@ -58,6 +60,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     private settingsRepo?: ISettingsRepository,
     auditRepo?: IAuditRepository,
     private accountingSettingsRepo?: IAccountingSettingsRepository,
+    private supplierRepo?: ISupplierRepository,
   ) {
     super();
     if (auditRepo) {
@@ -208,6 +211,14 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         } else if (typeof this.purchaseRepo.updateStatus === "function") {
           await this.purchaseRepo.updateStatus(input.purchaseId, newStatus, tx);
         }
+      }
+
+      // Reduce supplier.currentBalance by the exact payment amount applied.
+      // delta = newRemainingAmount - oldRemainingAmount = -amount
+      // Runs unconditionally (not gated on ledgersEnabled) so the balance
+      // field stays correct regardless of whether audit ledgers are active.
+      if (supplierId && this.supplierRepo) {
+        await syncSupplierBalance(this.supplierRepo, supplierId, -amount, tx);
       }
 
       if (ledgersEnabled && supplierId) {

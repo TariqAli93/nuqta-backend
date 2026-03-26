@@ -27,6 +27,7 @@ function buildDeps() {
 
   const supplierRepo = {
     findById: vi.fn(async () => ({ id: 5, name: "Test Supplier", currentBalance: 0 })),
+    updatePayable: vi.fn(async () => {}),
   };
 
   const paymentRepo = {

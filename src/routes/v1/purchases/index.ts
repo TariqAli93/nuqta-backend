@@ -63,7 +63,27 @@ const PurchaseSchema = {
     updatedAt: { type: "string", nullable: true, format: "date-time" },
     createdBy: { type: "integer", nullable: true },
     items: { type: "array", items: PurchaseItemSchema },
-    payments: { type: "array", items: { type: "object" } },
+    payments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          purchaseId: { type: "integer", nullable: true },
+          supplierId: { type: "integer", nullable: true },
+          amount: { type: "integer" },
+          currency: { type: "string" },
+          exchangeRate: { type: "number" },
+          paymentMethod: { type: "string" },
+          referenceNumber: { type: "string", nullable: true },
+          status: { type: "string" },
+          paymentDate: { type: "string", nullable: true },
+          notes: { type: "string", nullable: true },
+          createdAt: { type: "string", nullable: true },
+          createdBy: { type: "integer", nullable: true },
+        },
+      },
+    },
   },
 };
 
@@ -285,6 +305,7 @@ const purchases: FastifyPluginAsync = async (fastify) => {
         fastify.repos.settings,
         fastify.repos.audit,
         fastify.repos.accountingSettings,
+        fastify.repos.supplier,
       );
       const result = await uc.execute({ purchaseId, ...body }, userId);
       return { ok: true, data: result };

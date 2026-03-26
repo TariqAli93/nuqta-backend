@@ -1,4 +1,5 @@
 import { Supplier } from "../entities/Supplier.js";
+import type { TxOrDb } from "../../data/db/transaction.js";
 
 export interface ISupplierRepository {
   findAll(params?: {
@@ -13,5 +14,9 @@ export interface ISupplierRepository {
   ): Promise<Supplier>;
   update(id: number, supplier: Partial<Supplier>): Promise<Supplier>;
   delete(id: number): Promise<void>;
-  updatePayable(id: number, amountChange: number): Promise<void>;
+  /**
+   * Atomically adjusts supplier.currentBalance by amountChange (delta).
+   * Pass tx to execute inside an existing database transaction.
+   */
+  updatePayable(id: number, amountChange: number, tx?: TxOrDb): Promise<void>;
 }

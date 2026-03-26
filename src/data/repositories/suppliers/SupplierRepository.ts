@@ -1,5 +1,6 @@
 import { eq, like, sql, and } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
+import type { TxOrDb } from "../../db/transaction.js";
 import { suppliers } from "../../schema/schema.js";
 import { ISupplierRepository, Supplier } from "../../../domain/index.js";
 
@@ -67,8 +68,9 @@ export class SupplierRepository implements ISupplierRepository {
     await this.db.delete(suppliers).where(eq(suppliers.id, id));
   }
 
-  async updatePayable(id: number, amountChange: number): Promise<void> {
-    await this.db
+  async updatePayable(id: number, amountChange: number, tx?: TxOrDb): Promise<void> {
+    const client = tx ?? this.db;
+    await client
       .update(suppliers)
       .set({
         currentBalance: sql`${suppliers.currentBalance} + ${amountChange}`,
