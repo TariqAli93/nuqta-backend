@@ -322,7 +322,7 @@ const auth: FastifyPluginAsync = async (fastify) => {
         fastify.repos.user,
         fastify.repos.settings,
       );
-      const status = await uc.execute();
+      const status = await uc.execute(undefined, "anonymous");
       return { ok: true, data: status };
     },
   );
@@ -462,7 +462,8 @@ const auth: FastifyPluginAsync = async (fastify) => {
         });
       }
       const { password, ...safeUser } = user;
-      const permissions = (request.user as { permissions?: string[] })?.permissions ?? [];
+      const permissions =
+        (request.user as { permissions?: string[] })?.permissions ?? [];
       return { ok: true, data: { ...safeUser, permissions } };
     },
   );

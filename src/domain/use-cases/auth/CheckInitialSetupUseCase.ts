@@ -17,10 +17,11 @@ export class CheckInitialSetupUseCase extends ReadUseCase<void, SetupStatus> {
     super();
   }
 
-  async execute(): Promise<SetupStatus> {
+  async execute(_: void, _userId: string): Promise<SetupStatus> {
     // Primary flag — set atomically at the end of InitializeAppUseCase
     const initialized = await this.settingsRepo.get("app_initialized");
     const isInitialized = initialized === "true";
+
     const wizardFlag1 = await this.settingsRepo.get("setup.wizardCompleted");
     const wizardFlag2 = await this.settingsRepo.get("setup.wizard_completed");
     const wizardFlag = wizardFlag1 ?? wizardFlag2;
