@@ -57,9 +57,7 @@ export class ProductRepository implements IProductRepository {
     }
     if (params?.isExpire) {
       conditions.push(
-        sql`EXISTS (
-            SELECT * FROM products WHERE expire_date IS NOT NULL AND expire_date <=  CURRENT_DATE
-          )`,
+        sql`(${products.isExpire} = true OR (${products.expireDate} IS NOT NULL AND ${products.expireDate}::date < CURRENT_DATE))`,
       );
     }
 
