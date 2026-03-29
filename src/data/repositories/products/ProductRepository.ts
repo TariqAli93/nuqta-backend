@@ -22,6 +22,7 @@ export class ProductRepository implements IProductRepository {
     status?: string;
     lowStockOnly?: boolean;
     expiringSoonOnly?: boolean;
+    isExpire?: boolean;
   }): Promise<{ items: Product[]; total: number }> {
     const conditions: any[] = [];
     if (params?.search) {
@@ -52,6 +53,13 @@ export class ProductRepository implements IProductRepository {
             AND pb.expiry_date::date <= CURRENT_DATE + INTERVAL '30 days'
             AND pb.expiry_date::date >= CURRENT_DATE
         )`,
+      );
+    }
+    if (params?.isExpire) {
+      conditions.push(
+        sql`EXISTS (
+            SELECT * FROM products WHERE expire_date IS NOT NULL AND expire_date <=  CURRENT_DATE
+          )`,
       );
     }
 

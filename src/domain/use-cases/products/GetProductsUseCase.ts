@@ -1,18 +1,22 @@
-import { IProductRepository } from '../../interfaces/IProductRepository.js';
-import { Product } from '../../entities/Product.js';
+import { IProductRepository } from "../../interfaces/IProductRepository.js";
+import { Product } from "../../entities/Product.js";
 import { ReadUseCase } from "../../shared/ReadUseCase.js";
 
-export class GetProductsUseCase extends ReadUseCase<{
-  search?: string;
-  barcode?: string;
-  page?: number;
-  limit?: number;
-  categoryId?: number;
-  supplierId?: number;
-  status?: string;
-  lowStockOnly?: boolean;
-  expiringSoonOnly?: boolean;
-}, Awaited<ReturnType<IProductRepository["findAll"]>>> {
+export class GetProductsUseCase extends ReadUseCase<
+  {
+    search?: string;
+    barcode?: string;
+    page?: number;
+    limit?: number;
+    categoryId?: number;
+    supplierId?: number;
+    status?: string;
+    lowStockOnly?: boolean;
+    expiringSoonOnly?: boolean;
+    isExpire?: boolean;
+  },
+  Awaited<ReturnType<IProductRepository["findAll"]>>
+> {
   constructor(private productRepo: IProductRepository) {
     super();
   }
@@ -28,7 +32,8 @@ export class GetProductsUseCase extends ReadUseCase<{
       status?: string;
       lowStockOnly?: boolean;
       expiringSoonOnly?: boolean;
-    } = {}
+      isExpire?: boolean;
+    } = {},
   ) {
     const page = params.page || 1;
     const limit = params.limit || 20;
@@ -42,6 +47,7 @@ export class GetProductsUseCase extends ReadUseCase<{
       status: params.status,
       lowStockOnly: params.lowStockOnly,
       expiringSoonOnly: params.expiringSoonOnly,
+      isExpire: params.isExpire,
       limit,
       offset,
     });

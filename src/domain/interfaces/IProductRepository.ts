@@ -14,6 +14,7 @@ export interface IProductRepository {
     status?: string;
     lowStockOnly?: boolean;
     expiringSoonOnly?: boolean;
+    isExpire?: boolean;
   }): Promise<{ items: Product[]; total: number }>;
   findById(id: number, tx?: TxOrDb): Promise<Product | null>;
   findByBarcode?(barcode: string): Promise<Product | null>;
