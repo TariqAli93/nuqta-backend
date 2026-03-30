@@ -601,6 +601,21 @@ export const payments = pgTable("payments", {
     "chk_payments_no_customer_and_supplier",
     sql`NOT (${table.customerId} IS NOT NULL AND ${table.supplierId} IS NOT NULL)`,
   ),
+  // A sale-context payment must not reference a supplier (incoherent mix).
+  check(
+    "chk_payments_no_sale_and_supplier",
+    sql`NOT (${table.saleId} IS NOT NULL AND ${table.supplierId} IS NOT NULL)`,
+  ),
+  // A purchase-context payment must not reference a customer (incoherent mix).
+  check(
+    "chk_payments_no_purchase_and_customer",
+    sql`NOT (${table.purchaseId} IS NOT NULL AND ${table.customerId} IS NOT NULL)`,
+  ),
+  // Every payment must carry at least one traceable business context.
+  check(
+    "chk_payments_has_context",
+    sql`(${table.saleId} IS NOT NULL OR ${table.purchaseId} IS NOT NULL OR ${table.customerId} IS NOT NULL OR ${table.supplierId} IS NOT NULL)`,
+  ),
 ]);
 
 export const paymentAllocations = pgTable("payment_allocations", {
