@@ -15,10 +15,7 @@ import { syncSupplierBalance } from "../../shared/services/SupplierBalanceServic
 import { ValidationError } from "../../shared/errors/DomainErrors.js";
 import { WriteUseCase } from "../../shared/WriteUseCase.js";
 import type { DbConnection } from "../../../data/db/db.js";
-import {
-  withTransaction,
-  type TxOrDb,
-} from "../../../data/db/transaction.js";
+import { withTransaction, type TxOrDb } from "../../../data/db/transaction.js";
 
 export interface CreatePurchaseInput {
   invoiceNumber: string;
@@ -277,7 +274,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
             {
               supplierId: createdPurchase.supplierId,
               transactionType: "payment",
-              amount: -paidAmount,
+              amount: paidAmount,
               balanceAfter: balanceBefore + total - paidAmount,
               purchaseId: createdPurchase.id,
               notes: `Initial payment for purchase #${createdPurchase.invoiceNumber}`,
@@ -336,11 +333,18 @@ export class CreatePurchaseUseCase extends WriteUseCase<
       : "1300";
     const ACCT_AP = settings ? await settings.getApAccountCode() : "2100";
 
-    const inventoryAcct =
-      await this.accountingRepository.findAccountByCode(ACCT_INVENTORY, tx);
-    const cashAcct =
-      await this.accountingRepository.findAccountByCode(ACCT_CASH, tx);
-    const apAcct = await this.accountingRepository.findAccountByCode(ACCT_AP, tx);
+    const inventoryAcct = await this.accountingRepository.findAccountByCode(
+      ACCT_INVENTORY,
+      tx,
+    );
+    const cashAcct = await this.accountingRepository.findAccountByCode(
+      ACCT_CASH,
+      tx,
+    );
+    const apAcct = await this.accountingRepository.findAccountByCode(
+      ACCT_AP,
+      tx,
+    );
     const vatInputAcct =
       purchase.tax > 0
         ? await this.accountingRepository.findAccountByCode(ACCT_VAT_INPUT, tx)

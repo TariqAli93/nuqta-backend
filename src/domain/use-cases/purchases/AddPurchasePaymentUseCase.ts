@@ -179,20 +179,23 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     const accountingEnabled = await this.isAccountingEnabled();
 
     const updatedPurchase = await withTransaction(this.db, async (tx) => {
-      const payment = await this.paymentRepo.createSync({
-        purchaseId: input.purchaseId,
-        supplierId,
-        amount,
-        currency,
-        exchangeRate: input.exchangeRate || purchase.exchangeRate || 1,
-        paymentMethod: input.paymentMethod || "cash",
-        referenceNumber: input.referenceNumber,
-        notes: input.notes,
-        createdBy: numUserId,
-        status: "completed",
-        paymentDate: new Date(),
-        idempotencyKey: input.idempotencyKey,
-      } as any, tx);
+      const payment = await this.paymentRepo.createSync(
+        {
+          purchaseId: input.purchaseId,
+          supplierId,
+          amount,
+          currency,
+          exchangeRate: input.exchangeRate || purchase.exchangeRate || 1,
+          paymentMethod: input.paymentMethod || "cash",
+          referenceNumber: input.referenceNumber,
+          notes: input.notes,
+          createdBy: numUserId,
+          status: "completed",
+          paymentDate: new Date(),
+          idempotencyKey: input.idempotencyKey,
+        } as any,
+        tx,
+      );
 
       const newStatus = newRemainingAmount <= 0 ? "completed" : "pending";
 
@@ -207,7 +210,11 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
       // received/partial purchase back to "pending" on a partial payment.
       if (newRemainingAmount <= 0) {
         if (typeof this.purchaseRepo.updateStatusSync === "function") {
-          await this.purchaseRepo.updateStatusSync(input.purchaseId, newStatus, tx);
+          await this.purchaseRepo.updateStatusSync(
+            input.purchaseId,
+            newStatus,
+            tx,
+          );
         } else if (typeof this.purchaseRepo.updateStatus === "function") {
           await this.purchaseRepo.updateStatus(input.purchaseId, newStatus, tx);
         }
@@ -222,18 +229,23 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
       }
 
       if (ledgersEnabled && supplierId) {
-        const balanceBefore =
-          await this.supplierLedgerRepo.getLastBalanceSync(supplierId, tx);
-        await this.supplierLedgerRepo.createSync({
+        const balanceBefore = await this.supplierLedgerRepo.getLastBalanceSync(
           supplierId,
-          transactionType: "payment",
-          amount: -amount,
-          balanceAfter: balanceBefore - amount,
-          purchaseId: input.purchaseId,
-          paymentId: payment.id,
-          notes: input.notes || `Payment for purchase #${input.purchaseId}`,
-          createdBy: numUserId,
-        } as any, tx);
+          tx,
+        );
+        await this.supplierLedgerRepo.createSync(
+          {
+            supplierId,
+            transactionType: "payment",
+            amount: amount,
+            balanceAfter: balanceBefore - amount,
+            purchaseId: input.purchaseId,
+            paymentId: payment.id,
+            notes: input.notes || `Payment for purchase #${input.purchaseId}`,
+            createdBy: numUserId,
+          } as any,
+          tx,
+        );
       }
 
       if (accountingEnabled) {
@@ -307,19 +319,22 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
       },
     ];
 
-    await this.accountingRepo.createJournalEntrySync({
-      entryNumber: `JE-PPAY-${paymentId}`,
-      entryDate: new Date(),
-      description: `Supplier payment #${paymentId} for purchase #${purchaseId}`,
-      sourceType: "payment",
-      sourceId: paymentId,
-      isPosted: autoPost,
-      isReversed: false,
-      totalAmount: amount,
-      currency,
-      createdBy: userId,
-      lines,
-    }, tx);
+    await this.accountingRepo.createJournalEntrySync(
+      {
+        entryNumber: `JE-PPAY-${paymentId}`,
+        entryDate: new Date(),
+        description: `Supplier payment #${paymentId} for purchase #${purchaseId}`,
+        sourceType: "payment",
+        sourceId: paymentId,
+        isPosted: autoPost,
+        isReversed: false,
+        totalAmount: amount,
+        currency,
+        createdBy: userId,
+        lines,
+      },
+      tx,
+    );
   }
 
   async executeSideEffectsPhase(
@@ -373,7 +388,10 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
     );
   }
 
-  private async findPurchaseSync(id: number, tx?: TxOrDb): Promise<Purchase | null> {
+  private async findPurchaseSync(
+    id: number,
+    tx?: TxOrDb,
+  ): Promise<Purchase | null> {
     if (typeof this.purchaseRepo.findByIdSync === "function") {
       return await this.purchaseRepo.findByIdSync(id, tx);
     }

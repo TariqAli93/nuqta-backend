@@ -102,7 +102,7 @@ export class RecordSupplierPaymentUseCase extends WriteUseCase<
       const entry = await this.ledgerRepo.createSync({
         supplierId: data.supplierId,
         transactionType: "payment",
-        amount: -data.amount,
+        amount: data.amount,
         balanceAfter,
         paymentId: payment.id,
         notes: data.notes,

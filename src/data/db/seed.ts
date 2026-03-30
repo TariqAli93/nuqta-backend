@@ -363,7 +363,7 @@ async function initializeDatabase(): Promise<void> {
     password: string;
     fullName: string;
     phone?: string;
-    role: "admin" | "cashier" | "manager" | "viewer";
+    role: "admin" | "cashier" | "manager";
   }): Promise<EnsureResult<SeedUser>> {
     const existing = usersByUsername.get(input.username);
     if (existing) {
@@ -507,6 +507,7 @@ async function initializeDatabase(): Promise<void> {
         minStock: input.minStock,
         unit: input.unit,
         supplierId,
+        trackExpiry: input.trackExpiry ?? false,
         status: input.status,
         isActive: true,
         createdBy,
@@ -1135,19 +1136,12 @@ async function initializeDatabase(): Promise<void> {
     fullName: "سارة البائعة",
     role: "cashier",
   });
-  const viewerResult = await ensureUser({
-    username: "viewer",
-    password: "Viewer@123",
-    fullName: "علي المراقب",
-    role: "viewer",
-  });
 
   totalCounters.users =
     Number(adminResult.created) +
     Number(managerResult.created) +
     Number(cashierResult.created) +
-    Number(cashier2Result.created) +
-    Number(viewerResult.created);
+    Number(cashier2Result.created);
 
   const creators: SeedUser[] = [
     adminResult.entity,
@@ -1196,7 +1190,7 @@ async function initializeDatabase(): Promise<void> {
         continue;
       }
 
-      const supplier = supplierMap.get(presetProduct.supplier);
+      const supplier = supplierMap.get(presetProduct.supplierRef);
       const result = await ensureProduct(
         presetProduct,
         category.id,

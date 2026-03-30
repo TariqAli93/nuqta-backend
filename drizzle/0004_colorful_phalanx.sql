@@ -1,1 +1,0 @@
-ALTER TABLE "sale_items" ADD COLUMN "returned_quantity_base" integer DEFAULT 0 NOT NULL;
