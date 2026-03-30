@@ -181,8 +181,16 @@ export class CreatePurchaseUseCase extends WriteUseCase<
       updatedAt: now,
       createdBy: numUserId,
       items: input.items.map((item) => {
-        const quantityBase =
-          item.quantityBase || item.quantity * (item.unitFactor || 1);
+        // Always compute quantityBase server-side from the authoritative unitFactor.
+        // Never trust a client-supplied quantityBase — the server owns unit math.
+        const unitFactor = item.unitFactor ?? 1;
+        if (!Number.isInteger(unitFactor) || unitFactor < 1) {
+          throw new ValidationError(
+            "Item unitFactor must be an integer >= 1",
+            { productId: item.productId, unitFactor },
+          );
+        }
+        const quantityBase = item.quantity * unitFactor;
         if (!Number.isInteger(quantityBase) || quantityBase <= 0) {
           throw new ValidationError(
             "Item quantityBase must be a positive integer",
@@ -196,7 +204,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
           productId: item.productId,
           productName: item.productName || `Product #${item.productId}`,
           unitName: item.unitName || "piece",
-          unitFactor: item.unitFactor || 1,
+          unitFactor,
           quantity: item.quantity,
           quantityBase,
           unitCost: item.unitCost,
