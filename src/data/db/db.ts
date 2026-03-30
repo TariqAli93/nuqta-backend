@@ -8,7 +8,14 @@ import * as schema from "../schema/schema.js";
 
 // Load .env from project root (3 levels up from src/data/db)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
+dotenv.config({
+  path: path.resolve(
+    __dirname,
+    process.env.NODE_ENV === "production"
+      ? "../../../.env.production"
+      : "../../../.env.development",
+  ),
+});
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

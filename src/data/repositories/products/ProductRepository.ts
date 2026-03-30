@@ -1,7 +1,12 @@
 import { eq, like, and, sql, desc } from "drizzle-orm";
 import { DbConnection } from "../../db/db.js";
 import type { TxOrDb } from "../../db/transaction.js";
-import { products, productBatches, productUnits } from "../../schema/schema.js";
+import {
+  products,
+  productBatches,
+  productUnits,
+  systemSettings,
+} from "../../schema/schema.js";
 import {
   IProductRepository,
   Product,
@@ -37,7 +42,7 @@ export class ProductRepository implements IProductRepository {
       conditions.push(eq(products.categoryId, params.categoryId));
     if (params?.supplierId)
       conditions.push(eq(products.supplierId, params.supplierId));
-    if (params?.status) conditions.push(eq(products.status, params.status));
+    if (params?.status) conditions.push(eq(products.status, params.status as any));
     if (params?.lowStockOnly) {
       conditions.push(
         sql`${products.stock} <= ${products.minStock} AND ${products.minStock} > 0`,
@@ -46,18 +51,32 @@ export class ProductRepository implements IProductRepository {
     if (params?.expiringSoonOnly) {
       conditions.push(
         sql`EXISTS (
-          SELECT 1 FROM product_batches pb
+          SELECT 1
+          FROM product_batches pb
           WHERE pb.product_id = ${products.id}
             AND pb.quantity_on_hand > 0
-            AND pb.expiry_date IS NOT NULL
-            AND pb.expiry_date::date <= CURRENT_DATE + INTERVAL '30 days'
-            AND pb.expiry_date::date >= CURRENT_DATE
+            AND pb.expiry_date >= CURRENT_DATE
+            AND pb.expiry_date <= CURRENT_DATE + (
+              COALESCE(
+                (SELECT ${systemSettings.expiryAlertDays}
+                 FROM ${systemSettings}
+                 ORDER BY ${systemSettings.id}
+                 LIMIT 1),
+                30
+              ) * INTERVAL '1 day'
+            )
         )`,
       );
     }
     if (params?.isExpire) {
       conditions.push(
-        sql`(${products.isExpire} = true OR (${products.expireDate} IS NOT NULL AND ${products.expireDate}::date < CURRENT_DATE))`,
+        sql`${products.trackExpiry} = true AND EXISTS (
+          SELECT 1
+          FROM product_batches pb
+          WHERE pb.product_id = ${products.id}
+            AND pb.quantity_on_hand > 0
+            AND pb.expiry_date < CURRENT_DATE
+        )`,
       );
     }
 
@@ -163,6 +182,11 @@ export class ProductRepository implements IProductRepository {
       .update(productBatches)
       .set({
         quantityOnHand: sql`${productBatches.quantityOnHand} + ${quantityChange}`,
+        status: sql`CASE
+          WHEN ${productBatches.quantityOnHand} + ${quantityChange} <= 0 THEN 'depleted'::product_batch_status
+          ELSE 'active'::product_batch_status
+        END`,
+        version: sql`${productBatches.version} + 1`,
       } as any)
       .where(eq(productBatches.id, batchId));
   }

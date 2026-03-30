@@ -28,8 +28,8 @@ export class CreateEmployeeUseCase extends WriteUseCase<Employee, Employee, Empl
     if (!employee.position || employee.position.trim().length === 0) {
       throw new ValidationError("Employee position is required");
     }
-    if (!employee.department || employee.department.trim().length === 0) {
-      throw new ValidationError("Employee department is required");
+    if (!Number.isInteger(employee.departmentId) || employee.departmentId <= 0) {
+      throw new ValidationError("Employee departmentId is required");
     }
     if (!Number.isInteger(employee.salary) || employee.salary < 0) {
       throw new ValidationError("Employee salary must be a non-negative integer", {

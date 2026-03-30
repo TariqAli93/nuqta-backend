@@ -5,6 +5,7 @@ import {
   inventoryMovements,
   products,
   productBatches,
+  systemSettings,
 } from "../../schema/schema.js";
 import {
   IInventoryRepository,
@@ -17,12 +18,22 @@ import {
  * ────────────────────────────────────────────────────────────────── */
 
 /** Reusable WHERE fragment for "batches expiring within N days". */
-function expiringBatchesCondition(days = 30): SQL {
+function expiringBatchesCondition(days?: number): SQL {
+  const horizon =
+    days === undefined
+      ? sql`COALESCE(
+          (SELECT ${systemSettings.expiryAlertDays}
+           FROM ${systemSettings}
+           ORDER BY ${systemSettings.id}
+           LIMIT 1),
+          30
+        ) * INTERVAL '1 day'`
+      : sql`${days} * INTERVAL '1 day'`;
   return and(
     sql`${productBatches.quantityOnHand} > 0`,
     sql`${productBatches.expiryDate} IS NOT NULL`,
-    sql`${productBatches.expiryDate}::date <= CURRENT_DATE + INTERVAL '${sql.raw(String(days))} days'`,
-    sql`${productBatches.expiryDate}::date >= CURRENT_DATE`,
+    sql`${productBatches.expiryDate} >= CURRENT_DATE`,
+    sql`${productBatches.expiryDate} <= CURRENT_DATE + ${horizon}`,
   )!;
 }
 
@@ -79,22 +90,13 @@ export class InventoryRepository implements IInventoryRepository {
       .update(productBatches)
       .set({
         quantityOnHand: sql`${productBatches.quantityOnHand} + ${qty}`,
-        isActive: true,
+        status: sql`CASE
+          WHEN ${productBatches.quantityOnHand} + ${qty} <= 0 THEN 'depleted'::product_batch_status
+          ELSE 'active'::product_batch_status
+        END`,
+        version: sql`${productBatches.version} + 1`,
       } as any)
       .where(eq(productBatches.id, batchId));
-
-    // Keep products.stock in sync
-    const [batch] = await this.c(tx)
-      .select({ productId: productBatches.productId })
-      .from(productBatches)
-      .where(eq(productBatches.id, batchId));
-
-    if (batch?.productId) {
-      await this.c(tx)
-        .update(products)
-        .set({ stock: sql`${products.stock} + ${qty}` } as any)
-        .where(eq(products.id, batch.productId));
-    }
   }
 
   async getMovements(params?: {
@@ -112,7 +114,7 @@ export class InventoryRepository implements IInventoryRepository {
     if (params?.productId)
       conditions.push(eq(inventoryMovements.productId, params.productId));
     if (params?.movementType)
-      conditions.push(eq(inventoryMovements.movementType, params.movementType));
+      conditions.push(eq(inventoryMovements.movementType, params.movementType as any));
     if (params?.sourceType)
       conditions.push(eq(inventoryMovements.sourceType, params.sourceType));
     if (params?.sourceId)
@@ -267,21 +269,19 @@ export class InventoryRepository implements IInventoryRepository {
     const offset = params?.offset ?? 0;
     const driftOnly = params?.driftOnly ?? true;
 
-    // Sub-query: sum movements per product
-    const ledgerSub = this.db
+    // Reconcile the cached projection against live batch totals. This matches
+    // the production stock model after the schema hardening migration.
+    const batchSub = this.db
       .select({
-        productId: inventoryMovements.productId,
-        ledgerStock: sql<number>`
-          SUM(CASE
-            WHEN ${inventoryMovements.movementType} = 'in'     THEN ${inventoryMovements.quantityBase}
-            WHEN ${inventoryMovements.movementType} = 'out'    THEN -${inventoryMovements.quantityBase}
-            WHEN ${inventoryMovements.movementType} = 'adjust' THEN ${inventoryMovements.quantityBase}
-            ELSE 0
-          END)`.as("ledger_stock"),
+        productId: productBatches.productId,
+        authoritativeStock:
+          sql<number>`COALESCE(SUM(${productBatches.quantityOnHand}), 0)`.as(
+            "authoritative_stock",
+          ),
       })
-      .from(inventoryMovements)
-      .groupBy(inventoryMovements.productId)
-      .as("ledger");
+      .from(productBatches)
+      .groupBy(productBatches.productId)
+      .as("batch_totals");
 
     const conditions: SQL[] = [eq(products.isActive, true)];
 
@@ -291,7 +291,7 @@ export class InventoryRepository implements IInventoryRepository {
 
     if (driftOnly) {
       conditions.push(
-        sql`COALESCE(${products.stock}, 0) != COALESCE(${ledgerSub.ledgerStock}, 0)`,
+        sql`COALESCE(${products.stock}, 0) != COALESCE(${batchSub.authoritativeStock}, 0)`,
       );
     }
 
@@ -300,17 +300,17 @@ export class InventoryRepository implements IInventoryRepository {
     const [countRow] = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(products)
-      .leftJoin(ledgerSub, eq(products.id, ledgerSub.productId))
+      .leftJoin(batchSub, eq(products.id, batchSub.productId))
       .where(where);
 
     const [driftSumRow] = await this.db
       .select({
         totalDrift: sql<number>`COALESCE(SUM(ABS(
-          COALESCE(${products.stock}, 0) - COALESCE(${ledgerSub.ledgerStock}, 0)
+          COALESCE(${products.stock}, 0) - COALESCE(${batchSub.authoritativeStock}, 0)
         )), 0)`,
       })
       .from(products)
-      .leftJoin(ledgerSub, eq(products.id, ledgerSub.productId))
+      .leftJoin(batchSub, eq(products.id, batchSub.productId))
       .where(where);
 
     const rows = await this.db
@@ -318,11 +318,11 @@ export class InventoryRepository implements IInventoryRepository {
         productId: products.id,
         productName: products.name,
         cachedStock: sql<number>`COALESCE(${products.stock}, 0)`,
-        ledgerStock: sql<number>`COALESCE(${ledgerSub.ledgerStock}, 0)`,
-        drift: sql<number>`COALESCE(${products.stock}, 0) - COALESCE(${ledgerSub.ledgerStock}, 0)`,
+        ledgerStock: sql<number>`COALESCE(${batchSub.authoritativeStock}, 0)`,
+        drift: sql<number>`COALESCE(${products.stock}, 0) - COALESCE(${batchSub.authoritativeStock}, 0)`,
       })
       .from(products)
-      .leftJoin(ledgerSub, eq(products.id, ledgerSub.productId))
+      .leftJoin(batchSub, eq(products.id, batchSub.productId))
       .where(where)
       .orderBy(products.id)
       .limit(limit)
@@ -344,25 +344,24 @@ export class InventoryRepository implements IInventoryRepository {
   /* ── Drift repair ───────────────────────────────────────────── */
 
   async repairStockDrift(): Promise<number> {
-    // Uses a LEFT JOIN so products with zero movements get stock → 0.
-    // The original INNER JOIN silently skipped those products.
+    // Batch totals are authoritative after the hardening migration.
     const result = await this.db.execute(sql`
       UPDATE products AS p
-      SET stock = COALESCE(m.ledger_stock, 0)
+      SET stock = COALESCE(m.batch_stock, 0)
       FROM (
         SELECT
           pr.id AS product_id,
-          COALESCE(mv.ledger_stock, 0) AS ledger_stock
+          COALESCE(bt.batch_stock, 0) AS batch_stock
         FROM products pr
         LEFT JOIN (
           SELECT
             product_id,
-            ${LEDGER_SUM_EXPR} AS ledger_stock
-          FROM inventory_movements
+            COALESCE(SUM(quantity_on_hand), 0) AS batch_stock
+          FROM product_batches
           GROUP BY product_id
-        ) mv ON mv.product_id = pr.id
+        ) bt ON bt.product_id = pr.id
         WHERE pr.is_active = true
-          AND COALESCE(pr.stock, 0) != COALESCE(mv.ledger_stock, 0)
+          AND COALESCE(pr.stock, 0) != COALESCE(bt.batch_stock, 0)
       ) m
       WHERE p.id = m.product_id
     `);

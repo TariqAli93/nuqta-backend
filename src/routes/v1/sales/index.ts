@@ -70,7 +70,7 @@ const SaleSchema = {
     total: { type: "integer" },
     currency: { type: "string" },
     exchangeRate: { type: "number" },
-    interestRate: { type: "integer" },
+    interestRate: { type: "number" },
     interestAmount: { type: "integer" },
     paymentType: { type: "string", enum: ["cash", "credit", "mixed"] },
     paymentMethod: {
@@ -147,7 +147,7 @@ const CreateSaleBodySchema = {
     paidAmount: { type: "integer", minimum: 0 },
     currency: { type: "string" },
     notes: { type: "string" },
-    interestRate: { type: "integer" },
+    interestRate: { type: "number" },
     interestRateBps: { type: "integer" },
     paymentMethod: {
       type: "string",

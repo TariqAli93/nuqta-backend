@@ -48,7 +48,7 @@ export const SaleSchema = z.object({
   total: z.number().int().min(0),
   currency: z.string().default("IQD"),
   exchangeRate: z.number().default(1),
-  interestRate: z.number().int().default(0),
+  interestRate: z.number().min(0).default(0),
   interestAmount: z.number().int().default(0),
   paymentType: z.enum(["cash", "credit", "mixed"]).default("cash"),
   paymentMethod: z

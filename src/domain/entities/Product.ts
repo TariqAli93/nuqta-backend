@@ -13,10 +13,8 @@ export const ProductSchema = z.object({
   stock: z.number().int().min(0).default(0),
   minStock: z.number().int().min(0).default(0),
   unit: z.string().default("piece"),
-  supplier: z.string().nullable().optional(),
   supplierId: z.number().nullable().optional(),
-  expireDate: z.union([z.string(), z.date()]).nullable().optional(),
-  isExpire: z.boolean().default(false),
+  trackExpiry: z.boolean().default(false),
   status: z
     .enum(["available", "out_of_stock", "discontinued"])
     .default("available"),
@@ -24,6 +22,7 @@ export const ProductSchema = z.object({
   createdAt: z.union([z.string(), z.date()]).optional(),
   updatedAt: z.union([z.string(), z.date()]).optional(),
   createdBy: z.number().optional(),
+  version: z.number().int().min(1).default(1),
 });
 
 export type Product = z.infer<typeof ProductSchema>;

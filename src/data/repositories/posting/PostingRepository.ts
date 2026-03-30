@@ -4,7 +4,6 @@ import {
   postingBatches,
   journalEntries,
   journalLines,
-  accounts,
 } from "../../schema/schema.js";
 import { IPostingRepository, PostingBatch, JournalEntry } from "../../../domain/index.js";
 
@@ -31,7 +30,7 @@ export class PostingRepository implements IPostingRepository {
   }): Promise<{ items: PostingBatch[]; total: number }> {
     const conditions: any[] = [];
     if (params?.periodType)
-      conditions.push(eq(postingBatches.periodType, params.periodType));
+      conditions.push(eq(postingBatches.periodType, params.periodType as any));
     if (params?.dateFrom)
       conditions.push(gte(postingBatches.periodStart, params.dateFrom));
     if (params?.dateTo)
@@ -170,17 +169,6 @@ export class PostingRepository implements IPostingRepository {
         description: line.description,
       }));
       await this.db.insert(journalLines).values(reversedLines as any);
-
-      // Update account balances (reverse the amounts)
-      for (const line of original.lines as any[]) {
-        const netReverse = (line.credit || 0) - (line.debit || 0);
-        await this.db
-          .update(accounts)
-          .set({
-            balance: sql`${accounts.balance} + ${netReverse}`,
-          } as any)
-          .where(eq(accounts.id, line.accountId));
-      }
     }
 
     // Mark original as reversed

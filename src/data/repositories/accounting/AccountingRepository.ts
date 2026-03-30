@@ -59,29 +59,18 @@ export class AccountingRepository implements IAccountingRepository {
 
       if (lines && lines.length > 0) {
         const lineValues = lines.map((line) => {
-          const balance = (line.debit || 0) - (line.credit || 0);
           return {
             journalEntryId: created.id,
             accountId: line.accountId,
             partnerId: line.partnerId ?? null,
             debit: line.debit ?? 0,
             credit: line.credit ?? 0,
-            balance,
             description: line.description ?? null,
             reconciled: false,
             reconciliationId: null,
           };
         });
         await client.insert(journalLines).values(lineValues as any);
-
-        // Update account balances
-        for (const line of lines) {
-          const netAmount = (line.debit || 0) - (line.credit || 0);
-          await client
-            .update(accounts)
-            .set({ balance: sql`${accounts.balance} + ${netAmount}` } as any)
-            .where(eq(accounts.id, line.accountId));
-        }
       }
 
       return this.getEntryById(created.id, client) as Promise<JournalEntry>;
@@ -113,33 +102,75 @@ export class AccountingRepository implements IAccountingRepository {
     account: Omit<Account, "id" | "createdAt">,
     tx?: TxOrDb,
   ): Promise<Account> {
+    const { balance: _ignoredBalance, ...insertable } = account;
     const [created] = await this.c(tx)
       .insert(accounts)
-      .values(account as any)
+      .values(insertable as any)
       .returning();
-    return created as unknown as Account;
+    return { ...(created as unknown as Account), balance: 0 };
   }
 
   async findAccountByCode(code: string, tx?: TxOrDb): Promise<Account | null> {
-    const [row] = await this.c(tx)
-      .select()
+    const rows = await this.c(tx)
+      .select({
+        id: accounts.id,
+        code: accounts.code,
+        name: accounts.name,
+        nameAr: accounts.nameAr,
+        accountType: accounts.accountType,
+        parentId: accounts.parentId,
+        isSystem: accounts.isSystem,
+        isActive: accounts.isActive,
+        createdAt: accounts.createdAt,
+        balance: sql<number>`COALESCE(SUM(${journalLines.balance}), 0)`,
+      })
       .from(accounts)
-      .where(eq(accounts.code, code));
+      .leftJoin(journalLines, eq(journalLines.accountId, accounts.id))
+      .where(eq(accounts.code, code))
+      .groupBy(accounts.id);
+    const row = rows[0];
     return (row as unknown as Account) || null;
   }
 
   async findAccountById(id: number, tx?: TxOrDb): Promise<Account | null> {
-    const [row] = await this.c(tx)
-      .select()
+    const rows = await this.c(tx)
+      .select({
+        id: accounts.id,
+        code: accounts.code,
+        name: accounts.name,
+        nameAr: accounts.nameAr,
+        accountType: accounts.accountType,
+        parentId: accounts.parentId,
+        isSystem: accounts.isSystem,
+        isActive: accounts.isActive,
+        createdAt: accounts.createdAt,
+        balance: sql<number>`COALESCE(SUM(${journalLines.balance}), 0)`,
+      })
       .from(accounts)
-      .where(eq(accounts.id, id));
+      .leftJoin(journalLines, eq(journalLines.accountId, accounts.id))
+      .where(eq(accounts.id, id))
+      .groupBy(accounts.id);
+    const row = rows[0];
     return (row as unknown as Account) || null;
   }
 
   async getAccounts(tx?: TxOrDb): Promise<Account[]> {
     const rows = await this.c(tx)
-      .select()
+      .select({
+        id: accounts.id,
+        code: accounts.code,
+        name: accounts.name,
+        nameAr: accounts.nameAr,
+        accountType: accounts.accountType,
+        parentId: accounts.parentId,
+        isSystem: accounts.isSystem,
+        isActive: accounts.isActive,
+        createdAt: accounts.createdAt,
+        balance: sql<number>`COALESCE(SUM(${journalLines.balance}), 0)`,
+      })
       .from(accounts)
+      .leftJoin(journalLines, eq(journalLines.accountId, accounts.id))
+      .groupBy(accounts.id)
       .orderBy(accounts.code);
     return rows as unknown as Account[];
   }
@@ -154,7 +185,7 @@ export class AccountingRepository implements IAccountingRepository {
   }): Promise<{ items: JournalEntry[]; total: number }> {
     const conditions: any[] = [];
     if (params?.sourceType)
-      conditions.push(eq(journalEntries.sourceType, params.sourceType));
+      conditions.push(eq(journalEntries.sourceType, params.sourceType as any));
     if (params?.dateFrom)
       conditions.push(
         gte(journalEntries.entryDate, new Date(params.dateFrom).toISOString()),
@@ -223,7 +254,7 @@ export class AccountingRepository implements IAccountingRepository {
       .from(journalEntries)
       .where(
         and(
-          eq(journalEntries.sourceType, sourceType),
+          eq(journalEntries.sourceType, sourceType as any),
           eq(journalEntries.sourceId, sourceId),
         ),
       )

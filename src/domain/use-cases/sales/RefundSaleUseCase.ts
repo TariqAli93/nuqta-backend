@@ -237,12 +237,6 @@ export class RefundSaleUseCase extends WriteUseCase<
               actuallyRestoredBase,
               tx,
             );
-
-            // Update products.stock cached counter so future stock checks
-            // (CreateSaleUseCase fallback path, reconciliation) stay accurate.
-            if (this.productRepo) {
-              await this.productRepo.updateStock(productId, actuallyRestoredBase, tx);
-            }
           }
         }
       }

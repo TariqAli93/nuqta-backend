@@ -26,10 +26,11 @@ export class UpdateEmployeeUseCase extends WriteUseCase<TInput, Employee, Employ
       throw new ValidationError("Employee position cannot be empty");
     }
     if (
-      input.employee.department !== undefined &&
-      input.employee.department.trim().length === 0
+      input.employee.departmentId !== undefined &&
+      (!Number.isInteger(input.employee.departmentId) ||
+        input.employee.departmentId <= 0)
     ) {
-      throw new ValidationError("Employee department cannot be empty");
+      throw new ValidationError("Employee departmentId must be a positive integer");
     }
     if (
       input.employee.salary !== undefined &&

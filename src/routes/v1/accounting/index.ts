@@ -341,7 +341,7 @@ const accounting: FastifyPluginAsync = async (fastify) => {
       const { eq } = await import("drizzle-orm");
       const [updated] = await fastify.db
         .update(accounts)
-        .set({ ...body })
+        .set(body as any)
         .where(eq(accounts.id, id))
         .returning();
       if (!updated) {

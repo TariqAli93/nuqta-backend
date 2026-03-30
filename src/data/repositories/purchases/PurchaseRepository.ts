@@ -68,7 +68,7 @@ export class PurchaseRepository implements IPurchaseRepository {
       conditions.push(like(purchases.invoiceNumber, `%${params.search}%`));
     if (params?.supplierId)
       conditions.push(eq(purchases.supplierId, params.supplierId));
-    if (params?.status) conditions.push(eq(purchases.status, params.status));
+    if (params?.status) conditions.push(eq(purchases.status, params.status as any));
     if (params?.dateFrom)
       conditions.push(
         gte(purchases.createdAt, new Date(params.dateFrom).toISOString()),

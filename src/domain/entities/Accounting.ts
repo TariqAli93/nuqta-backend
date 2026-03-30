@@ -49,6 +49,9 @@ export const JournalEntrySchema = z.object({
       "manual",
       "sale_cancellation",
       "sale_refund",
+      "payment_reversal",
+      "credit_note",
+      "payroll",
     ])
     .optional(),
   sourceId: z.number().optional(),

@@ -64,7 +64,7 @@ export class BarcodeRepository implements IBarcodeRepository {
       conditions.push(eq(barcodePrintJobs.productId, params.productId));
     }
     if (params?.status) {
-      conditions.push(eq(barcodePrintJobs.status, params.status));
+      conditions.push(eq(barcodePrintJobs.status, params.status as any));
     }
 
     const where =

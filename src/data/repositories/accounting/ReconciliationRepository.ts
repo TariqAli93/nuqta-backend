@@ -195,8 +195,8 @@ export class ReconciliationRepository implements IReconciliationRepository {
     offset?: number;
   }): Promise<{ items: Reconciliation[]; total: number }> {
     const conditions: any[] = [];
-    if (params.type) conditions.push(eq(reconciliations.type, params.type));
-    if (params.status) conditions.push(eq(reconciliations.status, params.status));
+    if (params.type) conditions.push(eq(reconciliations.type, params.type as any));
+    if (params.status) conditions.push(eq(reconciliations.status, params.status as any));
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [countRow] = await this.db

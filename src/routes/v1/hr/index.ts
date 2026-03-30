@@ -29,7 +29,9 @@ const EmployeeSchema = {
     name: { type: "string" },
     salary: { type: "integer" },
     position: { type: "string" },
-    department: { type: "string" },
+    departmentId: { type: "integer" },
+    departmentName: { type: "string", nullable: true },
+    department: { type: "string", nullable: true },
     isActive: { type: "boolean" },
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", nullable: true, format: "date-time" },
@@ -80,7 +82,8 @@ const PayrollRunItemSchema = {
     employeeId: { type: "integer" },
     employeeName: { type: "string" },
     position: { type: "string" },
-    department: { type: "string" },
+    departmentName: { type: "string" },
+    department: { type: "string", nullable: true },
     grossPay: { type: "integer" },
     deductions: { type: "integer" },
     bonuses: { type: "integer" },
@@ -136,7 +139,8 @@ const EmployeeListQuerySchema = {
   type: "object" as const,
   properties: {
     search: { type: "string", description: "Search by employee name" },
-    department: { type: "string", description: "Filter by department" },
+    departmentId: { type: "string", pattern: "^\\d+$", description: "Filter by department ID" },
+    department: { type: "string", description: "Legacy filter by department name" },
     isActive: { type: "string", enum: ["true", "false"] },
     limit: { type: "string", pattern: "^\\d+$" },
     offset: { type: "string", pattern: "^\\d+$" },
@@ -145,14 +149,16 @@ const EmployeeListQuerySchema = {
 
 const CreateEmployeeBodySchema = {
   type: "object" as const,
-  required: ["name", "salary", "position", "department"],
+  required: ["name", "salary", "position"],
   properties: {
     name: { type: "string", minLength: 1 },
     salary: { type: "integer", minimum: 0 },
     position: { type: "string", minLength: 1 },
+    departmentId: { type: "integer", minimum: 1 },
     department: { type: "string", minLength: 1 },
     isActive: { type: "boolean", default: true },
   },
+  anyOf: [{ required: ["departmentId"] }, { required: ["department"] }],
   additionalProperties: false,
 } as const;
 
@@ -162,6 +168,7 @@ const UpdateEmployeeBodySchema = {
     name: { type: "string", minLength: 1 },
     salary: { type: "integer", minimum: 0 },
     position: { type: "string", minLength: 1 },
+    departmentId: { type: "integer", minimum: 1 },
     department: { type: "string", minLength: 1 },
     isActive: { type: "boolean" },
   },
@@ -394,6 +401,59 @@ const approvePayrollRunSchema = {
   },
 } as const;
 
+const resolveDepartmentId = async (
+  fastify: Parameters<FastifyPluginAsync>[0],
+  input: { departmentId?: number; department?: string },
+): Promise<number | undefined> => {
+  if (Number.isInteger(input.departmentId) && (input.departmentId ?? 0) > 0) {
+    return input.departmentId;
+  }
+
+  const legacyDepartmentName = input.department?.trim();
+  if (!legacyDepartmentName) {
+    return undefined;
+  }
+
+  const departmentRepo = (fastify as any).repos?.department;
+  if (!departmentRepo || typeof departmentRepo.findAll !== "function") {
+    return 1;
+  }
+
+  const { items } = await departmentRepo.findAll({
+    search: legacyDepartmentName,
+    limit: 50,
+    offset: 0,
+  });
+
+  const match = items.find(
+    (department: Department) =>
+      department.name.trim().toLowerCase() === legacyDepartmentName.toLowerCase(),
+  );
+
+  return match?.id;
+};
+
+const mapEmployeeResponse = <T extends Record<string, unknown>>(employee: T): T => ({
+  ...employee,
+  department:
+    (employee.department as string | undefined) ??
+    (employee.departmentName as string | undefined) ??
+    null,
+});
+
+const mapPayrollRunResponse = <T extends Record<string, unknown>>(payrollRun: T): T => ({
+  ...payrollRun,
+  items: Array.isArray(payrollRun.items)
+    ? payrollRun.items.map((item) => ({
+        ...(item as Record<string, unknown>),
+        department:
+          (item as { department?: string }).department ??
+          (item as { departmentName?: string }).departmentName ??
+          null,
+      }))
+    : payrollRun.items,
+});
+
 const hr: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("onRequest", fastify.authenticate);
 
@@ -406,20 +466,38 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const query = request.query as {
         search?: string;
+        departmentId?: string;
         department?: string;
         isActive?: string;
         limit?: string;
         offset?: string;
       };
+      const departmentId = await resolveDepartmentId(fastify, {
+        departmentId: query.departmentId
+          ? parseInt(query.departmentId, 10)
+          : undefined,
+        department: query.department,
+      });
+
+      if (query.department && !departmentId) {
+        return { ok: true, data: { items: [], total: 0 } };
+      }
+
       const data = await fastify.repos.employee.findAll({
         search: query.search,
-        department: query.department,
+        departmentId,
         isActive:
           query.isActive !== undefined ? query.isActive === "true" : undefined,
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });
-      return { ok: true, data };
+      return {
+        ok: true,
+        data: {
+          ...data,
+          items: data.items.map((item) => mapEmployeeResponse(item as any)),
+        },
+      };
     },
   );
 
@@ -432,7 +510,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const uc = new GetEmployeeByIdUseCase(fastify.repos.employee);
       const data = await uc.execute(parseInt(request.params.id, 10));
-      return { ok: true, data };
+      return { ok: true, data: mapEmployeeResponse(data as any) };
     },
   );
 
@@ -443,13 +521,22 @@ const hr: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("hr:update"),
     },
     async (request) => {
-      const body = request.body as Employee;
+      const body = request.body as Employee & { department?: string };
+      const departmentId = await resolveDepartmentId(fastify, {
+        departmentId: body.departmentId,
+        department: body.department,
+      });
+
+      if (!departmentId) {
+        throw fastify.httpErrors.badRequest("Employee departmentId is required");
+      }
+
       const uc = new CreateEmployeeUseCase(fastify.repos.employee);
       const data = await uc.execute(
-        body,
+        { ...body, departmentId } as Employee,
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data };
+      return { ok: true, data: mapEmployeeResponse(data as any) };
     },
   );
 
@@ -460,13 +547,33 @@ const hr: FastifyPluginAsync = async (fastify) => {
       preHandler: requirePermission("hr:update"),
     },
     async (request) => {
-      const body = request.body as Partial<Employee>;
+      const body = request.body as Partial<Employee> & { department?: string };
+      const resolvedDepartmentId =
+        body.departmentId !== undefined || body.department !== undefined
+          ? await resolveDepartmentId(fastify, {
+              departmentId: body.departmentId,
+              department: body.department,
+            })
+          : undefined;
+
+      if ((body.departmentId !== undefined || body.department !== undefined) && !resolvedDepartmentId) {
+        throw fastify.httpErrors.badRequest("Employee departmentId is required");
+      }
+
       const uc = new UpdateEmployeeUseCase(fastify.repos.employee);
       const data = await uc.execute(
-        { id: parseInt(request.params.id, 10), employee: body },
+        {
+          id: parseInt(request.params.id, 10),
+          employee: {
+            ...body,
+            ...(resolvedDepartmentId !== undefined
+              ? { departmentId: resolvedDepartmentId }
+              : {}),
+          },
+        },
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data };
+      return { ok: true, data: mapEmployeeResponse(data as any) };
     },
   );
 
@@ -571,7 +678,13 @@ const hr: FastifyPluginAsync = async (fastify) => {
         limit: query.limit ? parseInt(query.limit, 10) : undefined,
         offset: query.offset ? parseInt(query.offset, 10) : undefined,
       });
-      return { ok: true, data };
+      return {
+        ok: true,
+        data: {
+          ...data,
+          items: data.items.map((item) => mapPayrollRunResponse(item as any)),
+        },
+      };
     },
   );
 
@@ -584,7 +697,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const uc = new GetPayrollRunByIdUseCase(fastify.repos.payroll);
       const data = await uc.execute(parseInt(request.params.id, 10));
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 
@@ -596,14 +709,14 @@ const hr: FastifyPluginAsync = async (fastify) => {
     },
     async (request) => {
       const body = request.body as CreatePayrollRunInput;
-      const userId = String(request.user?.sub ?? "system");
+      const userId = (request.user?.sub ?? "system") as any;
       const uc = new CreatePayrollRunUseCase(
         fastify.repos.employee,
         fastify.repos.payroll,
         fastify.repos.settings,
       );
       const data = await uc.execute(body, userId);
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 
@@ -620,7 +733,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         fastify.repos.accounting,
       );
       const data = await uc.execute(parseInt(request.params.id, 10), userId);
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 
@@ -646,7 +759,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         { payrollRunId: parseInt(request.params.id, 10) },
         userId,
       );
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 
@@ -672,7 +785,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         { payrollRunId: parseInt(request.params.id, 10) },
         userId,
       );
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 
@@ -698,7 +811,7 @@ const hr: FastifyPluginAsync = async (fastify) => {
         { payrollRunId: parseInt(request.params.id, 10) },
         userId,
       );
-      return { ok: true, data };
+      return { ok: true, data: mapPayrollRunResponse(data as any) };
     },
   );
 };

@@ -37,6 +37,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         status?: string;
         lowStockOnly?: string;
         expiringSoonOnly?: string;
+        isExpire?: string;
       };
       const page = query.page ? parseInt(query.page, 10) : 1;
       const limit = query.limit ? parseInt(query.limit, 10) : 20;
@@ -55,6 +56,7 @@ const products: FastifyPluginAsync = async (fastify) => {
         status: query.status,
         lowStockOnly: query.lowStockOnly === "true",
         expiringSoonOnly: query.expiringSoonOnly === "true",
+        isExpire: query.isExpire === "true",
       });
       return { ok: true, data: { ...data, page, limit } };
     },
@@ -352,7 +354,10 @@ const products: FastifyPluginAsync = async (fastify) => {
         { productId, opts: { limit, offset } },
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data: { items: result.items, total: result.items.length } };
+      return {
+        ok: true,
+        data: { items: result.items, total: result.items.length },
+      };
     },
   );
 
@@ -377,7 +382,10 @@ const products: FastifyPluginAsync = async (fastify) => {
         { productId, opts: { limit, offset } },
         String(request.user?.sub ?? "system"),
       );
-      return { ok: true, data: { items: result.items, total: result.items.length } };
+      return {
+        ok: true,
+        data: { items: result.items, total: result.items.length },
+      };
     },
   );
 };

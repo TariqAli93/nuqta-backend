@@ -506,7 +506,6 @@ async function initializeDatabase(): Promise<void> {
         stock: 0,
         minStock: input.minStock,
         unit: input.unit,
-        supplier: input.supplier,
         supplierId,
         status: input.status,
         isActive: true,

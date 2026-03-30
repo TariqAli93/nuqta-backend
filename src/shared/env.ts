@@ -2,7 +2,14 @@ import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+dotenv.config({
+  path: path.resolve(
+    process.cwd(),
+    process.env.NODE_ENV === "production"
+      ? ".env.production"
+      : ".env.development",
+  ),
+});
 
 const isProd = process.env.NODE_ENV === "production";
 

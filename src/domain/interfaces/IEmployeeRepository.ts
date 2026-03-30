@@ -3,7 +3,7 @@ import { Employee } from "../entities/Employee.js";
 export interface IEmployeeRepository {
   findAll(params?: {
     search?: string;
-    department?: string;
+    departmentId?: number;
     isActive?: boolean;
     limit?: number;
     offset?: number;

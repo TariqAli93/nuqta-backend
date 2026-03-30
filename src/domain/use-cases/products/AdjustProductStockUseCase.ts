@@ -101,7 +101,7 @@ export class AdjustProductStockUseCase extends WriteUseCase<
         const newBatch = await this.productRepo.createBatch({
           productId: input.productId,
           batchNumber,
-          expiryDate: product.isExpire ? null : null, // caller should supply if needed
+          expiryDate: null,
           manufacturingDate: null,
           quantityReceived: input.quantityChange,
           quantityOnHand: input.quantityChange,

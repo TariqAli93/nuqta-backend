@@ -411,12 +411,12 @@ export class CreateSaleUseCase extends WriteUseCase<
         return input.interestRateBps;
       }
       if (input.interestRate === undefined) return 0;
-      if (!Number.isInteger(input.interestRate) || input.interestRate < 0) {
+      if (!Number.isFinite(input.interestRate) || input.interestRate < 0) {
         throw new ValidationError(
-          "Legacy interestRate must be a non-negative integer percent",
+          "Legacy interestRate must be a non-negative percent",
         );
       }
-      return input.interestRate * 100;
+      return Math.round(input.interestRate * 100);
     })();
 
     if (
@@ -468,7 +468,9 @@ export class CreateSaleUseCase extends WriteUseCase<
           remainingAmount,
           status: remainingAmount <= 0 ? "completed" : "pending",
           notes: input.notes,
-          interestRate: interestRateBps,
+          // Store the user-facing percentage. Pricing math still uses basis
+          // points internally to avoid changing the existing calculation path.
+          interestRate: interestRateBps / 100,
           interestAmount: roundByCurrency(interestAmount, currency),
           idempotencyKey: input.idempotencyKey,
           createdBy: numUserId,
@@ -569,12 +571,6 @@ export class CreateSaleUseCase extends WriteUseCase<
               runningStock = newStock;
             }
 
-            // Update products.stock cache (one atomic update per product)
-            await this.productRepo.updateStock(
-              item.productId,
-              -item.quantityBase,
-              tx,
-            );
           } else {
             // ── Legacy path: no FIFO, flat stock deduction ──
             const stockAfter = stockBefore - item.quantityBase;
@@ -602,12 +598,6 @@ export class CreateSaleUseCase extends WriteUseCase<
             );
             diagnostics.inventoryMovementsCreated += 1;
 
-            await this.productRepo.updateStock(
-              item.productId,
-              -item.quantityBase,
-              tx,
-            );
-
             if (item.batchId) {
               await this.productRepo.updateBatchStock(
                 item.batchId,
@@ -626,6 +616,12 @@ export class CreateSaleUseCase extends WriteUseCase<
                     totalCost: item.fallbackCostTotal,
                   },
                 ],
+                tx,
+              );
+            } else {
+              await this.productRepo.updateStock(
+                item.productId,
+                -item.quantityBase,
                 tx,
               );
             }

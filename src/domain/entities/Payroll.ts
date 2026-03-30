@@ -6,7 +6,7 @@ export const PayrollRunItemSchema = z.object({
   employeeId: z.number().int().min(1),
   employeeName: z.string().min(1),
   position: z.string().min(1),
-  department: z.string().min(1),
+  departmentName: z.string().min(1),
   grossPay: z.number().int().min(0),
   deductions: z.number().int().min(0).default(0),
   bonuses: z.number().int().min(0).default(0),
