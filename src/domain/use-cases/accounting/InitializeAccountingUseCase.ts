@@ -74,73 +74,129 @@ export interface InitializeAccountingResult extends AccountingSetupStatus {
   existingCodes: string[];
 }
 
-type AccountBlueprint = {
-  selectionKey: keyof AccountingCodeSelections;
+// ── System parent accounts (structural, not user-configurable) ─────────────
+
+type ParentBlueprint = {
+  code: string;
   name: string;
   nameAr: string;
   accountType: Account["accountType"];
 };
 
-const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
+/**
+ * Top-level system accounts.  Created before any leaf account so children
+ * can reference them via parentId.  Codes are fixed and never stored in
+ * user-configurable settings.
+ */
+export const PARENT_ACCOUNT_BLUEPRINTS: ParentBlueprint[] = [
+  { code: "1000", name: "Assets", nameAr: "الأصول", accountType: "asset" },
   {
-    selectionKey: "cashAccountCode",
-    name: "الصندوق",
-    nameAr: "الصندوق",
-    accountType: "asset",
-  },
-  {
-    selectionKey: "salaryExpenseAccountCode",
-    name: "مصروفات الرواتب",
-    nameAr: "مصروفات الرواتب",
-    accountType: "expense",
-  },
-  {
-    selectionKey: "deductionsLiabilityAccountCode",
-    name: "اقتطاعات الرواتب المستحقة",
-    nameAr: "اقتطاعات الرواتب المستحقة",
+    code: "2000",
+    name: "Liabilities",
+    nameAr: "الخصوم",
     accountType: "liability",
   },
   {
-    selectionKey: "arAccountCode",
-    name: "ذمم العملاء",
-    nameAr: "ذمم العملاء",
-    accountType: "asset",
+    code: "3000",
+    name: "Equity",
+    nameAr: "حقوق الملكية",
+    accountType: "equity",
   },
   {
-    selectionKey: "inventoryAccountCode",
-    name: "المخزون",
-    nameAr: "المخزون",
-    accountType: "asset",
-  },
-  {
-    selectionKey: "apAccountCode",
-    name: "ذمم الموردين",
-    nameAr: "ذمم الموردين",
-    accountType: "liability",
-  },
-  {
-    selectionKey: "salesRevenueAccountCode",
-    name: "إيرادات المبيعات",
-    nameAr: "إيرادات المبيعات",
+    code: "4000",
+    name: "Revenue",
+    nameAr: "الإيرادات",
     accountType: "revenue",
   },
   {
-    selectionKey: "cogsAccountCode",
-    name: "تكلفة البضاعة",
-    nameAr: "تكلفة البضاعة",
+    code: "5000",
+    name: "Expenses",
+    nameAr: "المصروفات",
     accountType: "expense",
+  },
+];
+
+// ── Leaf accounts (configurable codes, fixed parent mapping) ───────────────
+
+type AccountBlueprint = {
+  selectionKey: keyof AccountingCodeSelections;
+  name: string;
+  nameAr: string;
+  accountType: Account["accountType"];
+  /** Code of the parent from PARENT_ACCOUNT_BLUEPRINTS */
+  parentCode: string;
+};
+
+const ACCOUNT_BLUEPRINTS: AccountBlueprint[] = [
+  {
+    selectionKey: "cashAccountCode",
+    name: "Cash",
+    nameAr: "الصندوق",
+    accountType: "asset",
+    parentCode: "1000",
+  },
+  {
+    selectionKey: "arAccountCode",
+    name: "Accounts Receivable",
+    nameAr: "ذمم العملاء",
+    accountType: "asset",
+    parentCode: "1000",
+  },
+  {
+    selectionKey: "inventoryAccountCode",
+    name: "Inventory",
+    nameAr: "المخزون",
+    accountType: "asset",
+    parentCode: "1000",
   },
   {
     selectionKey: "vatInputAccountCode",
-    name: "ضريبة المدخلات",
+    name: "VAT Input",
     nameAr: "ضريبة المدخلات",
     accountType: "asset",
+    parentCode: "1000",
+  },
+  {
+    selectionKey: "apAccountCode",
+    name: "Accounts Payable",
+    nameAr: "ذمم الموردين",
+    accountType: "liability",
+    parentCode: "2000",
   },
   {
     selectionKey: "vatOutputAccountCode",
-    name: "ضريبة المخرجات",
+    name: "VAT Output",
     nameAr: "ضريبة المخرجات",
     accountType: "liability",
+    parentCode: "2000",
+  },
+  {
+    selectionKey: "deductionsLiabilityAccountCode",
+    name: "Salary Deductions Payable",
+    nameAr: "اقتطاعات الرواتب المستحقة",
+    accountType: "liability",
+    parentCode: "2000",
+  },
+  {
+    selectionKey: "salesRevenueAccountCode",
+    name: "Sales Revenue",
+    nameAr: "إيرادات المبيعات",
+    accountType: "revenue",
+    parentCode: "4000",
+  },
+  {
+    selectionKey: "cogsAccountCode",
+    name: "Cost of Goods Sold",
+    nameAr: "تكلفة البضاعة",
+    accountType: "expense",
+    parentCode: "5000",
+  },
+  {
+    selectionKey: "salaryExpenseAccountCode",
+    name: "Salary Expense",
+    nameAr: "مصروفات الرواتب",
+    accountType: "expense",
+    parentCode: "5000",
   },
 ];
 
@@ -189,11 +245,18 @@ export class InitializeAccountingUseCase extends WriteUseCase<
   ): Promise<InitializeAccountingResult> {
     await this.persistConfiguration(input);
 
-    const enabled = await this.readEnabled();
-    const selectedCodes = await this.resolveSelectedCodes(input);
+    let enabled = await this.readEnabled();
+
+    // Requirement: if accounting.enabled is null/missing (first-run), treat as
+    // enabled and persist the flag so subsequent reads are consistent.
+    if (enabled === null) {
+      await this.settingsRepo.set(ACCOUNTING_SETTING_KEYS.enabled, "true");
+      enabled = true;
+    }
 
     if (enabled !== true) {
       await this.settingsRepo.set(ACCOUNTING_SETTING_KEYS.coaSeeded, "false");
+      const selectedCodes = await this.resolveSelectedCodes(input);
       return {
         enabled,
         seeded: false,
@@ -209,10 +272,19 @@ export class InitializeAccountingUseCase extends WriteUseCase<
       };
     }
 
+    const selectedCodes = await this.resolveSelectedCodes(input);
     const createdCodes: string[] = [];
     const existingCodes: string[] = [];
     const warnings: string[] = [];
 
+    // ── Step 1: ensure parent accounts exist first ─────────────────────────
+    const parentIdMap = await this.ensureParentAccounts(
+      createdCodes,
+      existingCodes,
+      warnings,
+    );
+
+    // ── Step 2: seed leaf accounts with correct parentId ──────────────────
     for (const blueprint of ACCOUNT_BLUEPRINTS) {
       const code = selectedCodes[blueprint.selectionKey];
       if (!code) {
@@ -226,13 +298,14 @@ export class InitializeAccountingUseCase extends WriteUseCase<
         continue;
       }
 
+      const parentId = parentIdMap.get(blueprint.parentCode) ?? null;
       try {
         await this.accountingRepo.createAccountSync({
           code,
           name: blueprint.name,
           nameAr: blueprint.nameAr,
           accountType: blueprint.accountType,
-          parentId: null,
+          parentId,
           isSystem: true,
           isActive: true,
           balance: 0,
@@ -245,6 +318,7 @@ export class InitializeAccountingUseCase extends WriteUseCase<
       }
     }
 
+    // ── Step 3: verify completeness and persist flag ───────────────────────
     const missingCodes = await this.findMissingCodes(selectedCodes);
     if (missingCodes.length > 0) {
       warnings.push(`Missing account codes: ${missingCodes.join(", ")}`);
@@ -282,6 +356,51 @@ export class InitializeAccountingUseCase extends WriteUseCase<
 
   toEntity(result: InitializeAccountingResult): InitializeAccountingResult {
     return result;
+  }
+
+  /**
+   * Ensure all system parent accounts exist.
+   * Returns a Map<parentCode, parentId> for use when linking leaf accounts.
+   * Parents already in the DB are reused; only missing ones are created.
+   */
+  private async ensureParentAccounts(
+    createdCodes: string[],
+    existingCodes: string[],
+    warnings: string[],
+  ): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+
+    for (const parent of PARENT_ACCOUNT_BLUEPRINTS) {
+      const existing = await this.accountingRepo.findAccountByCode(parent.code);
+      if (existing?.id != null) {
+        map.set(parent.code, existing.id);
+        existingCodes.push(parent.code);
+        continue;
+      }
+
+      try {
+        const created = await this.accountingRepo.createAccountSync({
+          code: parent.code,
+          name: parent.name,
+          nameAr: parent.nameAr,
+          accountType: parent.accountType,
+          parentId: null,
+          isSystem: true,
+          isActive: true,
+          balance: 0,
+        });
+        if (created.id != null) {
+          map.set(parent.code, created.id);
+          createdCodes.push(parent.code);
+        }
+      } catch (error: unknown) {
+        warnings.push(
+          `Failed seeding parent account ${parent.code}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+    }
+
+    return map;
   }
 
   private async persistConfiguration(
