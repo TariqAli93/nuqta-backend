@@ -227,7 +227,7 @@ export class AddPurchasePaymentUseCase extends WriteUseCase<
         await this.supplierLedgerRepo.createSync({
           supplierId,
           transactionType: "payment",
-          amount: -amount,
+          amount: amount,
           balanceAfter: balanceBefore - amount,
           purchaseId: input.purchaseId,
           paymentId: payment.id,

@@ -277,7 +277,7 @@ export class CreatePurchaseUseCase extends WriteUseCase<
             {
               supplierId: createdPurchase.supplierId,
               transactionType: "payment",
-              amount: -paidAmount,
+              amount: paidAmount,
               balanceAfter: balanceBefore + total - paidAmount,
               purchaseId: createdPurchase.id,
               notes: `Initial payment for purchase #${createdPurchase.invoiceNumber}`,
