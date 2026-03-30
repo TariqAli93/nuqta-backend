@@ -72,6 +72,16 @@ export class AdjustProductStockUseCase extends WriteUseCase<
       throw new ValidationError("Quantity change cannot be zero");
     }
 
+    // Validate and resolve unit factor
+    const unitFactor = input.unitFactor ?? 1;
+    if (!Number.isInteger(unitFactor) || unitFactor < 1) {
+      throw new ValidationError("unitFactor must be an integer >= 1");
+    }
+
+    // Convert user-entered quantity to base units.
+    // All stock, batch, and movement quantities must be in base units only.
+    const quantityBase = input.quantityChange * unitFactor;
+
     const product = await this.productRepo.findById(input.productId);
     if (!product) {
       throw new NotFoundError("Product not found");
@@ -92,7 +102,7 @@ export class AdjustProductStockUseCase extends WriteUseCase<
         }
         await this.productRepo.updateBatchStock(
           input.batchId,
-          input.quantityChange,
+          quantityBase,
         );
         batchId = input.batchId;
       } else {
@@ -103,8 +113,8 @@ export class AdjustProductStockUseCase extends WriteUseCase<
           batchNumber,
           expiryDate: null,
           manufacturingDate: null,
-          quantityReceived: input.quantityChange,
-          quantityOnHand: input.quantityChange,
+          quantityReceived: quantityBase,
+          quantityOnHand: quantityBase,
           costPerUnit: product.costPrice || 0,
           status: "active",
         });
@@ -120,19 +130,19 @@ export class AdjustProductStockUseCase extends WriteUseCase<
         if (existing.productId !== input.productId) {
           throw new ValidationError("Batch does not belong to this product");
         }
-        if (existing.quantityOnHand + input.quantityChange < 0) {
+        if (existing.quantityOnHand + quantityBase < 0) {
           throw new InsufficientStockError(
             "Cannot decrease batch stock below zero",
             {
               batchId: input.batchId,
               currentStock: existing.quantityOnHand,
-              requestedChange: input.quantityChange,
+              requestedChange: quantityBase,
             },
           );
         }
         await this.productRepo.updateBatchStock(
           input.batchId,
-          input.quantityChange,
+          quantityBase,
         );
         batchId = input.batchId;
       } else {
@@ -146,27 +156,27 @@ export class AdjustProductStockUseCase extends WriteUseCase<
             "No active batches available for negative adjustment",
             {
               productId: input.productId,
-              requestedChange: input.quantityChange,
+              requestedChange: quantityBase,
             },
           );
         }
 
-        // Take from first batch with enough stock
-        const absChange = Math.abs(input.quantityChange);
+        // Take from first batch with enough stock (compare in base units)
+        const absChange = Math.abs(quantityBase);
         const target = batches.find((b) => b.quantityOnHand >= absChange);
         if (!target) {
           throw new InsufficientStockError(
             "No single batch has enough stock for this adjustment",
             {
               productId: input.productId,
-              requestedChange: input.quantityChange,
+              requestedChange: quantityBase,
             },
           );
         }
 
         await this.productRepo.updateBatchStock(
           target.id!,
-          input.quantityChange,
+          quantityBase,
         );
         batchId = target.id!;
       }
@@ -191,13 +201,13 @@ export class AdjustProductStockUseCase extends WriteUseCase<
       batchId,
       movementType: "adjust",
       reason: input.reason || "manual",
-      quantityBase: input.quantityChange,
+      quantityBase,
       unitName: input.unitName || product.unit || "piece",
-      unitFactor: input.unitFactor || 1,
+      unitFactor,
       stockBefore,
       stockAfter,
       costPerUnit: product.costPrice,
-      totalCost: Math.abs(input.quantityChange) * product.costPrice,
+      totalCost: Math.abs(quantityBase) * product.costPrice,
       sourceType: "adjustment",
       notes: input.notes,
       createdBy: Number(userId) || 0,
@@ -215,7 +225,7 @@ export class AdjustProductStockUseCase extends WriteUseCase<
     // ── Journal entry ────────────────────────────────────────────
     await this.createAdjustmentJournalIfPossible(
       product.costPrice,
-      input.quantityChange,
+      quantityBase,
       movement.id,
       Number(userId) || 0,
     );
