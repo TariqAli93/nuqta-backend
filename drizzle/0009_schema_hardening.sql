@@ -184,38 +184,63 @@ WHERE NOT (left(trim(pb."period_start"), 10) ~ '^\d{4}-\d{2}-\d{2}$')
 --> statement-breakpoint
 
 ALTER TABLE "users"
-  ALTER COLUMN "role" TYPE "user_role" USING "role"::"user_role";
+  ALTER COLUMN "role" DROP DEFAULT,
+  ALTER COLUMN "role" TYPE "user_role" USING "role"::"user_role",
+  ALTER COLUMN "role" SET DEFAULT 'cashier';
 ALTER TABLE "products"
-  ALTER COLUMN "status" TYPE "product_status" USING "status"::"product_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "product_status" USING "status"::"product_status",
+  ALTER COLUMN "status" SET DEFAULT 'available';
 ALTER TABLE "product_batches"
+  ALTER COLUMN "status" DROP DEFAULT,
   ALTER COLUMN "status" TYPE "product_batch_status" USING "status"::"product_batch_status",
+  ALTER COLUMN "status" SET DEFAULT 'active',
   ALTER COLUMN "expiry_date" TYPE date USING CASE WHEN "expiry_date" IS NULL THEN NULL ELSE "expiry_date"::date END,
   ALTER COLUMN "manufacturing_date" TYPE date USING CASE WHEN "manufacturing_date" IS NULL THEN NULL ELSE "manufacturing_date"::date END;
 ALTER TABLE "sales"
   ALTER COLUMN "exchange_rate" TYPE numeric(18,6) USING COALESCE("exchange_rate", 1)::numeric(18,6),
   ALTER COLUMN "interest_rate" TYPE numeric(18,6) USING (COALESCE("interest_rate", 0)::numeric(18,6) / 100.0),
+  ALTER COLUMN "status" DROP DEFAULT,
   ALTER COLUMN "status" TYPE "sale_status" USING "status"::"sale_status",
+  ALTER COLUMN "status" SET DEFAULT 'pending',
+  ALTER COLUMN "payment_type" DROP DEFAULT,
   ALTER COLUMN "payment_type" TYPE "sale_payment_type" USING "payment_type"::"sale_payment_type",
+  ALTER COLUMN "payment_method" DROP DEFAULT,
   ALTER COLUMN "payment_method" TYPE "sale_payment_method" USING "payment_method"::"sale_payment_method",
-  ALTER COLUMN "print_status" TYPE "print_status" USING "print_status"::"print_status";
+  ALTER COLUMN "payment_method" SET DEFAULT 'cash',
+  ALTER COLUMN "print_status" DROP DEFAULT,
+  ALTER COLUMN "print_status" TYPE "print_status" USING "print_status"::"print_status",
+  ALTER COLUMN "print_status" SET DEFAULT 'pending';
 ALTER TABLE "purchases"
   ALTER COLUMN "exchange_rate" TYPE numeric(18,6) USING COALESCE("exchange_rate", 1)::numeric(18,6),
-  ALTER COLUMN "status" TYPE "purchase_status" USING "status"::"purchase_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "purchase_status" USING "status"::"purchase_status",
+  ALTER COLUMN "status" SET DEFAULT 'pending';
 ALTER TABLE "purchase_items"
   ALTER COLUMN "expiry_date" TYPE date USING CASE WHEN "expiry_date" IS NULL THEN NULL ELSE "expiry_date"::date END;
 ALTER TABLE "payments"
   ALTER COLUMN "exchange_rate" TYPE numeric(18,6) USING COALESCE("exchange_rate", 1)::numeric(18,6),
+  ALTER COLUMN "payment_method" DROP DEFAULT,
   ALTER COLUMN "payment_method" TYPE "payment_method" USING "payment_method"::"payment_method",
-  ALTER COLUMN "status" TYPE "payment_status" USING "status"::"payment_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "payment_status" USING "status"::"payment_status",
+  ALTER COLUMN "status" SET DEFAULT 'completed';
 ALTER TABLE "inventory_movements"
+  ALTER COLUMN "movement_type" DROP DEFAULT,
   ALTER COLUMN "movement_type" TYPE "inventory_movement_type" USING "movement_type"::"inventory_movement_type",
+  ALTER COLUMN "reason" DROP DEFAULT,
   ALTER COLUMN "reason" TYPE "inventory_movement_reason" USING "reason"::"inventory_movement_reason";
 ALTER TABLE "payroll_runs"
-  ALTER COLUMN "status" TYPE "payroll_run_status" USING "status"::"payroll_run_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "payroll_run_status" USING "status"::"payroll_run_status",
+  ALTER COLUMN "status" SET DEFAULT 'draft';
 ALTER TABLE "accounts"
+  ALTER COLUMN "account_type" DROP DEFAULT,
   ALTER COLUMN "account_type" TYPE "account_type" USING "account_type"::"account_type";
 ALTER TABLE "posting_batches"
+  ALTER COLUMN "period_type" DROP DEFAULT,
   ALTER COLUMN "period_type" TYPE "posting_batch_period_type" USING "period_type"::"posting_batch_period_type",
+  ALTER COLUMN "period_type" SET DEFAULT 'day',
   ALTER COLUMN "period_start" TYPE date USING CASE
     WHEN left(trim("period_start"), 10) ~ '^\d{4}-\d{2}-\d{2}$' THEN left(trim("period_start"), 10)::date
     ELSE COALESCE("posted_at"::date, CURRENT_DATE)
@@ -224,30 +249,48 @@ ALTER TABLE "posting_batches"
     WHEN left(trim("period_end"), 10) ~ '^\d{4}-\d{2}-\d{2}$' THEN left(trim("period_end"), 10)::date
     ELSE COALESCE("posted_at"::date, CURRENT_DATE)
   END,
-  ALTER COLUMN "status" TYPE "posting_batch_status" USING "status"::"posting_batch_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "posting_batch_status" USING "status"::"posting_batch_status",
+  ALTER COLUMN "status" SET DEFAULT 'posted';
 ALTER TABLE "journal_entries"
+  ALTER COLUMN "source_type" DROP DEFAULT,
   ALTER COLUMN "source_type" TYPE "journal_source_type" USING CASE
     WHEN "source_type" IS NULL THEN NULL
     ELSE "source_type"::"journal_source_type"
   END;
 ALTER TABLE "reconciliations"
+  ALTER COLUMN "type" DROP DEFAULT,
   ALTER COLUMN "type" TYPE "reconciliation_type" USING "type"::"reconciliation_type",
-  ALTER COLUMN "status" TYPE "reconciliation_status" USING "status"::"reconciliation_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "reconciliation_status" USING "status"::"reconciliation_status",
+  ALTER COLUMN "status" SET DEFAULT 'open';
 ALTER TABLE "barcode_templates"
-  ALTER COLUMN "barcode_type" TYPE "barcode_type" USING "barcode_type"::"barcode_type";
+  ALTER COLUMN "barcode_type" DROP DEFAULT,
+  ALTER COLUMN "barcode_type" TYPE "barcode_type" USING "barcode_type"::"barcode_type",
+  ALTER COLUMN "barcode_type" SET DEFAULT 'CODE128';
 ALTER TABLE "barcode_print_jobs"
   ALTER COLUMN "expiry_date" TYPE date USING CASE WHEN "expiry_date" IS NULL THEN NULL ELSE "expiry_date"::date END,
-  ALTER COLUMN "status" TYPE "barcode_print_job_status" USING "status"::"barcode_print_job_status";
+  ALTER COLUMN "status" DROP DEFAULT,
+  ALTER COLUMN "status" TYPE "barcode_print_job_status" USING "status"::"barcode_print_job_status",
+  ALTER COLUMN "status" SET DEFAULT 'pending';
 ALTER TABLE "currency_settings"
   ALTER COLUMN "exchange_rate" TYPE numeric(18,6) USING COALESCE("exchange_rate", 1)::numeric(18,6);
 ALTER TABLE "accounting_settings"
   ALTER COLUMN "default_tax_rate" TYPE numeric(18,6) USING COALESCE("default_tax_rate", 0)::numeric(18,6),
   ALTER COLUMN "usd_exchange_rate" TYPE numeric(18,6) USING COALESCE("usd_exchange_rate", 1480)::numeric(18,6),
+  ALTER COLUMN "cost_method" DROP DEFAULT,
   ALTER COLUMN "cost_method" TYPE "accounting_cost_method" USING "cost_method"::"accounting_cost_method",
-  ALTER COLUMN "rounding_method" TYPE "accounting_rounding_method" USING "rounding_method"::"accounting_rounding_method";
+  ALTER COLUMN "cost_method" SET DEFAULT 'fifo',
+  ALTER COLUMN "rounding_method" DROP DEFAULT,
+  ALTER COLUMN "rounding_method" TYPE "accounting_rounding_method" USING "rounding_method"::"accounting_rounding_method",
+  ALTER COLUMN "rounding_method" SET DEFAULT 'round';
 ALTER TABLE "pos_settings"
+  ALTER COLUMN "paper_size" DROP DEFAULT,
   ALTER COLUMN "paper_size" TYPE "pos_paper_size" USING "paper_size"::"pos_paper_size",
-  ALTER COLUMN "layout_direction" TYPE "pos_layout_direction" USING "layout_direction"::"pos_layout_direction";
+  ALTER COLUMN "paper_size" SET DEFAULT 'thermal',
+  ALTER COLUMN "layout_direction" DROP DEFAULT,
+  ALTER COLUMN "layout_direction" TYPE "pos_layout_direction" USING "layout_direction"::"pos_layout_direction",
+  ALTER COLUMN "layout_direction" SET DEFAULT 'rtl';
 --> statement-breakpoint
 
 ALTER TABLE "products"
