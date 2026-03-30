@@ -589,6 +589,33 @@ export const payments = pgTable("payments", {
   index("idx_payments_supplier").on(table.supplierId),
   uniqueIndex("idx_payments_idempotency").on(table.idempotencyKey),
   check("chk_payments_exchange_rate_positive", sql`${table.exchangeRate} > 0`),
+  // Zero-value payments have no business meaning.
+  check("chk_payments_amount_nonzero", sql`${table.amount} <> 0`),
+  // A payment settles a sale OR a purchase — never both simultaneously.
+  check(
+    "chk_payments_no_sale_and_purchase",
+    sql`NOT (${table.saleId} IS NOT NULL AND ${table.purchaseId} IS NOT NULL)`,
+  ),
+  // A payment belongs to a customer OR a supplier — never both simultaneously.
+  check(
+    "chk_payments_no_customer_and_supplier",
+    sql`NOT (${table.customerId} IS NOT NULL AND ${table.supplierId} IS NOT NULL)`,
+  ),
+  // A sale-context payment must not reference a supplier (incoherent mix).
+  check(
+    "chk_payments_no_sale_and_supplier",
+    sql`NOT (${table.saleId} IS NOT NULL AND ${table.supplierId} IS NOT NULL)`,
+  ),
+  // A purchase-context payment must not reference a customer (incoherent mix).
+  check(
+    "chk_payments_no_purchase_and_customer",
+    sql`NOT (${table.purchaseId} IS NOT NULL AND ${table.customerId} IS NOT NULL)`,
+  ),
+  // Every payment must carry at least one traceable business context.
+  check(
+    "chk_payments_has_context",
+    sql`(${table.saleId} IS NOT NULL OR ${table.purchaseId} IS NOT NULL OR ${table.customerId} IS NOT NULL OR ${table.supplierId} IS NOT NULL)`,
+  ),
 ]);
 
 export const paymentAllocations = pgTable("payment_allocations", {

@@ -222,7 +222,7 @@ export class InventoryRepository implements IInventoryRepository {
 
   /* ── Expiry alerts ──────────────────────────────────────────── */
 
-  async getExpiryAlerts(daysAhead = 30): Promise<
+  async getExpiryAlerts(daysAhead?: number): Promise<
     {
       batchId: number;
       productId: number;
