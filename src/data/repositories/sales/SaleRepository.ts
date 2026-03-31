@@ -20,6 +20,20 @@ import {
   derivePaymentStatus,
 } from "../../../domain/index.js";
 
+type SaleWithUser = Sale & {
+  user: {
+    id: number;
+    username: string;
+    fullName: string;
+    phone: string | null;
+    role: string;
+    isActive: boolean;
+    lastLoginAt: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+  } | null;
+};
+
 export class SaleRepository implements ISaleRepository {
   constructor(private db: DbConnection) {}
 
@@ -44,23 +58,28 @@ export class SaleRepository implements ISaleRepository {
       await client.insert(saleItems).values(itemValues as any);
     }
 
-    return this.mapSaleWithDetails(created, tx);
+    return this.mapSaleWithDetails(created, null, tx);
   }
 
   async findById(id: number, tx?: TxOrDb): Promise<Sale | null> {
     const client = this.c(tx);
-    const [row] = await client.select().from(sales).where(eq(sales.id, id));
+    const [row] = await client
+      .select()
+      .from(sales)
+      .innerJoin(users, eq(sales.createdBy, users.id))
+      .where(eq(sales.id, id));
     if (!row) return null;
-    return this.mapSaleWithDetails(row, tx);
+    return this.mapSaleWithDetails(row.sales, row.users, tx);
   }
 
   async findByIdempotencyKey(key: string): Promise<Sale | null> {
     const [row] = await this.db
       .select()
       .from(sales)
+      .innerJoin(users, eq(sales.createdBy, users.id))
       .where(eq(sales.idempotencyKey, key));
     if (!row) return null;
-    return this.mapSaleWithDetails(row);
+    return this.mapSaleWithDetails(row.sales, row.users);
   }
 
   async findOpenByCustomerId(customerId: number, tx?: TxOrDb): Promise<Sale[]> {
@@ -68,6 +87,7 @@ export class SaleRepository implements ISaleRepository {
     const rows = await client
       .select()
       .from(sales)
+      .innerJoin(users, eq(sales.createdBy, users.id))
       .where(
         and(
           eq(sales.customerId, customerId),
@@ -76,13 +96,18 @@ export class SaleRepository implements ISaleRepository {
           sql`${sales.remainingAmount} > 0`,
         ),
       )
+
       .orderBy(asc(sales.createdAt), asc(sales.id));
 
     return rows.map((row) => ({
-      ...row,
+      ...row.sales,
+      user: row.users,
       items: [],
-      paymentStatus: derivePaymentStatus(row.paidAmount ?? 0, row.total ?? 0),
-    })) as unknown as Sale[];
+      paymentStatus: derivePaymentStatus(
+        row.sales.paidAmount ?? 0,
+        row.sales.total ?? 0,
+      ),
+    })) as unknown as SaleWithUser[];
   }
 
   async findAll(params?: {
@@ -91,42 +116,52 @@ export class SaleRepository implements ISaleRepository {
     customerId?: number;
     startDate?: string;
     endDate?: string;
-  }): Promise<{ items: Sale[]; total: number }> {
+  }): Promise<{ items: SaleWithUser[]; total: number }> {
     const conditions: any[] = [];
-    if (params?.customerId)
+
+    if (params?.customerId) {
       conditions.push(eq(sales.customerId, params.customerId));
-    if (params?.startDate)
+    }
+
+    if (params?.startDate) {
       conditions.push(
         gte(sales.createdAt, new Date(params.startDate).toISOString()),
       );
-    if (params?.endDate)
+    }
+
+    if (params?.endDate) {
       conditions.push(
         lte(sales.createdAt, new Date(params.endDate).toISOString()),
       );
+    }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const totalResult = await this.db
-      .select({ count: sql<number>`count(*)` })
-      .from(sales)
-      .where(where);
-    const total = Number(totalResult[0]?.count ?? 0);
 
     const page = params?.page ?? 1;
     const limit = params?.limit ?? 20;
     const offset = (page - 1) * limit;
 
+    const totalResult = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(sales)
+      .innerJoin(users, eq(sales.createdBy, users.id))
+      .where(where);
+
+    const total = Number(totalResult[0]?.count ?? 0);
+
     const rows = await this.db
       .select()
       .from(sales)
+      .innerJoin(users, eq(sales.createdBy, users.id))
       .where(where)
       .orderBy(desc(sales.id))
       .limit(limit)
       .offset(offset);
 
-    const items = await Promise.all(
-      rows.map((row) => this.mapSaleWithDetails(row)),
-    );
+    const items = (await Promise.all(
+      rows.map((row) => this.mapSaleWithDetails(row.sales, row.users)),
+    )) as SaleWithUser[];
+
     return { items, total };
   }
 
@@ -546,14 +581,18 @@ export class SaleRepository implements ISaleRepository {
 
   // ── Helpers ───────────────────────────────────────────────────
 
-  private async mapSaleWithDetails(row: any, tx?: TxOrDb): Promise<Sale> {
+  private async mapSaleWithDetails(
+    row: any,
+    user?: any,
+    tx?: TxOrDb,
+  ): Promise<Sale> {
     const client = this.c(tx);
+
     const items = await client
       .select()
       .from(saleItems)
       .where(eq(saleItems.saleId, row.id));
 
-    // Fetch depletions for each item and attach
     const itemsWithDepletions = await Promise.all(
       items.map(async (item) => {
         const depletions = await client
@@ -578,15 +617,15 @@ export class SaleRepository implements ISaleRepository {
           .where(eq(saleItemDepletions.saleItemId, item.id as number));
 
         const cogs = depletions.reduce((sum, d) => sum + d.totalCost, 0);
+
+        const totalQty = depletions.reduce((s, d) => s + d.quantityBase, 0);
+        const totalWeightedCost = depletions.reduce(
+          (s, d) => s + d.costPerUnit * d.quantityBase,
+          0,
+        );
+
         const weightedAverageCost =
-          depletions.length > 0
-            ? Math.round(
-                depletions.reduce(
-                  (s, d) => s + d.costPerUnit * d.quantityBase,
-                  0,
-                ) / depletions.reduce((s, d) => s + d.quantityBase, 0),
-              )
-            : 0;
+          totalQty > 0 ? Math.round(totalWeightedCost / totalQty) : 0;
 
         return {
           ...item,
@@ -601,12 +640,28 @@ export class SaleRepository implements ISaleRepository {
       (sum, i) => sum + (i.cogs || 0),
       0,
     );
-    const profit = row.total - totalCogs;
+
+    const safeTotal = Number(row.total ?? 0);
+    const profit = safeTotal - totalCogs;
+    const safeProfit = Number(profit ?? 0);
     const marginBps =
-      row.total > 0 ? Math.round((profit / row.total) * 10000) : 0;
+      safeTotal > 0 ? Math.round((safeProfit / safeTotal) * 10000) : null;
 
     return {
       ...row,
+      user: user
+        ? {
+            id: user.id,
+            username: user.username,
+            fullName: user.fullName,
+            phone: user.phone ?? null,
+            role: user.role,
+            isActive: user.isActive,
+            lastLoginAt: user.lastLoginAt ?? null,
+            createdAt: user.createdAt ?? null,
+            updatedAt: user.updatedAt ?? null,
+          }
+        : null,
       items: itemsWithDepletions,
       paymentStatus: derivePaymentStatus(row.paidAmount ?? 0, row.total ?? 0),
       totalCogs,

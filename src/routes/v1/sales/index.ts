@@ -94,6 +94,24 @@ const SaleSchema = {
     createdAt: { type: "string", format: "date-time" },
     updatedAt: { type: "string", nullable: true, format: "date-time" },
     createdBy: { type: "integer", nullable: true },
+    user: {
+      type: "object",
+      properties: {
+        id: {
+          type: "integer",
+          description: "ID of the user who created the sale",
+        },
+        username: {
+          type: "string",
+          description: "Username of the user who created the sale",
+        },
+        fullName: {
+          type: "string",
+          description: "Full name of the user who created the sale",
+        },
+      },
+      nullable: true,
+    },
     items: { type: "array", items: SaleItemSchema },
     cogs: { type: "integer", nullable: true },
     totalCogs: { type: "integer", nullable: true },
