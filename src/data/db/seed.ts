@@ -45,7 +45,7 @@ import { SettingsRepository } from "../repositories/settings/SettingsRepository.
 import { SystemSettingsRepository } from "../repositories/settings/SystemSettingsRepository.js";
 import { SupplierLedgerRepository } from "../repositories/supplier-ledger/SupplierLedgerRepository.js";
 import { SupplierRepository } from "../repositories/suppliers/SupplierRepository.js";
-import { UserRepository } from "../repositories/users/UserRepository.js";
+
 import {
   currencySettings,
   inventoryMovements,
@@ -213,7 +213,6 @@ async function initializeDatabase(): Promise<void> {
     `\nSelected preset(s): ${selectedKeys.map((key) => PRESETS[key].label).join(", ")}`,
   );
 
-  const userRepo = new UserRepository(db);
   const categoryRepo = new CategoryRepository(db);
   const supplierRepo = new SupplierRepository(db);
   const productRepo = new ProductRepository(db);
@@ -238,7 +237,6 @@ async function initializeDatabase(): Promise<void> {
   const createSupplierUseCase = new CreateSupplierUseCase(supplierRepo);
   const createProductUseCase = new CreateProductUseCase(productRepo, auditRepo);
   const createCustomerUseCase = new CreateCustomerUseCase(customerRepo);
-  const createUserUseCase = new CreateUserUseCase(userRepo);
   const createPurchaseUseCase = new CreatePurchaseUseCase(
     db,
     purchaseRepo,
@@ -287,9 +285,6 @@ async function initializeDatabase(): Promise<void> {
     inventoryRepo,
   );
 
-  const usersByUsername = new Map<string, User>(
-    (await userRepo.findAll()).map((user) => [user.username, user]),
-  );
   const categoriesByName = new Map<string, Category>(
     (await categoryRepo.findAll()).map((category) => [category.name, category]),
   );
@@ -356,38 +351,6 @@ async function initializeDatabase(): Promise<void> {
           updatedAt: new Date().toISOString(),
         },
       });
-  }
-
-  async function ensureUser(input: {
-    username: string;
-    password: string;
-    fullName: string;
-    phone?: string;
-    role: "admin" | "cashier" | "manager";
-  }): Promise<EnsureResult<SeedUser>> {
-    const existing = usersByUsername.get(input.username);
-    if (existing) {
-      return {
-        entity: requireId(existing, `user:${input.username}`),
-        created: false,
-      };
-    }
-
-    const created = await createUserUseCase.execute(
-      {
-        username: input.username,
-        password: input.password,
-        fullName: input.fullName,
-        phone: input.phone ?? null,
-        role: input.role,
-        isActive: true,
-      } as User,
-      "system",
-    );
-
-    const withId = requireId(created, `user:${input.username}`);
-    usersByUsername.set(withId.username, withId);
-    return { entity: withId, created: true };
   }
 
   async function ensureCategory(
@@ -1112,45 +1075,7 @@ async function initializeDatabase(): Promise<void> {
 
   const totalCounters = emptyCounters();
 
-  const adminResult = await ensureUser({
-    username: "admin",
-    password: "Admin@123",
-    fullName: "أحمد المدير",
-    role: "admin",
-  });
-  const managerResult = await ensureUser({
-    username: "manager",
-    password: "Manager@123",
-    fullName: "محمد المشرف",
-    role: "manager",
-  });
-  const cashierResult = await ensureUser({
-    username: "cashier",
-    password: "Cashier@123",
-    fullName: "فاطمة الكاشير",
-    role: "cashier",
-  });
-  const cashier2Result = await ensureUser({
-    username: "cashier2",
-    password: "Cashier@123",
-    fullName: "سارة البائعة",
-    role: "cashier",
-  });
-
-  totalCounters.users =
-    Number(adminResult.created) +
-    Number(managerResult.created) +
-    Number(cashierResult.created) +
-    Number(cashier2Result.created);
-
-  const creators: SeedUser[] = [
-    adminResult.entity,
-    managerResult.entity,
-    cashierResult.entity,
-    cashier2Result.entity,
-  ];
-  const pickCreator = (index: number): SeedUser =>
-    creators[index % creators.length]!;
+  const pickCreator = 1;
 
   for (const presetKey of selectedKeys) {
     const preset = PRESETS[presetKey];
@@ -1165,7 +1090,7 @@ async function initializeDatabase(): Promise<void> {
     for (let index = 0; index < preset.categories.length; index += 1) {
       const result = await ensureCategory(
         preset.categories[index]!,
-        pickCreator(index).id,
+        pickCreator,
       );
       categoryMap.set(result.entity.name, result.entity);
       presetCounters.categories += Number(result.created);
@@ -1174,7 +1099,7 @@ async function initializeDatabase(): Promise<void> {
     for (let index = 0; index < preset.suppliers.length; index += 1) {
       const result = await ensureSupplier(
         preset.suppliers[index]!,
-        pickCreator(index).id,
+        pickCreator,
       );
       supplierMap.set(result.entity.name, result.entity);
       presetCounters.suppliers += Number(result.created);
@@ -1195,7 +1120,7 @@ async function initializeDatabase(): Promise<void> {
         presetProduct,
         category.id,
         supplier?.id,
-        pickCreator(index).id,
+        pickCreator,
       );
       productMap.set(presetProduct.sku, result.entity);
       presetCounters.products += Number(result.created);
@@ -1220,7 +1145,7 @@ async function initializeDatabase(): Promise<void> {
         presetPurchase,
         supplier,
         productMap,
-        pickCreator(index).id,
+        pickCreator,
       );
       presetCounters.purchases += Number(result.created);
       presetCounters.payments += Number(
@@ -1229,7 +1154,7 @@ async function initializeDatabase(): Promise<void> {
 
       const inventoryResult = await materializePurchaseInventory(
         result.entity,
-        pickCreator(index).id,
+        pickCreator,
       );
       presetCounters.batches += inventoryResult.batches;
       presetCounters.inventoryMovements += inventoryResult.inventoryMovements;
@@ -1262,7 +1187,7 @@ async function initializeDatabase(): Promise<void> {
           product,
           marker,
           presetProduct.stock,
-          adminResult.entity.id,
+          pickCreator,
         )
       ) {
         presetCounters.batches += 1;
@@ -1273,7 +1198,7 @@ async function initializeDatabase(): Promise<void> {
     for (let index = 0; index < preset.customers.length; index += 1) {
       const result = await ensureCustomer(
         preset.customers[index]!,
-        pickCreator(index).id,
+        pickCreator,
       );
       customerList.push(result.entity);
       presetCounters.customers += Number(result.created);
@@ -1288,7 +1213,7 @@ async function initializeDatabase(): Promise<void> {
         index,
         customer?.id,
         productMap,
-        pickCreator(index).id,
+        pickCreator,
       );
 
       presetCounters.sales += Number(result.created);
